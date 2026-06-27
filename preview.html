@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Party Sprite Preview — Classes, Jobs & Animations</title>
+<style>
+  :root { --bg:#11131a; --panel:#1b1f2b; --panel2:#232838; --accent:#7cc4ff; --gold:#f3c969; --text:#e6e9f0; --muted:#8b93a7; }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--text);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  .layout { display:flex; align-items:flex-start; }
+  .main { flex:1; padding:24px; min-width:0; }
+  h1 { font-size: 22px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; font-size:13px; }
+  .controls { margin-bottom:20px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  .controls label { font-size:13px; color:var(--muted); display:flex; gap:6px; align-items:center; }
+  .class-block { margin-bottom:34px; }
+  .class-title {
+    font-size:16px; color:var(--gold); text-transform:uppercase; letter-spacing:2px;
+    border-bottom:1px solid #2c3346; padding-bottom:6px; margin-bottom:14px;
+  }
+  .row { display:flex; gap:14px; flex-wrap:wrap; }
+  .card {
+    background:var(--panel); border:1px solid #2c3346; border-radius:10px;
+    padding:10px; width:210px; scroll-margin-top:16px;
+  }
+  .card.legendary { border-color: var(--gold); box-shadow:0 0 12px rgba(243,201,105,.15); }
+  @keyframes flash { 0%{box-shadow:0 0 0 2px var(--accent);} 100%{box-shadow:0 0 0 2px transparent;} }
+  .card.flash { animation: flash 1.6s ease-out; }
+  .job-name { font-size:13px; font-weight:bold; margin-bottom:2px; }
+  .job-rank { font-size:11px; color:var(--muted); margin-bottom:8px; }
+  .anims { display:flex; gap:8px; flex-wrap:wrap; }
+  .anim { background:var(--panel2); border-radius:8px; padding:6px; text-align:center; flex:1; min-width:88px; }
+  .anim.special { background:#2a2335; border:1px solid var(--gold); flex-basis:100%; }
+  .anim-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  .anim.special .anim-label { color:var(--gold); }
+  .stage {
+    width:100%; height:110px; display:flex; align-items:center; justify-content:center;
+    background: repeating-linear-gradient(45deg, #1a1e29 0 8px, #181c26 8px 16px);
+    border-radius:6px; overflow:hidden;
+  }
+  .anim.special .stage { height:150px; }
+  .stage img { image-rendering: pixelated; height: 100px; width:auto; }
+  .anim.special .stage img { height:140px; }
+  .fcount { font-size:9px; color:#5c6480; margin-top:3px; }
+
+  /* activity feed */
+  aside.feed {
+    width:300px; flex:none; position:sticky; top:0; height:100vh; overflow-y:auto;
+    background:#0d0f15; border-left:1px solid #2c3346; padding:20px 16px;
+  }
+  .feed h2 { font-size:13px; text-transform:uppercase; letter-spacing:2px; color:var(--accent); margin:0 0 4px; }
+  .feed .hint { font-size:11px; color:var(--muted); margin:0 0 14px; }
+  .feed-item {
+    display:block; width:100%; text-align:left; cursor:pointer;
+    background:var(--panel); border:1px solid #2c3346; border-radius:8px;
+    padding:9px 10px; margin-bottom:8px; color:var(--text); font-family:inherit;
+  }
+  .feed-item:hover { border-color:var(--accent); }
+  .feed-item .ttl { font-size:12px; font-weight:bold; }
+  .feed-item .note { font-size:11px; color:var(--muted); margin-top:2px; line-height:1.35; }
+  .tag { font-size:9px; text-transform:uppercase; letter-spacing:1px; padding:1px 6px; border-radius:10px; margin-right:6px; vertical-align:middle; }
+  .tag.redone { background:#3a2b1a; color:#f3c969; }
+  .tag.new    { background:#1a3a2b; color:#7ce0a3; }
+  .tag.reused { background:#1a2b3a; color:#7cc4ff; }
+  .tag.added  { background:#2b1a3a; color:#c79cf0; }
+  .tag.fix    { background:#3a1a1a; color:#f0a0a0; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="main">
+    <h1>⚔️ Party Sprite Preview</h1>
+    <p class="sub">8 classes × 5 job ranks · idle + attack + evolution (jobs 1-4) animations. South / front-facing-right battle view. Job 5 = legendary.</p>
+    <div class="controls">
+      <label>Speed (FPS): <input type="range" id="fps" min="3" max="16" value="9"><span id="fpsVal">9</span></label>
+      <label><input type="checkbox" id="bigger"> 1.4× size</label>
+    </div>
+    <div id="root"><p style="color:var(--muted)">Loading animations…</p></div>
+  </div>
+
+  <aside class="feed">
+    <h2>Activity Feed</h2>
+    <p class="hint">Latest changes — click to jump to that card. Reload the page to pull in freshly-rendered frames.</p>
+    <div id="feed"></div>
+  </aside>
+</div>
+
+<script>
+const CLASSES = [
+  ["Warrior", "warrior", [["1_rookie","Rookie"],["2_strider","Strider"],["3_vanguard","Vanguard"],["4_champion","Champion"],["5_warlord","Warlord"]]],
+  ["Mage", "mage", [["1_apprentice","Apprentice"],["2_adept","Adept"],["3_conjurer","Conjurer"],["4_sorcerer","Sorcerer"],["5_archmage","Archmage"]]],
+  ["Medic", "medic", [["1_acolyte","Acolyte"],["2_healer","Healer"],["3_cleric","Cleric"],["4_priest","Priest"],["5_hierophant","Hierophant"]]],
+  ["Archer", "archer", [["1_greenhorn","Greenhorn"],["2_scout","Scout"],["3_hunter","Hunter"],["4_ranger","Ranger"],["5_sentinel","Sentinel"]]],
+  ["Assassin", "assassin", [["1_footpad","Footpad"],["2_prowler","Prowler"],["3_nightblade","Nightblade"],["4_assassin","Assassin"],["5_shadowlord","Shadowlord"]]],
+  ["Paladin", "paladin", [["1_squire","Squire"],["2_knight","Knight"],["3_crusader","Crusader"],["4_paladin","Paladin"],["5_lightbringer","Lightbringer"]]],
+  ["Warlock", "warlock", [["1_initiate","Initiate"],["2_cultist","Cultist"],["3_hexer","Hexer"],["4_warlock","Warlock"],["5_dreadlord","Dreadlord"]]],
+  ["Bard", "bard", [["1_busker","Busker"],["2_minstrel","Minstrel"],["3_troubadour","Troubadour"],["4_bard","Bard"],["5_maestro","Maestro"]]],
+];
+const EXTRA = { "warrior/5_warlord": ["special"] };
+
+// Newest first. target = "class/job" or null.
+const UPDATES = [
+  ["new","Bard · Maestro (5)","Attack → epic 16-frame musical-flurry finale.","bard/5_maestro"],
+  ["new","Warlock · Dreadlord (5)","Attack → epic 16-frame green-hellfire flurry.","warlock/5_dreadlord"],
+  ["new","Paladin · Lightbringer (5)","Attack → epic 16-frame radiant hammer flurry.","paladin/5_lightbringer"],
+  ["new","Archer · Sentinel (5)","Attack → epic 16-frame celestial arrow flurry.","archer/5_sentinel"],
+  ["new","Medic · Hierophant (5)","Attack → epic 16-frame holy-light flurry.","medic/5_hierophant"],
+  ["new","Mage · Archmage (5)","Attack → epic 16-frame arcane-storm flurry.","mage/5_archmage"],
+  ["fix","Paladin · Crusader (3)","Facing fixed — animations now use south-east (its south was front-on).","paladin/3_crusader"],
+  ["fix","Assassin · Shadowlord (5)","Attack redone — big wind-up + crazy crossing dual-blade flurry.","assassin/5_shadowlord"],
+  ["fix","Assassin · job 4","Attack redone — real dual-blade swings with crimson trails.","assassin/4_assassin"],
+  ["fix","Assassin · Nightblade (3)","Attack redone — natural flowing dual-dagger combo.","assassin/3_nightblade"],
+  ["fix","Assassin · Prowler (2)","Attack redone — proper two-hit cross combo, both daggers.","assassin/2_prowler"],
+  ["fix","Archer · Greenhorn (1)","Attack redone — full draw + release.","archer/1_greenhorn"],
+  ["fix","Paladin · Knight (2)","Attack redone — hammer wind-up + overhead slam.","paladin/2_knight"],
+  ["fix","Warrior · Champion (4)","Attack redone — wind-up + big sweeping arc.","warrior/4_champion"],
+  ["fix","Warrior · Strider (2)","Attack redone — overhead chop with wind-up.","warrior/2_strider"],
+  ["fix","Warrior · Rookie (1)","Attack redone — real wind-up + slash.","warrior/1_rookie"],
+  ["redone","Paladin · Knight (2)","Now wields a warhammer (was a sword); male.","paladin/2_knight"],
+  ["redone","Paladin · Squire (1)","Male, no armor — lighter starter look.","paladin/1_squire"],
+  ["new","Assassin · job 4","New elite design, between old job 4 and Shadowlord.","assassin/4_assassin"],
+  ["reused","Assassin · Nightblade (3)","Now uses the previous job-4 assets.","assassin/3_nightblade"],
+  ["new","Archer · Sentinel (5)","New epic celestial archer with wings of light.","archer/5_sentinel"],
+  ["reused","Archer · Ranger (4)","Now uses the previous Sentinel design (+ new evolution).","archer/4_ranger"],
+  ["redone","Archer · Hunter (3)","Fancier, more distinct from Scout.","archer/3_hunter"],
+  ["redone","Medic · Cleric (3)","Simpler + facing fixed (was front-on); distinct from Priest.","medic/3_cleric"],
+  ["redone","Mage · Apprentice (1)","Now female to match the other mage ranks.","mage/1_apprentice"],
+  ["added","Warrior · Warlord — SPECIAL","Epic 17-frame dash + spinning combo special attack.","warrior/5_warlord"],
+  ["added","Evolution animations","Level-up transformation added to jobs 1-4 of every class.",null],
+];
+
+const pad = n => String(n).padStart(3, "0");
+const cardId = (c,j) => `card-${c}-${j}`;
+
+function loadFrames(dir) {
+  return new Promise(resolve => {
+    const frames = [];
+    (function tryNext(i){
+      const img = new Image();
+      const src = `${dir}/frame_${pad(i)}.png`;
+      img.onload = () => { frames.push(img); tryNext(i+1); };
+      img.onerror = () => resolve(frames);
+      img.src = src;
+    })(0);
+  });
+}
+const players = [];
+async function buildAnim(container, basedir, type, special=false) {
+  const wrap = document.createElement("div");
+  wrap.className = "anim" + (special ? " special" : "");
+  wrap.innerHTML = `<div class="anim-label">${type}</div>`;
+  const stage = document.createElement("div"); stage.className = "stage";
+  const img = document.createElement("img"); stage.appendChild(img); wrap.appendChild(stage);
+  const fc = document.createElement("div"); fc.className = "fcount"; wrap.appendChild(fc);
+  container.appendChild(wrap);
+  const frames = await loadFrames(`${basedir}/${type}`);
+  if (!frames.length) { fc.textContent="(none yet)"; img.remove(); return; }
+  img.src = frames[0].src; fc.textContent = frames.length + " frames";
+  players.push({ frames, img, i:0 });
+}
+async function build() {
+  const root = document.getElementById("root"); root.innerHTML = "";
+  for (const [clsName, clsKey, jobs] of CLASSES) {
+    const block = document.createElement("div"); block.className="class-block";
+    block.innerHTML = `<div class="class-title">${clsName}</div>`;
+    const row = document.createElement("div"); row.className="row";
+    for (const [jobKey, jobName] of jobs) {
+      const card = document.createElement("div");
+      card.className = "card" + (jobKey.startsWith("5_") ? " legendary" : "");
+      card.id = cardId(clsKey, jobKey);
+      const rank = jobKey.split("_")[0];
+      card.innerHTML = `<div class="job-name">${jobName}</div><div class="job-rank">${clsName} · Job ${rank}</div>`;
+      const anims = document.createElement("div"); anims.className="anims"; card.appendChild(anims);
+      row.appendChild(card);
+      const base = `characters/${clsKey}/${jobKey}/animations`;
+      await buildAnim(anims, base, "idle");
+      await buildAnim(anims, base, "attack");
+      if (!jobKey.startsWith("5_")) await buildAnim(anims, base, "evolution");
+      for (const t of (EXTRA[`${clsKey}/${jobKey}`]||[])) await buildAnim(anims, base, t, true);
+    }
+    block.appendChild(row); root.appendChild(block);
+  }
+}
+function buildFeed() {
+  const feed = document.getElementById("feed");
+  for (const [tag, ttl, note, target] of UPDATES) {
+    const el = document.createElement("button"); el.className="feed-item";
+    el.innerHTML = `<div><span class="tag ${tag}">${tag}</span><span class="ttl">${ttl}</span></div><div class="note">${note}</div>`;
+    if (target) {
+      const [c,j] = target.split("/");
+      el.onclick = () => {
+        const card = document.getElementById(cardId(c,j));
+        if (card) { card.scrollIntoView({behavior:"smooth", block:"center"}); card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash"); }
+      };
+    } else { el.style.cursor="default"; }
+    feed.appendChild(el);
+  }
+}
+let fps=9, last=0;
+function tick(ts){ if (ts-last >= 1000/fps){ last=ts; for(const p of players){ p.i=(p.i+1)%p.frames.length; p.img.src=p.frames[p.i].src; } } requestAnimationFrame(tick); }
+document.getElementById("fps").addEventListener("input", e=>{ fps=+e.target.value; document.getElementById("fpsVal").textContent=fps; });
+document.getElementById("bigger").addEventListener("change", e=>{
+  document.querySelectorAll(".stage img").forEach(im=> im.style.height=(e.target.checked?140:100)+"px");
+  document.querySelectorAll(".anim.special .stage img").forEach(im=> im.style.height=(e.target.checked?196:140)+"px");
+});
+buildFeed();
+build().then(()=>requestAnimationFrame(tick));
+</script>
+</body>
+</html>
