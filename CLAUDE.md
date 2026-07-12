@@ -240,6 +240,17 @@ in the RN app — port plan is `docs/fx-rn-port-plan.md`, decisions already made
   QA rig; **`?verify=1` must print `PASS — 80/80`** after any FX/anchor change.
 - Verified 2026-07-12: 80/80 attacks pass, zero console errors.
 
+### Phase 3 — Core-loop evolution: FUEL HYBRID (designed 2026-07-12, NOT built)
+Direction + tuning v1 approved by the user. Spec:
+`docs/superpowers/specs/2026-07-12-core-loop-fuel-hybrid-design.md`; research +
+rationale PDF: `docs/gameplay-loop-design.pdf`. In one line: steps = fuel for a
+24/7 fighting hero (Battling → Winded → Resting at camp, never punished), DEPLOY
+survives as the daily anchor, plus player-activated Overdrive (charged by steps
+past the daily goal), Rally (gift a resting friend 6h fuel for 500 energy), and
+auto-applied Streak Shields. Boss baseHP retunes 60k → 150k with it. Guardrails
+locked: never punish the party for a member's inactivity; loss-framing only on
+bonuses, never earned progress. Next step: implementation plan (writing-plans).
+
 ### Phase 3+ — Deferred (architect for, don't build)
 Other classes, recognition screens, IAP, cosmetics, guild-vs-guild / global.
 
