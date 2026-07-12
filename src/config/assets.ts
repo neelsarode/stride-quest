@@ -89,6 +89,35 @@ export const JUICE = {
 
 export type BannerVariant = keyof typeof BANNER;
 
+// ============================================================================
+// HUD pixel-art chrome — PixelLab `create_ui_asset`, stone base + gold for
+// high-hierarchy, iconography BAKED IN (never overlay emoji/icons on top).
+// Generated 2026-07-12 for the fuel-hybrid HUD (STR-39). Repo-relative paths,
+// same convention as spriteRelPath(): RN rendering adds a static require()
+// map later — the M1 frontend tickets consume these.
+// ============================================================================
+export const HUD_ASSETS = {
+  /** Fuel gauge frame — PRIMARY readout (gold tier), hourglass emblem baked
+   *  into the left cap. Display ~308px wide, like the boss HP bar. */
+  fuelGauge: "assets/ui/prod/fuel_gauge.png",
+  /** Overdrive charge meter — stone bezel, violet crystal shards on the left
+   *  cap (Overdrive's signature color). */
+  overdriveMeter: "assets/ui/prod/overdrive_meter.png",
+  /** Overdrive ACTIVATE — big gold button (visual weight rivals the DEPLOY
+   *  button attack_gold2), violet lightning-bolt emblem baked in. */
+  overdriveActivate: "assets/ui/prod/overdrive_activate.png",
+  /** Rally — guild-board action button (golden war horn baked in), nav-button
+   *  scale (~50px). */
+  rallyHorn: "assets/ui/prod/rally_horn.png",
+  /** Streak Shield — small badge (gold-trimmed shield + flame emblem). */
+  shieldBadge: "assets/ui/prod/shield_badge.png",
+  /** Roster-size hero-state badges (round stone tokens). Resting must read
+   *  COZY (pale moon) — never red, never shameful. */
+  stateBattling: "assets/ui/prod/state_battling.png",
+  stateWinded: "assets/ui/prod/state_winded.png",
+  stateResting: "assets/ui/prod/state_resting.png",
+} as const;
+
 /** Directions available for each sprite (matches the art folders). */
 export type Direction =
   | "south"
