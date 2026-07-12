@@ -19,6 +19,12 @@ work in small testable increments, and stop for sign-off before major
 dependencies / architectural decisions. Prioritize a working end-to-end skeleton
 over features.
 
+**Work tracking lives in Linear** (workspace team `Stridequest`, project
+**Stride Quest** — https://linear.app/stridequest/project/stride-quest-40ccda389ff9).
+Milestones M1 (fuel hybrid loop) / M2 (battle-scene RN port) / M3 (monetization)
+/ M4 (platform & release) mirror the phases in §7. Keep issues updated as work
+happens (In Progress → Done); new work gets a ticket. GitHub sync pending (M4).
+
 ---
 
 ## 2. Tech stack (decided — do not re-litigate)
@@ -29,7 +35,7 @@ over features.
 | Backend / DB | **Convex** | Reactive queries → shared state (boss HP, steps) updates live on every screen. |
 | Steps | **Apple HealthKit** via `@kingstinct/react-native-healthkit` v14 | iOS-only, Nitro-based, has an Expo config plugin (no manual Xcode). |
 | Auth | **Convex Auth — Anonymous provider** (`@convex-dev/auth`) | Auto identity, no login screen. Upgrades to Apple/email later keep the same userId. (Library is beta — pinned.) |
-| Monetization | Apple IAP | **Architect for later, don't build yet.** |
+| Monetization | Apple IAP via **RevenueCat** (+ AdMob rewarded-only, maybe) | **Architect for later, don't build yet.** Strategy decided 2026-07-12: cosmetics + season pass + streak-repair ladder; steps stay the ONLY source of power. Spec: `docs/superpowers/specs/2026-07-12-monetization-strategy.md`. |
 | Game engine | **None** | The "game" is animated UI; RN handles it. |
 
 ### Decisions made with the user (2026-06-27)
