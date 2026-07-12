@@ -1,0 +1,18 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "include": [
+    "App.tsx",
+    "index.ts",
+    "src/**/*",
+    ".expo/types/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "convex",
+    ".expo",
+    "dist"
+  ]
+}

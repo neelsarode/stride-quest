@@ -1,0 +1,35 @@
+{
+  "name": "stride-quest",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@auth/core": "^0.37.0",
+    "@convex-dev/auth": "^0.0.94",
+    "@kingstinct/react-native-healthkit": "^14.0.2",
+    "convex": "^1.42.0",
+    "expo": "~56.0.12",
+    "expo-crypto": "~56.0.4",
+    "expo-dev-client": "~56.0.20",
+    "expo-secure-store": "~56.0.4",
+    "expo-status-bar": "~56.0.4",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-nitro-modules": "^0.35.10",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start --dev-client",
+    "web": "expo start --web",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "convex": "convex dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "private": true
+}

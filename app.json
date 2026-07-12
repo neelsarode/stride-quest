@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Stride Quest",
+    "slug": "stride-quest",
+    "scheme": "stridequest",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stridequest.app"
+    },
+    "android": {
+      "package": "com.stridequest.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#11131a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Stride Quest reads your step count so your walking deals damage to your guild's weekly boss.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ]
+    ]
+  }
+}
