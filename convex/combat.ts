@@ -14,6 +14,7 @@ import { effectiveNow, effectiveDayForTz, effectiveWeekForTz, dayString } from "
 import { getUserGroup, memberCount } from "./players";
 import { energyEarned } from "./economy";
 import { settleIdle } from "./idle";
+import { settleFuel } from "./fuel";
 import { stepsForWeek } from "./steps";
 import { computeStreakMultiplier } from "./streak";
 import {
@@ -177,10 +178,13 @@ export const collectIdle = mutation({
     if (userId === null) throw new Error("Not signed in.");
     const ug = await getUserGroup(ctx, userId);
     if (!ug) return { collected: 0 };
+    const now = await effectiveNow(ctx);
+    // The tank settles on every open too (fuel keeps draining while you fight).
+    await settleFuel(ctx, userId, now);
     const challenge = await ensureCurrentChallenge(ctx, ug.group);
     if (challenge.status !== "active") return { collected: 0 };
     const progress = await ensureProgress(ctx, challenge, userId);
-    const collected = await settleIdle(ctx, progress, await effectiveNow(ctx));
+    const collected = await settleIdle(ctx, progress, now);
     await resolveBoss(ctx, challenge._id);
     return { collected };
   },

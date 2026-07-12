@@ -20,8 +20,11 @@ import {
   weekRange,
 } from "./time";
 import { getUserGroup } from "./players";
-import { multiplierForJobLevel } from "./gameConfig";
+import { FUEL, multiplierForJobLevel } from "./gameConfig";
 import { applyDeploy, ensureCurrentChallenge } from "./combat";
+import { stepsForDate } from "./steps";
+import { grantFuel, grantStarterFuelIfNew } from "./fuel";
+import { STARTER_FUEL } from "./fuelMath";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -180,13 +183,20 @@ async function injectFor(
   stepCount: number,
   date: string,
 ) {
+  const clamped = Math.max(0, Math.floor(stepCount));
+  // Injected steps grant fuel exactly like real syncs: on the day-max delta,
+  // settled-then-added (see steps.recordSteps). Keeps the dev loop honest.
+  const prevDayMax = await stepsForDate(ctx, userId, date);
   await ctx.db.insert("stepEntries", {
     userId,
     date,
-    stepCount: Math.max(0, Math.floor(stepCount)),
+    stepCount: clamped,
     source: "injector",
     createdAt: Date.now(),
   });
+  const now = await effectiveNow(ctx);
+  await grantStarterFuelIfNew(ctx, userId, now);
+  await grantFuel(ctx, userId, now, Math.max(0, clamped - prevDayMax) * FUEL.fuelPerStep);
 }
 
 export const injectStepsFor = mutation({
@@ -220,6 +230,10 @@ export const addSimulatedTeammate = mutation({
       displayName: name ?? `Bot ${Math.floor((await effectiveNow(ctx)) % 1000)}`,
       isAnonymous: false,
       isSimulated: true,
+      // Bots skip bootstrap, so give them the starter tank here — a fuel-less
+      // bot would rest forever and make co-op testing misleading.
+      fuel: STARTER_FUEL,
+      fuelSettledAt: await effectiveNow(ctx),
     });
     await ctx.db.insert("memberships", {
       userId: botId,
@@ -333,12 +347,14 @@ export const resetAccount = mutation({
       }
     }
 
-    // …and reset account meta (energy spent, streaks).
+    // …and reset account meta (energy spent, streaks, fuel back to the starter tank).
     await ctx.db.patch(caller, {
       energySpent: 0,
       streakCount: 0,
       longestStreak: 0,
       lastDeployDate: undefined,
+      fuel: STARTER_FUEL,
+      fuelSettledAt: now,
     });
   },
 });

@@ -12,6 +12,8 @@ import type * as auth from "../auth.js";
 import type * as combat from "../combat.js";
 import type * as dev from "../dev.js";
 import type * as economy from "../economy.js";
+import type * as fuel from "../fuel.js";
+import type * as fuelMath from "../fuelMath.js";
 import type * as game from "../game.js";
 import type * as gameConfig from "../gameConfig.js";
 import type * as guild from "../guild.js";
@@ -34,6 +36,8 @@ declare const fullApi: ApiFromModules<{
   combat: typeof combat;
   dev: typeof dev;
   economy: typeof economy;
+  fuel: typeof fuel;
+  fuelMath: typeof fuelMath;
   game: typeof game;
   gameConfig: typeof gameConfig;
   guild: typeof guild;

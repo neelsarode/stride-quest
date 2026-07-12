@@ -5,6 +5,8 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ensureCurrentChallenge, ensureProgress } from "./combat";
+import { grantStarterFuelIfNew } from "./fuel";
+import { effectiveNow } from "./time";
 
 /** The currently signed-in player (or null if not signed in yet). */
 export const viewer = query({
@@ -48,6 +50,10 @@ export const bootstrap = mutation({
         displayName: `Hero-${userId.slice(-4)}`,
       });
     }
+
+    // 1b) Starter fuel (24h) so the first session never shows a resting hero.
+    //     Idempotent — only fires while the tank has never been set.
+    await grantStarterFuelIfNew(ctx, userId, await effectiveNow(ctx));
 
     // 2) Ensure a personal guild + owner membership (capture timezone).
     let membership = await ctx.db

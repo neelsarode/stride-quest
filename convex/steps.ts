@@ -9,7 +9,8 @@ import type { Id } from "./_generated/dataModel";
 import { getUserGroup } from "./players";
 import { effectiveDayForTz, effectiveNow, effectiveWeekForTz } from "./time";
 import { settleIdle } from "./idle";
-import { jobLevelForWeeklySteps, multiplierForJobLevel } from "./gameConfig";
+import { grantFuel, grantStarterFuelIfNew } from "./fuel";
+import { FUEL, jobLevelForWeeklySteps, multiplierForJobLevel } from "./gameConfig";
 
 // A clearly absurd upper bound — a placeholder for real anti-cheat. The point is
 // that EVERY step number flows through the server, so validation (rate limits,
@@ -43,6 +44,10 @@ export const recordSteps = mutation({
     }
     const clamped = Math.min(Math.floor(stepCount), MAX_PLAUSIBLE_DAILY_STEPS);
 
+    // Fuel is earned on the day-max DELTA (readings are cumulative, so only the
+    // increase over what we'd already counted for this date grants new fuel).
+    const prevDayMax = await stepsForDate(ctx, userId, day);
+
     await ctx.db.insert("stepEntries", {
       userId,
       date: day,
@@ -50,6 +55,14 @@ export const recordSteps = mutation({
       source,
       createdAt: Date.now(),
     });
+
+    // Grant the earned fuel. grantFuel settles the pending burn at the OLD fuel
+    // level first (same "settle before the rate changes" rule as idle), then
+    // adds — clamped at the 48h tank cap.
+    const now = await effectiveNow(ctx);
+    await grantStarterFuelIfNew(ctx, userId, now);
+    const earnedFuel = Math.max(0, clamped - prevDayMax) * FUEL.fuelPerStep;
+    await grantFuel(ctx, userId, now, earnedFuel);
 
     // If this step changed the job (multiplier), SETTLE pending idle at the old
     // rate first, then snapshot the new multiplier — so idle never accrues at the

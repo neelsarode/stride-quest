@@ -26,6 +26,12 @@ import {
   nextJobThreshold,
 } from "./gameConfig";
 import { computeStreakMultiplier } from "./streak";
+import { fuelSnapshot, currentBurnPerHour } from "./fuel";
+import {
+  TANK_CAP_FUEL,
+  WINDED_THRESHOLD_FUEL,
+  hoursToEmpty,
+} from "./fuelMath";
 
 export const dashboard = query({
   args: {},
@@ -85,6 +91,19 @@ export const dashboard = query({
     // Dual meters: Job XP (weekly cumulative, never spent) + Energy (spendable bank).
     const jobXp = stepsThisWeek * XP_PER_STEP;
     const energy = await energyBalance(ctx, userId);
+
+    // Fuel tank: read-only snapshot (the pending burn window is walked but not
+    // written — settling happens in mutations). Drives the hero-state display.
+    const tank = fuelSnapshot(user, now);
+    const fuel = {
+      current: Math.floor(tank.fuel),
+      state: tank.state, // "battling" | "winded" | "resting"
+      burnPerHour: currentBurnPerHour(tank),
+      hoursToEmpty: hoursToEmpty(tank.fuel),
+      tankCap: TANK_CAP_FUEL,
+      windedThreshold: WINDED_THRESHOLD_FUEL,
+      settledAt: user.fuelSettledAt ?? now,
+    };
 
     // Idle: rate the client uses to extrapolate a live "pending idle" ticker.
     const idleMult =
@@ -155,6 +174,7 @@ export const dashboard = query({
           }
         : null,
       steps: { today: stepsToday, thisWeek: stepsThisWeek },
+      fuel,
       meters: {
         energy, // spendable Energy bank
         jobXp, // weekly cumulative Job XP

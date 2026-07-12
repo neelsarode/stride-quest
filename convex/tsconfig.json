@@ -11,6 +11,10 @@
     "jsx": "react-jsx",
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
+    /* Lets fuelMath.ts import "./gameConfig.ts" WITH the extension, which is
+     * what allows plain `node --test` (type-stripping) to run the pure fuel
+     * math in tests/fuel.test.mjs. Safe because noEmit is on. */
+    "allowImportingTsExtensions": true,
     "types": ["node"],
 
     /* These compiler options are required by Convex */

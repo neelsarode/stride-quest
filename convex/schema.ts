@@ -46,6 +46,14 @@ export default defineSchema({
     streakCount: v.optional(v.number()),
     longestStreak: v.optional(v.number()),
     lastDeployDate: v.optional(v.string()), // "YYYY-MM-DD" effective day of last deploy
+
+    // --- Phase 3 fuel tank (fuel hybrid; PERSISTS across weekly resets) ---
+    // Settled fuel (in steps; 1 step = 1 fuel) as of fuelSettledAt (effective
+    // ms). Current fuel is DERIVED by walking the piecewise burn from this pair
+    // (convex/fuelMath.ts) — same settle-on-interaction shape as idle accrual.
+    // `undefined` means "never fueled yet" → bootstrap grants the starter tank.
+    fuel: v.optional(v.number()),
+    fuelSettledAt: v.optional(v.number()),
     // Dev-only simulated teammate bot (never authenticates). Lets us test co-op solo.
     isSimulated: v.optional(v.boolean()),
   })

@@ -1,7 +1,12 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    // convex/fuelMath.ts imports "./gameConfig.ts" WITH the extension (so plain
+    // `node --test` can run the pure fuel math). It reaches this project's type
+    // graph through the convex/_generated/api types that src/ imports. Safe:
+    // noEmit comes from the expo base, and Metro never bundles fuelMath.
+    "allowImportingTsExtensions": true
   },
   "include": [
     "App.tsx",
