@@ -21,6 +21,7 @@ import type * as http from "../http.js";
 import type * as idle from "../idle.js";
 import type * as overdrive from "../overdrive.js";
 import type * as players from "../players.js";
+import type * as rally from "../rally.js";
 import type * as steps from "../steps.js";
 import type * as streak from "../streak.js";
 import type * as time from "../time.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   idle: typeof idle;
   overdrive: typeof overdrive;
   players: typeof players;
+  rally: typeof rally;
   steps: typeof steps;
   streak: typeof streak;
   time: typeof time;

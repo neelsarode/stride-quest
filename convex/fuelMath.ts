@@ -21,6 +21,7 @@ import {
   FUEL,
   OFFLINE_CAP_MS,
   OVERDRIVE,
+  RALLY,
 } from "./gameConfig.ts";
 
 const HOUR_MS = 3_600_000;
@@ -126,6 +127,16 @@ export function cappedElapsedMs(lastSettledAt: number, now: number): number {
 export function addFuel(fuel: number, amount: number): number {
   return Math.min(Math.max(0, fuel + Math.max(0, amount)), TANK_CAP_FUEL);
 }
+
+/** Fuel one Rally grants (STR-9): 6 hours at the battling rate = 1,800, PLUS a
+ *  1-fuel wake margin. Why the margin: the state boundary puts the threshold
+ *  itself in the Winded band (fuel must be STRICTLY above 1,800 to Battle), and
+ *  a fully-drained tank sits at exactly 0 — so a bare 1,800 grant would land an
+ *  empty receiver exactly ON the threshold, still Winded. A rally is a WAKE-UP
+ *  (spec §5): the +1 (≈12 seconds of battling) guarantees every rallied hero
+ *  comes back Battling. */
+export const RALLY_FUEL_GRANT =
+  RALLY.fuelHoursGiven * FUEL.burnPerHourBattling + 1;
 
 /** REAL hours of fighting left in the tank from this level ("your hero can
  *  fight for 9 more hours") — the winded stretch burns at half rate, so the

@@ -151,6 +151,25 @@ export default defineSchema({
     .index("by_challenge_and_user", ["challengeId", "userId"])
     .index("by_user", ["userId"]),
 
+  // rallies — one row per rally sent (STR-9, spec §5): a giver spends Energy to
+  // gift a Winded/Resting guildmate some fight time. The row records WHO sent it
+  // (the receiver's celebration names the friend, not the app) and doubles as
+  // the per-giver-per-day rate-limit ledger.
+  rallies: defineTable({
+    giverId: v.id("users"),
+    receiverId: v.id("users"),
+    groupId: v.id("groups"),
+    date: v.string(), // giver's effective "YYYY-MM-DD" (anchors the daily limit)
+    fuelGiven: v.number(), // actually granted (post tank-cap clamp)
+    energySpent: v.number(), // what the giver paid (RALLY.energyCost at the time)
+    // False until the receiver's client plays the "X rallied you!" moment
+    // (STR-15 flips it). Unseen rallies = pending celebrations.
+    seen: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_giver_and_date", ["giverId", "date"])
+    .index("by_receiver_and_seen", ["receiverId", "seen"]),
+
   // devState — a single row holding the dev-only mocked-clock offset. Lets the
   // dev tools time-travel (advance day, fast-forward idle). In production this
   // table stays empty → offset 0 → effectiveNow() == real Date.now().
