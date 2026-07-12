@@ -54,6 +54,16 @@ export default defineSchema({
     // `undefined` means "never fueled yet" → bootstrap grants the starter tank.
     fuel: v.optional(v.number()),
     fuelSettledAt: v.optional(v.number()),
+    // --- Phase 3 Overdrive (spec §4). Charge is DERIVED like Energy:
+    //   excess earned (Σ per-day max(0, dayMax − DAILY_STEP_GOAL) from the ledger)
+    //   − overdriveExcessSpent, clamped to one full charge (4,000 excess).
+    // Activation consumes the WHOLE earned pool (maxStoredCharges = 1: overflow
+    // past 100% is lost, exactly like deploy zeroing the Energy bank).
+    overdriveExcessSpent: v.optional(v.number()),
+    // Effective-ms timestamp when the current/most recent Overdrive ends. Stays
+    // on the doc after expiry — settles clamp the ×3 boundary inside their own
+    // window, so a stale value simply contributes 0 overdrive hours.
+    overdriveActiveUntil: v.optional(v.number()),
     // Dev-only simulated teammate bot (never authenticates). Lets us test co-op solo.
     isSimulated: v.optional(v.boolean()),
   })

@@ -119,6 +119,9 @@ export const dashboard = query({
           idleLastAt: myProgress.lastIdleCollectedAt ?? now,
           now,
           jobMult: idleMult,
+          // Overdrive-aware (STR-8) so the preview equals what the settle lands.
+          // (Dashboard EXPOSURE of overdrive state itself is STR-11.)
+          overdriveUntil: user.overdriveActiveUntil,
         }).damage
       : 0;
     const idle = {

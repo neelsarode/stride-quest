@@ -44,6 +44,10 @@ export async function settleFuelAndIdle(
     idleLastAt: progress.lastIdleCollectedAt ?? effNow,
     now: effNow,
     jobMult: progress.idleMultiplierSnapshot ?? 1,
+    // Overdrive (STR-8): the elapsed window prices any active/just-expired ×3
+    // hours from the stamp in force. Activation patches this AFTER settling,
+    // so the pre-activation window never retroactively earns the boost.
+    overdriveUntil: user.overdriveActiveUntil,
   });
 
   await ctx.db.patch(userId, { fuel: settled.fuel, fuelSettledAt: effNow });

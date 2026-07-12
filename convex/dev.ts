@@ -347,7 +347,9 @@ export const resetAccount = mutation({
       }
     }
 
-    // …and reset account meta (energy spent, streaks, fuel back to the starter tank).
+    // …and reset account meta (energy spent, streaks, fuel back to the starter
+    // tank, overdrive uncharged/inactive — the ledger is empty again, so the
+    // derived meters must not be offset by stale spent counters).
     await ctx.db.patch(caller, {
       energySpent: 0,
       streakCount: 0,
@@ -355,6 +357,8 @@ export const resetAccount = mutation({
       lastDeployDate: undefined,
       fuel: STARTER_FUEL,
       fuelSettledAt: now,
+      overdriveExcessSpent: 0,
+      overdriveActiveUntil: undefined,
     });
   },
 });

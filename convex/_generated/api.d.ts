@@ -19,6 +19,7 @@ import type * as gameConfig from "../gameConfig.js";
 import type * as guild from "../guild.js";
 import type * as http from "../http.js";
 import type * as idle from "../idle.js";
+import type * as overdrive from "../overdrive.js";
 import type * as players from "../players.js";
 import type * as steps from "../steps.js";
 import type * as streak from "../streak.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   guild: typeof guild;
   http: typeof http;
   idle: typeof idle;
+  overdrive: typeof overdrive;
   players: typeof players;
   steps: typeof steps;
   streak: typeof streak;

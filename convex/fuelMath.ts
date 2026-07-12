@@ -15,7 +15,13 @@
 // NOTE the ".ts" import extension: it lets Node's type-stripping run this file
 // directly in tests/fuel.test.mjs (extensionless imports don't resolve in Node).
 // =============================================================================
-import { BASE_IDLE_DPH, FUEL, OFFLINE_CAP_MS } from "./gameConfig.ts";
+import {
+  BASE_IDLE_DPH,
+  DAILY_STEP_GOAL,
+  FUEL,
+  OFFLINE_CAP_MS,
+  OVERDRIVE,
+} from "./gameConfig.ts";
 
 const HOUR_MS = 3_600_000;
 
@@ -142,14 +148,68 @@ export function idleDphFor(state: FuelState, jobMult: number): number {
 
 /** Price idle damage over EXACTLY the segments a fuel walk produced, so burn
  *  and damage always come from the same clock windows (unfloored — callers
- *  floor once, at the end of a settle). */
+ *  floor once, at the end of a settle).
+ *
+ *  `overdriveHours` (STR-8): how many hours of Overdrive remain at the START of
+ *  this window. Overdrive adds a TIME boundary on top of the fuel-state
+ *  boundaries: inside it, damage is ×OVERDRIVE.idleDamageMult; burn is
+ *  untouched (Overdrive is a pure reward, never a cost). The Winded ×0.5 is
+ *  already inside idleDphFor, so it stacks multiplicatively per the spec. */
 export function idleDamageForSegments(
   segments: FuelSegment[],
   jobMult: number,
+  overdriveHours = 0,
 ): number {
   let damage = 0;
-  for (const s of segments) damage += s.hours * idleDphFor(s.state, jobMult);
+  let odLeft = Math.max(0, overdriveHours);
+  for (const s of segments) {
+    const odHours = Math.min(s.hours, odLeft);
+    odLeft -= odHours;
+    const dph = idleDphFor(s.state, jobMult);
+    damage +=
+      odHours * dph * OVERDRIVE.idleDamageMult + (s.hours - odHours) * dph;
+  }
   return damage;
+}
+
+// --- Overdrive charge + window math (STR-8) ------------------------------------
+
+/** Overdrive charge earned by a set of per-day step totals: every step ABOVE
+ *  the daily goal charges the meter (per-day excess, never negative). */
+export function overdriveExcessFromDayTotals(
+  dayTotals: Iterable<number>,
+): number {
+  let excess = 0;
+  for (const t of dayTotals) excess += Math.max(0, t - DAILY_STEP_GOAL);
+  return excess;
+}
+
+/** Charge meter fraction in [0, 1]: (excess earned − excess consumed) / full
+ *  charge, clamped. Holds at 1 until used; partial charge persists across days
+ *  by construction (it's derived, nothing decays it). */
+export function overdriveChargeFraction(
+  excessEarned: number,
+  excessSpent: number,
+): number {
+  return Math.min(
+    Math.max(0, excessEarned - excessSpent) / OVERDRIVE.fullChargeExcessSteps,
+    1,
+  );
+}
+
+/** Hours of Overdrive remaining at a window's start, given the wall-clock
+ *  active-until stamp. The settled window is anchored at the last settle stamp
+ *  (the hero fights the FIRST cappedElapsed hours after it, then pauses), so
+ *  Overdrive always occupies the front of the window — the offline-cap pause
+ *  truncates the far end and can never eat the ×3 hours. Combined with
+ *  activation itself settling, every charge yields EXACTLY durationHours of
+ *  effective ×3 across settles. */
+export function overdriveHoursAt(
+  windowStartMs: number,
+  overdriveUntil: number | undefined,
+): number {
+  if (overdriveUntil === undefined) return 0;
+  return Math.max(0, overdriveUntil - windowStartMs) / HOUR_MS;
 }
 
 /**
@@ -167,6 +227,11 @@ export function idleDamageForSegments(
  *    the lead-in deals damage at the CURRENT settled level's state — the fuel
  *    trajectory before its own stamp is already settled and unknowable.
  * Each stamp anchors its own OFFLINE_CAP window (absence pauses both).
+ *
+ * `overdriveUntil` (STR-8, optional): wall-clock effective-ms when Overdrive
+ * ends. Damage inside it is ×OVERDRIVE.idleDamageMult; burn never changes.
+ * Every sub-window anchors the ×3 boundary at its own start stamp, so an
+ * expired stamp simply contributes zero overdrive hours.
  */
 export function settleFuelAndIdleWindow(args: {
   fuel: number;
@@ -174,8 +239,9 @@ export function settleFuelAndIdleWindow(args: {
   idleLastAt: number;
   now: number;
   jobMult: number;
+  overdriveUntil?: number;
 }): { fuel: number; burned: number; damage: number } {
-  const { now, jobMult } = args;
+  const { now, jobMult, overdriveUntil } = args;
   let fuel = Math.max(0, args.fuel);
   let burned = 0;
   let damage = 0;
@@ -184,6 +250,7 @@ export function settleFuelAndIdleWindow(args: {
 
   if (fuelLastAt < idleLastAt) {
     // Burn-only lead-in (no damage: the current boss didn't exist yet).
+    // Overdrive is irrelevant here — it multiplies damage, never burn.
     const w = walkFuel(fuel, cappedElapsedMs(fuelLastAt, Math.min(idleLastAt, now)));
     fuel = w.endFuel;
     burned += w.burned;
@@ -191,18 +258,27 @@ export function settleFuelAndIdleWindow(args: {
   } else if (idleLastAt < fuelLastAt) {
     // Damage-only lead-in at the current settled level's state (defensive path).
     const ms = cappedElapsedMs(idleLastAt, Math.min(fuelLastAt, now));
-    damage += (ms / HOUR_MS) * idleDphFor(fuelStateFor(fuel), jobMult);
+    const odMs = Math.min(
+      overdriveHoursAt(idleLastAt, overdriveUntil) * HOUR_MS,
+      ms,
+    );
+    const dph = idleDphFor(fuelStateFor(fuel), jobMult);
+    damage +=
+      (odMs / HOUR_MS) * dph * OVERDRIVE.idleDamageMult +
+      ((ms - odMs) / HOUR_MS) * dph;
     idleLastAt = fuelLastAt;
   }
 
   // The shared window: one walk prices burn AND damage from the same segments.
-  const shared = walkFuel(
-    fuel,
-    cappedElapsedMs(Math.max(fuelLastAt, idleLastAt), now),
-  );
+  const sharedStart = Math.max(fuelLastAt, idleLastAt);
+  const shared = walkFuel(fuel, cappedElapsedMs(sharedStart, now));
   fuel = shared.endFuel;
   burned += shared.burned;
-  damage += idleDamageForSegments(shared.segments, jobMult);
+  damage += idleDamageForSegments(
+    shared.segments,
+    jobMult,
+    overdriveHoursAt(sharedStart, overdriveUntil),
+  );
 
   return { fuel, burned, damage: Math.floor(damage) };
 }

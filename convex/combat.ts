@@ -160,7 +160,7 @@ async function totalDamage(
 }
 
 /** Mark the boss won if total damage has reached its HP (the kill transition). */
-async function resolveBoss(ctx: MutationCtx, challengeId: Id<"challenges">) {
+export async function resolveBoss(ctx: MutationCtx, challengeId: Id<"challenges">) {
   const challenge = await ctx.db.get(challengeId);
   if (!challenge || challenge.status !== "active") return;
   const total = await totalDamage(ctx, challengeId);
