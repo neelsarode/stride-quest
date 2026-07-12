@@ -7,7 +7,7 @@
 // Boss HP is derived: maxHP − Σ(damage from all members).
 // =============================================================================
 import { query } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { stepsForDate, stepsForWeek } from "./steps";
 import { getUserGroup } from "./players";
@@ -20,6 +20,9 @@ import {
   XP_PER_STEP,
   OFFLINE_CAP_MS,
   DAILY_STEP_GOAL,
+  OVERDRIVE,
+  RALLY,
+  STREAK_SHIELD,
   jobLevelForWeeklySteps,
   multiplierForJobLevel,
   nextJobThreshold,
@@ -27,12 +30,15 @@ import {
 import { computeStreakMultiplier } from "./streak";
 import { continueStreak } from "./streakMath";
 import { fuelSnapshot, currentBurnPerHour } from "./fuel";
+import { overdriveStatus } from "./overdrive";
 import {
   TANK_CAP_FUEL,
   WINDED_THRESHOLD_FUEL,
+  battlingHoursForFuel,
   hoursToEmpty,
   idleDphFor,
   settleFuelAndIdleWindow,
+  type FuelState,
 } from "./fuelMath";
 
 export const dashboard = query({
@@ -107,10 +113,29 @@ export const dashboard = query({
       settledAt: user.fuelSettledAt ?? now,
     };
 
+    // Overdrive (STR-8 exposure): charge is DERIVED from the ledger (excess
+    // earned − spent). Remaining time is computed SERVER-side — the raw
+    // activeUntil stamp rides along for display formatting only, never for
+    // client date math.
+    const od = await overdriveStatus(ctx, user, now);
+    const overdrive = {
+      charge: od.charge, // 0..1
+      chargePct: Math.round(od.charge * 100), // 0..100 for the meter label
+      ready: od.ready, // the button lights up
+      active: od.active, // the ×3 window is running
+      remainingSeconds: od.active
+        ? Math.max(0, Math.ceil((od.activeUntil! - now) / 1000))
+        : 0,
+      activeUntil: od.activeUntil, // raw effective-ms (display formatting only)
+      durationHours: OVERDRIVE.durationHours,
+      idleDamageMult: OVERDRIVE.idleDamageMult,
+    };
+
     // Idle: fuel-driven (STR-7). `dph` is the rate at the tank's CURRENT state
-    // (Battling full, Winded half, Resting zero) for the client's live ticker;
-    // `pending` is the exact uncollected damage, priced over the same piecewise
-    // windows the settle will use (so the preview equals what lands).
+    // (Battling full, Winded half, Resting zero — ×3 while Overdrive runs) for
+    // the client's live ticker; `pending` is the exact uncollected damage,
+    // priced over the same piecewise windows the settle will use (so the
+    // preview equals what lands).
     const idleMult =
       myProgress?.idleMultiplierSnapshot ?? multiplierForJobLevel(jobLevel);
     const pendingIdle = myProgress
@@ -121,13 +146,14 @@ export const dashboard = query({
           now,
           jobMult: idleMult,
           // Overdrive-aware (STR-8) so the preview equals what the settle lands.
-          // (Dashboard EXPOSURE of overdrive state itself is STR-11.)
           overdriveUntil: user.overdriveActiveUntil,
         }).damage
       : 0;
     const idle = {
       lastIdleCollectedAt: myProgress?.lastIdleCollectedAt ?? now,
-      dph: idleDphFor(tank.state, idleMult),
+      dph:
+        idleDphFor(tank.state, idleMult) *
+        (od.active ? OVERDRIVE.idleDamageMult : 1),
       pending: pendingIdle,
       capMs: OFFLINE_CAP_MS,
     };
@@ -162,6 +188,77 @@ export const dashboard = query({
       goal: DAILY_STEP_GOAL,
       steps: stepsToday,
       hit: stepsToday >= DAILY_STEP_GOAL,
+    };
+
+    // Streak Shields (STR-10 exposure): the pocket, plus the deploy preview —
+    // `wouldConsumeOnDeploy` is how many shields a deploy RIGHT NOW would
+    // silently burn to bridge missed days (0 when the chain is intact or
+    // unsalvageable), from the SAME continuation rule the deploy applies.
+    const shields = {
+      held: user.shieldsHeld ?? 0,
+      max: STREAK_SHIELD.maxHeld,
+      wouldConsumeOnDeploy: streakCont.shieldsConsumed,
+    };
+
+    // Rally (STR-9 exposure): can-I-send state + who needs one + unseen
+    // received rallies (the STR-15 celebration moment — sender name + hours).
+    // Teammate hero states are DERIVED at read time by the same pure walk a
+    // settle runs (fuelSnapshot writes nothing; queries can't write anyway).
+    let rallySentToday = false;
+    const rallyEligible: Array<{
+      userId: Id<"users">;
+      displayName: string;
+      state: FuelState; // "winded" | "resting" here by construction
+    }> = [];
+    if (group) {
+      const sent = await ctx.db
+        .query("rallies")
+        .withIndex("by_giver_and_date", (q) =>
+          q.eq("giverId", userId).eq("date", date),
+        )
+        .take(1);
+      rallySentToday = sent.length > 0;
+      const memberships = await ctx.db
+        .query("memberships")
+        .withIndex("by_group", (q) => q.eq("groupId", group._id))
+        .collect();
+      for (const m of memberships) {
+        if (m.userId === userId) continue;
+        const u = await ctx.db.get(m.userId);
+        if (!u) continue;
+        const state = fuelSnapshot(u, now).state;
+        if (state !== "battling") {
+          rallyEligible.push({
+            userId: m.userId,
+            displayName: u.displayName ?? "Hero",
+            state,
+          });
+        }
+      }
+    }
+    const unseenRows = await ctx.db
+      .query("rallies")
+      .withIndex("by_receiver_and_seen", (q) =>
+        q.eq("receiverId", userId).eq("seen", false),
+      )
+      .take(20);
+    const unseenRallies = [];
+    for (const r of unseenRows) {
+      const sender = await ctx.db.get(r.giverId);
+      unseenRallies.push({
+        rallyId: r._id,
+        senderId: r.giverId,
+        senderName: sender?.displayName ?? "A teammate",
+        fuelGiven: r.fuelGiven,
+        hours: battlingHoursForFuel(r.fuelGiven), // ≈6 (post tank-cap clamp)
+        sentAt: r.createdAt,
+      });
+    }
+    const rally = {
+      sentToday: rallySentToday,
+      energyCost: RALLY.energyCost,
+      eligibleTeammates: rallyEligible,
+      unseen: unseenRallies, // STR-15 plays these, then calls rally.markRalliesSeen
     };
 
     return {
@@ -202,7 +299,10 @@ export const dashboard = query({
         nextJobThreshold: nextJobThreshold(jobLevel), // null if maxed (Job 5)
       },
       idle,
+      overdrive,
       streak,
+      shields,
+      rally,
       dailyGoal,
     };
   },

@@ -138,6 +138,14 @@ export function addFuel(fuel: number, amount: number): number {
 export const RALLY_FUEL_GRANT =
   RALLY.fuelHoursGiven * FUEL.burnPerHourBattling + 1;
 
+/** NOMINAL battling-hours worth of a fuel amount (fuel ÷ 300/h) — the unit the
+ *  spec sizes everything in ("48h tank", "6h rally"). Display-oriented: a rally
+ *  row's `fuelGiven` reads back as "≈6 hours". For REAL time-to-empty (which
+ *  stretches the winded tail) use hoursToEmpty. */
+export function battlingHoursForFuel(fuel: number): number {
+  return Math.max(0, fuel) / FUEL.burnPerHourBattling;
+}
+
 /** REAL hours of fighting left in the tank from this level ("your hero can
  *  fight for 9 more hours") — the winded stretch burns at half rate, so the
  *  last 1,800 nominal fuel lasts 12 real hours, not 6. */

@@ -14,11 +14,13 @@ import {
   STARTER_FUEL,
   WINDED_THRESHOLD_FUEL,
   WINDED_BURN_PER_HOUR,
+  RALLY_FUEL_GRANT,
   fuelStateFor,
   burnRateForState,
   walkFuel,
   cappedElapsedMs,
   addFuel,
+  battlingHoursForFuel,
   hoursToEmpty,
   idleDphFor,
   idleDamageForSegments,
@@ -294,4 +296,61 @@ test("damage floors once at the end of a settle (no per-segment rounding)", () =
   approx(r.burned, 101);
   assert.equal(r.damage, 50);
   assert.equal(r.fuel, 0);
+});
+
+// ==================================================================================
+// STR-11 — dashboard exposure: read-time derivation must equal settle-then-read.
+// Queries can't write, so the dashboard/guild roster derive the tank (and hero
+// state) with the SAME pure walk a settle runs. These tests pin that equivalence.
+// ==================================================================================
+
+test("derived-at-read == settle-then-read (within the offline cap)", () => {
+  // Reading the tank at t2 straight from the stored (fuel, t0) pair must give
+  // exactly what a mutation settling at t1 and a read at t2 would give — the
+  // piecewise walk composes: walk(f, a+b) == walk(walk(f, a), b). Cases cross
+  // every state boundary (battling→winded and winded→resting).
+  const t0 = 1_000_000;
+  for (const [fuel, h1, h2] of [
+    [7_200, 2, 3], // battling throughout
+    [2_100, 1, 3], // crosses into winded mid-window
+    [600, 2, 4], // winded → resting
+    [3_600, 5, 5], // battling → winded → (almost) resting, 10h = exactly the cap
+  ]) {
+    const t1 = t0 + h1 * HOUR_MS;
+    const t2 = t1 + h2 * HOUR_MS;
+    // one read at t2, straight from the t0 stamp
+    const direct = walkFuel(fuel, cappedElapsedMs(t0, t2));
+    // settle at t1 (re-stamps the clock), then read at t2
+    const settled = walkFuel(fuel, cappedElapsedMs(t0, t1));
+    const reread = walkFuel(settled.endFuel, cappedElapsedMs(t1, t2));
+    approx(reread.endFuel, direct.endFuel, `endFuel diverged for ${fuel}`);
+    assert.equal(
+      fuelStateFor(reread.endFuel),
+      fuelStateFor(direct.endFuel),
+      `state diverged for ${fuel}`,
+    );
+    approx(settled.burned + reread.burned, direct.burned, `burn diverged for ${fuel}`);
+  }
+});
+
+test("read-time hero state matches the settle across every band", () => {
+  // The roster's badge derivation: state(walk(stored fuel, elapsed)) — spot-check
+  // the boundaries the walk can land on.
+  assert.equal(fuelStateFor(walkFuel(7_200, 2 * HOUR_MS).endFuel), "battling");
+  // 2,100 − 4h piecewise = 1,350 → winded
+  assert.equal(fuelStateFor(walkFuel(2_100, 4 * HOUR_MS).endFuel), "winded");
+  // 300 fuel empties within the window → resting
+  assert.equal(fuelStateFor(walkFuel(300, 10 * HOUR_MS).endFuel), "resting");
+  // Landing EXACTLY on the threshold is winded (strictly-above battles).
+  assert.equal(fuelStateFor(walkFuel(2_100, HOUR_MS).endFuel), "winded");
+});
+
+test("battlingHoursForFuel: the display unit the spec sizes everything in", () => {
+  approx(battlingHoursForFuel(WINDED_THRESHOLD_FUEL), 6); // 1,800 → 6h
+  approx(battlingHoursForFuel(STARTER_FUEL), 24); // 7,200 → 24h
+  approx(battlingHoursForFuel(TANK_CAP_FUEL), 48); // 14,400 → 48h
+  approx(battlingHoursForFuel(0), 0);
+  approx(battlingHoursForFuel(-50), 0); // defensive: never negative
+  // A rally's fuelGiven reads back as ≈6 hours (the +1 wake margin is ~12s).
+  assert.ok(Math.abs(battlingHoursForFuel(RALLY_FUEL_GRANT) - 6) < 0.01);
 });

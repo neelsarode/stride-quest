@@ -14,6 +14,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { getUserGroup } from "./players";
 import { stepsForDate, stepsForWeek } from "./steps";
 import { getClockOffsetMs, dayString, weekRange } from "./time";
+import { fuelSnapshot } from "./fuel";
+import type { FuelState } from "./fuelMath";
 import {
   CLASSES,
   MVP_CLASS,
@@ -101,6 +103,7 @@ export const overview = query({
       weeklySteps: number;
       jobLevel: number;
       jobName: string;
+      heroState: FuelState;
       displayStreak: number;
       improvementPct: number;
       _improvement: number;
@@ -133,6 +136,11 @@ export const overview = query({
         weeklySteps: weekly,
         jobLevel,
         jobName: cls.jobNames[jobLevel - 1],
+        // Hero state (STR-11): DERIVED at read time from the member's stored
+        // (fuel, fuelSettledAt) by the same pure walk a settle runs — no extra
+        // reads (the user doc is already in hand) and no writes. A query-time
+        // derivation matches a settle-then-read exactly (see fuel.test.mjs).
+        heroState: fuelSnapshot(u, now).state,
         displayStreak,
         improvementPct: Math.round((improvement - 1) * 100),
         _improvement: improvement,
