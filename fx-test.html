@@ -1,0 +1,203 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — FX Test Rig</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; background:#0b0910; overflow:hidden;
+    font-family:-apple-system,"Segoe UI",system-ui,sans-serif; }
+  img.sprite { image-rendering:pixelated; image-rendering:crisp-edges; }
+  #stage { position:fixed; inset:0; overflow:hidden; }
+  #bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 35%; }
+  .hero { position:absolute; transform-origin:bottom center; }
+  .hero img { display:block; height:100%; }
+  #boss { position:absolute; right:0; bottom:18%; transform:translateX(30%); transform-origin:right bottom; }
+  #boss img { display:block; height:100%; filter:drop-shadow(0 14px 10px rgba(0,0,0,.5)); }
+  #panel { position:absolute; top:10px; left:10px; z-index:200; display:flex; gap:8px; flex-wrap:wrap;
+    background:rgba(12,10,16,.85); border:1px solid #46405a; border-radius:10px; padding:10px; }
+  select,button { background:#1c1723; color:#d8c9a0; border:1px solid #6b5a3e; border-radius:6px;
+    font-size:13px; font-weight:700; padding:6px 10px; cursor:pointer; }
+  button.gold { background:#3a2b12; color:#ffd166; border-color:#b98a2e; }
+  #status { position:absolute; bottom:8px; left:10px; z-index:200; color:#8f97a8; font-size:11px; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <img id="bg" src="assets/backgrounds/battlefield_beach.png" alt="" />
+    <div id="panel">
+      <select id="clsSel"></select>
+      <select id="jobSel"></select>
+      <button id="btnBasic">BASIC</button>
+      <button id="btnSpecial" class="gold">SPECIAL</button>
+      <button id="btnAuto">AUTO: OFF</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+<script src="assets/fx-anchors.js"></script>
+<script src="assets/fx-special-anchors.js"></script>
+<script src="assets/fx-engine.js"></script>
+<script>
+  const stage=document.getElementById('stage');
+  const JOBS={
+    warrior:['1_rookie','2_strider','3_vanguard','4_champion','5_warlord'],
+    mage:['1_apprentice','2_adept','3_conjurer','4_sorcerer','5_archmage'],
+    medic:['1_acolyte','2_healer','3_cleric','4_priest','5_hierophant'],
+    archer:['1_greenhorn','2_scout','3_hunter','4_ranger','5_sentinel'],
+    assassin:['1_footpad','2_prowler','3_nightblade','4_assassin','5_shadowlord'],
+    paladin:['1_squire','2_knight','3_crusader','4_paladin','5_lightbringer'],
+    warlock:['1_initiate','2_cultist','3_hexer','4_warlock','5_dreadlord'],
+    bard:['1_busker','2_minstrel','3_troubadour','4_bard','5_maestro'],
+  };
+  const HERO_PX=128*1.7, BOSS_PX=256*1.7;
+
+  const bossEl=document.createElement('div'); bossEl.id='boss'; bossEl.style.height=BOSS_PX+'px';
+  bossEl.style.transform='translateX(30%)';
+  const bossImg=document.createElement('img'); bossImg.className='sprite';
+  const bf=FXEngine.framesOf('characters/bosses/horse_256/idle',9); bossImg.src=bf[0]; FXEngine.preload(bf);
+  bossEl.appendChild(bossImg); stage.appendChild(bossEl);
+  let bi=0; setInterval(()=>{bi=(bi+1)%bf.length;bossImg.src=bf[bi];},1000/9);
+  FXEngine.setBoss(bossImg,bossEl);
+
+  const heroEl=document.createElement('div'); heroEl.className='hero';
+  heroEl.style.left='4%'; heroEl.style.bottom='24%'; heroEl.style.height=HERO_PX+'px'; heroEl.style.zIndex=5;
+  const heroImg=document.createElement('img'); heroImg.className='sprite';
+  heroEl.appendChild(heroImg); stage.appendChild(heroEl);
+
+  const clsSel=document.getElementById('clsSel'), jobSel=document.getElementById('jobSel');
+  Object.keys(JOBS).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c.toUpperCase();clsSel.appendChild(o);});
+  function fillJobs(cls){ jobSel.innerHTML=''; JOBS[cls].forEach(j=>{const o=document.createElement('option');o.value=j;o.textContent=j;jobSel.appendChild(o);}); }
+  fillJobs('warrior'); jobSel.value='5_warlord';
+
+  let fighter=FXEngine.makeFighter(heroImg,'warrior','5_warlord');
+  const status=document.getElementById('status');
+  function setStatus(){ status.textContent=`${clsSel.value}/${jobSel.value} — anchors: ${JSON.stringify(window.FX_ANCHORS[clsSel.value+'/'+jobSel.value])}`; }
+  setStatus();
+
+  function rebuild(){
+    fighter.destroy();
+    fighter=FXEngine.makeFighter(heroImg,clsSel.value,jobSel.value);
+    setStatus();
+  }
+  clsSel.onchange=()=>{ fillJobs(clsSel.value); jobSel.value=JOBS[clsSel.value][4]; rebuild(); };
+  jobSel.onchange=rebuild;
+  document.getElementById('btnBasic').onclick=()=>fighter.basic();
+  document.getElementById('btnSpecial').onclick=()=>fighter.special();
+  let auto=null;
+  document.getElementById('btnAuto').onclick=(e)=>{
+    if(auto){ clearInterval(auto); auto=null; e.target.textContent='AUTO: OFF'; }
+    else { let n=0; auto=setInterval(()=>{ (++n%4===0)?fighter.special():fighter.basic(); },2500); e.target.textContent='AUTO: ON'; }
+  };
+
+  // expose for playwright sweeps
+  window.__fx = { setClassJob(cls,job){ clsSel.value=cls; fillJobs(cls); jobSel.value=job; rebuild(); },
+    basic(){ fighter.basic(); }, special(){ fighter.special(); }, state(){ return fighter.mode; } };
+
+  /* ================= self-test modes =================
+     ?verify=1  — fires basic+special for all 40 jobs, checks each projectile
+                  flies strictly rightward at constant height and lands an
+                  impact. On-screen PASS/FAIL panel + window.__verifyResult.
+     ?scan=1    — pixel-scans attack + special frames of all 40 jobs and
+                  prints fresh JSON for assets/fx-anchors.js /
+                  assets/fx-special-anchors.js + window.__scanResult.       */
+  const params=new URLSearchParams(location.search);
+  function panel(){
+    let el=document.getElementById('selftest');
+    if(!el){ el=document.createElement('pre'); el.id='selftest';
+      el.style.cssText='position:fixed;right:8px;top:8px;bottom:8px;width:300px;overflow:auto;z-index:400;'+
+        'background:rgba(8,6,12,.93);color:#9fe89f;border:1px solid #46405a;border-radius:8px;'+
+        'padding:10px;font-size:11px;line-height:1.5;white-space:pre-wrap;margin:0;';
+      document.body.appendChild(el); }
+    return el;
+  }
+  const log=(m)=>{ const el=panel(); el.textContent+=m+'\n'; el.scrollTop=el.scrollHeight; };
+
+  function waitIdle(){ return new Promise(res=>{ const iv=setInterval(()=>{
+    if(fighter.mode==='idle'){ clearInterval(iv); res(); } },50);
+    setTimeout(()=>{ clearInterval(iv); res(); },7000); }); }
+
+  function runAttack(kind){
+    return new Promise(res=>{
+      const track=[]; let sawImpact=false;
+      kind==='basic'?fighter.basic():fighter.special();
+      const iv=setInterval(()=>{
+        const imgs=[...document.querySelectorAll('body > img')];
+        const p=imgs.find(i=>i.src.includes(kind==='basic'?'/basic/':'/special/'));
+        if(p){ const r=p.getBoundingClientRect(); track.push([Math.round(r.left),Math.round(r.top)]); }
+        if(imgs.some(i=>i.src.includes('/impact/'))) sawImpact=true;
+        if(sawImpact&&track.length){ clearInterval(iv);
+          res({ ok: track.every((q,i)=>i===0||q[0]>=track[i-1][0]) && track.every(q=>q[1]===track[0][1]),
+            impact:true }); }
+      },16);
+      setTimeout(()=>{ clearInterval(iv); res({ ok:false, impact:sawImpact, timeout:true }); },8000);
+    });
+  }
+
+  async function runVerify(){
+    const fails=[]; let pass=0, total=0;
+    log('FX VERIFY — 40 jobs x basic+special\n');
+    for(const [cls,jobs] of Object.entries(JOBS)){
+      for(const job of jobs){
+        window.__fx.setClassJob(cls,job);
+        await new Promise(r=>setTimeout(r,250));
+        for(const kind of ['basic','special']){
+          total++;
+          const r=await runAttack(kind); await waitIdle();
+          if(r.ok&&r.impact) pass++;
+          else { fails.push(`${cls}/${job} ${kind}: ${JSON.stringify(r)}`); log(`FAIL ${cls}/${job} ${kind}`); }
+        }
+        log(`${cls}/${job} ok (${pass}/${total})`);
+      }
+    }
+    const verdict=fails.length===0?`\nPASS — ${pass}/${total} attacks verified`:`\nFAIL — ${fails.length} failures`;
+    log(verdict); fails.forEach(f=>log('  '+f));
+    window.__verifyResult={ pass, total, fails, done:true };
+  }
+
+  async function runScan(){
+    const cv=document.createElement('canvas');
+    async function frameStats(src){
+      const img=new Image(); img.src=src;
+      try{ await img.decode(); }catch(e){ return null; }
+      cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+      const g=cv.getContext('2d',{willReadFrequently:true});
+      g.clearRect(0,0,cv.width,cv.height); g.drawImage(img,0,0);
+      const d=g.getImageData(0,0,cv.width,cv.height).data;
+      let maxX=-1,tipY=0;
+      for(let y=0;y<cv.height;y++)for(let x=0;x<cv.width;x++)
+        if(d[(y*cv.width+x)*4+3]>20&&x>maxX){ maxX=x; tipY=y; }
+      return { w:cv.width,h:cv.height,maxX,tipY };
+    }
+    async function scanDir(dir,maxFrames){
+      let best=null;
+      for(let i=0;i<maxFrames;i++){
+        const s=await frameStats(`${dir}/frame_${String(i).padStart(3,'0')}.png?scan=${Date.now()%1e6}`);
+        if(!s) break;
+        if(!best||s.maxX>best.maxX) best={...s,frame:i,count:i+1};
+        else best.count=i+1;
+      }
+      return best&&{ frames:best.count, release:best.frame,
+        tipX:+(best.maxX/best.w).toFixed(3), tipY:+(best.tipY/best.h).toFixed(3) };
+    }
+    log('FX ANCHOR SCAN\n');
+    const attack={}, special={};
+    for(const [cls,jobs] of Object.entries(JOBS)){
+      for(const job of jobs){
+        attack[`${cls}/${job}`]=await scanDir(`characters/${cls}/${job}/animations/attack`,32);
+        const sp=await scanDir(`characters/${cls}/${job}/animations/special`,32);
+        if(sp) special[`${cls}/${job}`]=sp;
+        log(`${cls}/${job} scanned`);
+      }
+    }
+    log('\n--- fx-anchors.js ---\nwindow.FX_ANCHORS = '+JSON.stringify(attack,null,1)+';');
+    log('\n--- fx-special-anchors.js ---\nwindow.FX_SPECIAL_ANCHORS = '+JSON.stringify(special,null,1)+';');
+    window.__scanResult={ attack, special, done:true };
+  }
+
+  if(params.has('verify')) setTimeout(runVerify,800);
+  if(params.has('scan')) setTimeout(runScan,800);
+</script>
+</body>
+</html>

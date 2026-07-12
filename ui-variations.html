@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Stride Quest — UI style options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #15131a; color: #e8ecf4; font-family: -apple-system, system-ui, sans-serif;
+    padding: 24px 28px 60px; max-width: 1080px; margin: 0 auto; }
+  img { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  h2 { font-size: 15px; color: #ffd166; letter-spacing: .5px; margin: 30px 0 14px; padding-bottom: 7px;
+    border-bottom: 1px solid #2b3142; }
+  .sub { color: #8a93a6; font-size: 12.5px; line-height: 1.55; max-width: 780px; }
+  .sub b { color: #cdd3df; }
+
+  /* density reference */
+  .refrow { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap;
+    background: #0e0c12; border: 1px solid #2b3142; border-radius: 12px; padding: 16px 22px; margin-top: 16px; }
+  .ref { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .cap { font-size: 10.5px; color: #8a93a6; text-align: center; line-height: 1.35; }
+
+  /* by-style cohesive kits */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card { background: #0e0c12; border: 1px solid #2b3142; border-radius: 12px; padding: 16px; }
+  .card h3 { font-size: 13px; letter-spacing: 1px; text-align: center; margin-bottom: 14px; }
+  .card.wood h3 { color: #e0b27a; }
+  .card.stone h3 { color: #b8c0cc; }
+  .card.gold h3 { color: #ffd166; }
+  .kit { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .kit .line { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .kit .lbl { font-size: 9px; color: #6b7385; text-align: center; margin-top: 3px; letter-spacing: .5px; }
+  .it { display: flex; flex-direction: column; align-items: center; }
+  .note { font-size: 9px; color: #c2604a; text-align: center; margin-top: 4px; }
+
+  /* by-element matrix */
+  .grid { display: grid; grid-template-columns: 116px repeat(3, 1fr); gap: 12px; align-items: stretch; }
+  .hd { font-weight: 800; font-size: 12px; letter-spacing: 1px; text-align: center; align-self: center; }
+  .hd.wood { color: #e0b27a; } .hd.stone { color: #b8c0cc; } .hd.gold { color: #ffd166; }
+  .rowlbl { font-weight: 700; font-size: 12px; color: #cdd3df; align-self: center; line-height: 1.4; }
+  .cell { background: #0e0c12; border: 1px solid #2b3142; border-radius: 10px; padding: 12px;
+    display: flex; align-items: center; justify-content: center; min-height: 96px; }
+</style>
+</head>
+<body>
+  <h1>Stride Quest — UI style options</h1>
+  <div class="sub">Pick a <b>style family</b> (Wood/Parchment · Stone · Gold), or mix per element. Pixels are chunkier
+    & simpler, shapes vary, and icons are <b>baked into</b> the art. Hero below = <b>in-game pixel-density reference</b>.</div>
+
+  <div class="refrow">
+    <div class="ref"><img src="characters/warrior/5_warlord/animations/idle/frame_000.png" style="height:170px" />
+      <div class="cap">HERO — in-game scale<br>(density reference)</div></div>
+    <div class="ref"><img src="assets/ui/variations/icon_stone.png" style="height:60px" /><div class="cap">icon @ game size</div></div>
+    <div class="ref"><img src="assets/ui/variations/btn_wood.png" style="height:58px" /><div class="cap">button @ game size</div></div>
+    <div class="ref"><img src="assets/ui/variations/badge_stone.png" style="height:50px" /><div class="cap">badge @ game size</div></div>
+    <div class="ref"><img src="assets/ui/variations/bar_gold.png" style="height:42px" /><div class="cap">bar @ game size</div></div>
+  </div>
+
+  <h2>1 · By style — each family as a cohesive kit</h2>
+  <div class="cards">
+    <div class="card wood">
+      <h3>WOOD / PARCHMENT</h3>
+      <div class="kit">
+        <div class="it"><img src="assets/ui/variations/panel_wood.png" style="width:172px" /><div class="lbl">PANEL</div></div>
+        <div class="it"><img src="assets/ui/variations/btn_wood.png" style="width:140px" /><div class="lbl">BUTTON</div></div>
+        <div class="line">
+          <div class="it"><img src="assets/ui/variations/icon_wood.png" style="width:58px" /><div class="lbl">ICON</div></div>
+          <div class="it"><img src="assets/ui/variations/badge_wood.png" style="width:54px" /><div class="lbl">BADGE</div></div>
+        </div>
+        <div class="it"><img src="assets/ui/variations/bar_wood.png" style="width:230px" /><div class="lbl">BAR</div></div>
+      </div>
+    </div>
+
+    <div class="card stone">
+      <h3>STONE</h3>
+      <div class="kit">
+        <div class="it"><img src="assets/ui/variations/panel_stone.png" style="width:172px" /><div class="lbl">PANEL</div></div>
+        <div class="it"><img src="assets/ui/variations/btn_stone.png" style="width:140px" /><div class="lbl">BUTTON</div></div>
+        <div class="line">
+          <div class="it"><img src="assets/ui/variations/icon_stone.png" style="width:58px" /><div class="lbl">ICON</div></div>
+          <div class="it"><img src="assets/ui/variations/badge_stone.png" style="width:54px" /><div class="lbl">BADGE</div></div>
+        </div>
+        <div class="it"><img src="assets/ui/variations/bar_stone.png" style="width:230px" /><div class="lbl">BAR</div></div>
+      </div>
+    </div>
+
+    <div class="card gold">
+      <h3>GOLD</h3>
+      <div class="kit">
+        <div class="it"><img src="assets/ui/variations/panel_gold.png" style="width:172px" /><div class="lbl">PANEL</div></div>
+        <div class="it"><img src="assets/ui/variations/btn_gold.png" style="width:140px" /><div class="lbl">BUTTON</div></div>
+        <div class="line">
+          <div class="it"><img src="assets/ui/variations/icon_gold.png" style="width:96px" /><div class="lbl">ICON <span class="note">(misfired → re-roll)</span></div></div>
+          <div class="it"><img src="assets/ui/variations/badge_gold.png" style="width:54px" /><div class="lbl">BADGE</div></div>
+        </div>
+        <div class="it"><img src="assets/ui/variations/bar_gold.png" style="width:230px" /><div class="lbl">BAR</div></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>2 · By element — compare the same piece across styles</h2>
+  <div class="grid">
+    <div></div><div class="hd wood">WOOD</div><div class="hd stone">STONE</div><div class="hd gold">GOLD</div>
+
+    <div class="rowlbl">Primary button<br>(ATTACK)</div>
+    <div class="cell"><img src="assets/ui/variations/btn_wood.png" style="width:132px" /></div>
+    <div class="cell"><img src="assets/ui/variations/btn_stone.png" style="width:132px" /></div>
+    <div class="cell"><img src="assets/ui/variations/btn_gold.png" style="width:132px" /></div>
+
+    <div class="rowlbl">Icon button<br>(swords baked in)</div>
+    <div class="cell"><img src="assets/ui/variations/icon_wood.png" style="width:72px" /></div>
+    <div class="cell"><img src="assets/ui/variations/icon_stone.png" style="width:72px" /></div>
+    <div class="cell"><img src="assets/ui/variations/icon_gold.png" style="width:116px" /></div>
+
+    <div class="rowlbl">Bar (HP / XP)</div>
+    <div class="cell"><img src="assets/ui/variations/bar_wood.png" style="width:200px" /></div>
+    <div class="cell"><img src="assets/ui/variations/bar_stone.png" style="width:200px" /></div>
+    <div class="cell"><img src="assets/ui/variations/bar_gold.png" style="width:200px" /></div>
+
+    <div class="rowlbl">Level badge</div>
+    <div class="cell"><img src="assets/ui/variations/badge_wood.png" style="width:66px" /></div>
+    <div class="cell"><img src="assets/ui/variations/badge_stone.png" style="width:66px" /></div>
+    <div class="cell"><img src="assets/ui/variations/badge_gold.png" style="width:66px" /></div>
+
+    <div class="rowlbl">Panel<br>(menus / sheets)</div>
+    <div class="cell"><img src="assets/ui/variations/panel_wood.png" style="width:152px" /></div>
+    <div class="cell"><img src="assets/ui/variations/panel_stone.png" style="width:152px" /></div>
+    <div class="cell"><img src="assets/ui/variations/panel_gold.png" style="width:152px" /></div>
+  </div>
+</body>
+</html>

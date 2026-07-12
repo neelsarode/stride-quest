@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — Battlefield Preview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+  /* crisp pixel art on upscale */
+  img.sprite { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  #stage { position: fixed; inset: 0; overflow: hidden; }
+  #bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 35%; }
+
+  /* a hero stands on the ground: bottom-anchored, facing right (toward boss) */
+  .hero { position: absolute; transform-origin: bottom center; }
+  .hero img { display: block; height: 100%; }
+  .hero .shadow {
+    position: absolute; left: 50%; bottom: 4px; width: 66%; height: 15px;
+    transform: translateX(-50%); border-radius: 50%;
+    background: #000; opacity: 0.65; filter: blur(5px);
+  }
+
+  /* boss anchored to the right edge, facing left, partly cut off */
+  #boss { position: absolute; right: 0; bottom: 17%; transform: translateX(28%); transform-origin: right bottom; }
+  #boss img { display: block; height: 100%; filter: drop-shadow(0 14px 10px rgba(0,0,0,0.5)); }
+
+  /* --- minimal game HUD so it reads as the actual screen --- */
+  #topHud {
+    position: absolute; top: 0; left: 0; right: 0; padding: 14px 16px 22px;
+    background: linear-gradient(180deg, rgba(8,6,10,0.85), rgba(8,6,10,0));
+    color: #e8ecf4; font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  #bossName { font-size: 15px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 1px 3px #000; }
+  #bossSub { font-size: 11px; color: #b9a4b8; margin-top: 1px; }
+  #hpTrack { margin-top: 7px; height: 16px; border-radius: 8px; background: rgba(40,12,16,0.85);
+             border: 1px solid rgba(255,255,255,0.12); overflow: hidden; }
+  #hpFill { height: 100%; width: 62%; background: linear-gradient(180deg, #ff5a5f, #c2161b); }
+  #hpText { font-size: 11px; color: #d7c4c8; margin-top: 3px; text-align: right; }
+
+  #label { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
+           color: rgba(255,255,255,0.35); font-family: system-ui; font-size: 11px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <img id="bg" src="assets/backgrounds/battlefield_beach.png" alt="" />
+    <!-- heroes + boss injected by JS -->
+    <div id="topHud">
+      <div id="bossName">THE NIGHTMARE</div>
+      <div id="bossSub">Weekly Boss · Tier 1</div>
+      <div id="hpTrack"><div id="hpFill"></div></div>
+      <div id="hpText">62,000 / 100,000 HP</div>
+    </div>
+    <div id="label">STRIDE QUEST — battlefield preview</div>
+  </div>
+
+<script>
+  const stage = document.getElementById('stage');
+
+  // === ACCURATE SCALE ===========================================================
+  // Heroes and the boss share ONE pixels-per-source-pixel scale, so their relative
+  // size is EXACTLY the native art ratio. Hero frames are 128px, boss frames 256px,
+  // so the boss renders exactly 2× a hero's height — no artificial enlargement.
+  const PX_PER_SRC = 1.8;          // display px per source pixel (same for both); 1.5× the prior 1.2
+  const SRC_HERO = 128, SRC_BOSS = 256;
+  const HERO_PX = SRC_HERO * PX_PER_SRC;   // every hero this tall
+  const BOSS_PX = SRC_BOSS * PX_PER_SRC;   // exactly 2× a hero
+  // ==============================================================================
+
+  // --- party: tight staggered formation, two consistent columns, small gaps ---
+  // left% = one of two columns (cleaner alignment); bottom% = depth (low = front).
+  const COL_L = 1, COL_R = 12; // the two columns (shifted left to use the space)
+  const HEROES = [
+    { cls:'mage',     job:'5_archmage',    left:COL_R, bottom:14.5, z:7 }, // front (bottom)
+    { cls:'assassin', job:'5_shadowlord',  left:COL_L, bottom:20.5, z:6 },
+    { cls:'warrior',  job:'5_warlord',     left:COL_R, bottom:26.5, z:5 },
+    { cls:'archer',   job:'5_sentinel',    left:COL_L, bottom:32.5, z:4 },
+    { cls:'paladin',  job:'5_lightbringer',left:COL_R, bottom:38.5, z:3 }, // back (top)
+  ];
+  const BOSS = { dir:'characters/bosses/horse_256/idle', frames:9, fps:9 };
+  const HERO_FPS = 6;
+
+  const pad = (n) => String(n).padStart(3, '0');
+  const framesOf = (dir, count) =>
+    Array.from({length: count}, (_, i) => `${dir}/frame_${pad(i)}.png`);
+
+  // preload + animate by swapping <img>.src
+  function animate(img, frames, fps) {
+    frames.forEach((f) => { const im = new Image(); im.src = f; });
+    let i = 0;
+    setInterval(() => { i = (i + 1) % frames.length; img.src = frames[i]; }, 1000 / fps);
+  }
+
+  // heroes
+  HEROES.forEach((hd) => {
+    const el = document.createElement('div');
+    el.className = 'hero';
+    el.style.left = hd.left + '%';
+    el.style.bottom = hd.bottom + '%';
+    el.style.height = HERO_PX + 'px'; // uniform → true comparative scale
+    el.style.zIndex = hd.z;
+    const img = document.createElement('img');
+    img.className = 'sprite';
+    const frames = framesOf(`characters/${hd.cls}/${hd.job}/animations/idle`, 4);
+    img.src = frames[0];
+    const shadow = document.createElement('div');
+    shadow.className = 'shadow';
+    el.appendChild(shadow); el.appendChild(img); // shadow behind the sprite
+    stage.appendChild(el);
+    animate(img, frames, HERO_FPS);
+  });
+
+  // boss
+  const bossEl = document.createElement('div');
+  bossEl.id = 'boss';
+  bossEl.style.height = BOSS_PX + 'px'; // exactly 2× a hero (256 vs 128 source px)
+  const bossImg = document.createElement('img');
+  bossImg.className = 'sprite';
+  const bossFrames = framesOf(BOSS.dir, BOSS.frames);
+  bossImg.src = bossFrames[0];
+  bossEl.appendChild(bossImg);
+  stage.appendChild(bossEl);
+  animate(bossImg, bossFrames, BOSS.fps);
+</script>
+</body>
+</html>

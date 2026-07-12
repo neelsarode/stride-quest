@@ -1,0 +1,242 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — UI (stone + gold)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  img.sprite { image-rendering: pixelated; image-rendering: crisp-edges; }
+  .px { image-rendering: pixelated; }
+
+  #stage { position: fixed; inset: 0; overflow: hidden; }
+  #bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 35%; }
+
+  .hero { position: absolute; transform-origin: bottom center; }
+  .hero img { display: block; height: 100%; }
+  .hero .shadow { position: absolute; left: 50%; bottom: 4px; width: 66%; height: 15px;
+    transform: translateX(-50%); border-radius: 50%; background: #000; opacity: .65; filter: blur(5px); }
+  #boss { position: absolute; right: 0; bottom: 22%; transform: translateX(30%); transform-origin: right bottom; }
+  #boss img { display: block; height: 100%; filter: drop-shadow(0 14px 10px rgba(0,0,0,.5)); }
+
+  #topbar, #bossbar, #rightnav, #jobxpframe, #jobbadge, #jobfrac,
+  #collect, #collectlabel, #attackwrap, #stepswrap, #mocklabel { z-index: 100; }
+
+  /* ---- top status ---- */
+  #topbar { position: absolute; top: 0; left: 0; right: 0; padding: 46px 14px 8px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    background: linear-gradient(180deg, rgba(8,6,10,.9), rgba(8,6,10,0)); }
+  #player { display: flex; gap: 9px; align-items: center; }
+  .avatar { width: 44px; height: 44px; background: url(assets/ui/prod/badge_round.png) center/contain no-repeat;
+    image-rendering: pixelated; }
+  #pname { color: #e8ecf4; font-size: 14px; font-weight: 800; }
+  #pmeta { font-size: 11px; color: #b9c0cf; }
+  #streakchip { font-size: 11px; color: #ff7b39; font-weight: 700; }
+  #day { font-size: 10px; color: #9aa3b4; text-align: right; }
+
+  /* ---- boss banner: GOLD hp bar (highest hierarchy) ---- */
+  #bossbar { position: absolute; top: 104px; left: 0; right: 0; text-align: center; }
+  #bossname { color: #ffce6b; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 4px #000; }
+  #bosssub { font-size: 10px; color: #caa6b2; margin-top: 1px; text-shadow: 0 1px 2px #000; }
+  #bosshpframe { position: relative; width: 308px; height: 74px; margin: 1px auto 0; overflow: hidden;
+    background: url(assets/ui/variations/bar_gold.png) center/308px auto no-repeat; image-rendering: pixelated; }
+  #bosshpfill { position: absolute; left: 11.5%; width: 46%; top: 33%; height: 33%;
+    background: linear-gradient(180deg, #ff5a5f, #b81419); }
+  #bosshptext { position: absolute; left: 0; right: 0; top: 35%; text-align: center;
+    font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+
+  /* ---- right nav: STONE buttons (emblems baked in) ---- */
+  #rightnav { position: absolute; right: 9px; top: 178px; display: flex; flex-direction: column; gap: 9px; }
+  .navbtn { width: 50px; height: 50px; background-size: contain; background-repeat: no-repeat; background-position: center;
+    image-rendering: pixelated; }
+  #nav_guild { background-image: url(assets/ui/prod/nav_guild.png); }
+  #nav_stats { background-image: url(assets/ui/prod/nav_stats.png); }
+  #nav_help  { background-image: url(assets/ui/prod/nav_help.png); }
+
+  /* ---- bottom: STONE XP bar + STONE shield badge ---- */
+  #jobxpframe { position: absolute; left: 58px; right: 16px; bottom: 150px; height: 30px; overflow: hidden;
+    background: url(assets/ui/variations/bar_stone.png) center/100% auto no-repeat; image-rendering: pixelated; }
+  #jobxpfill { position: absolute; left: 7%; width: 42%; top: 30%; height: 38%;
+    background: linear-gradient(180deg, #ffe08a, #e6b22b); }
+  #jobbadge { position: absolute; left: 6px; bottom: 138px; width: 50px; height: 50px;
+    background: url(assets/ui/prod/badge_shield.png) center/contain no-repeat; image-rendering: pixelated;
+    display: flex; align-items: center; justify-content: center; }
+  #jobbadge .num { font-size: 15px; font-weight: 800; color: #e8ecf4; text-shadow: 0 1px 2px #000; margin-top: 2px; }
+  #jobfrac { position: absolute; right: 14px; bottom: 164px; font-size: 10px; color: #d8c9a0; text-shadow: 0 1px 2px #000; }
+
+  /* ---- Collect (STONE burst button) bottom-left ---- */
+  #collect { position: absolute; left: 16px; bottom: 42px; width: 66px; height: 66px;
+    background: url(assets/ui/prod/nav_collect2.png) center/contain no-repeat; image-rendering: pixelated; }
+  #collectlabel { position: absolute; left: 16px; bottom: 28px; width: 66px; text-align: center;
+    font-size: 8px; color: #cdb98a; letter-spacing: .5px; }
+  #collectbadge { position: absolute; top: -4px; right: -4px; background: #3fb950; color: #06210d;
+    font-size: 9px; font-weight: 800; border-radius: 9px; padding: 2px 6px; }
+
+  /* ---- ATTACK (GOLD sword button, highest hierarchy) bottom-center ---- */
+  #attackwrap { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: 168px; height: 126px; }
+  #attackbtn { position: absolute; inset: 0; background: url(assets/ui/prod/attack_gold2.png) center/contain no-repeat;
+    image-rendering: pixelated; }
+  #attackcost { position: absolute; left: 50%; transform: translateX(-50%); bottom: 2px;
+    background: rgba(10,8,6,.82); border: 1px solid rgba(255,206,61,.55); border-radius: 8px;
+    font-size: 11px; font-weight: 800; color: #ffd166; padding: 1px 9px; white-space: nowrap; }
+  #streakbadge { position: absolute; top: 6px; right: 6px; background: #2a0f0a; color: #ff7b39;
+    border: 1px solid rgba(255,123,57,.6); border-radius: 10px; font-size: 10px; font-weight: 800; padding: 2px 6px; }
+
+  /* ---- Steps ring bottom-right (dynamic → code) ---- */
+  #stepswrap { position: absolute; right: 16px; bottom: 42px; width: 66px; height: 66px; }
+  #stepsring { position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(#9be37a 0% 78%, rgba(255,255,255,.1) 78% 100%);
+    -webkit-mask: radial-gradient(circle at center, transparent 27px, #000 28px);
+            mask: radial-gradient(circle at center, transparent 27px, #000 28px); }
+  #stepsinner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+  #stepsinner .n { font-size: 12px; font-weight: 800; color: #e8ecf4; }
+  #stepsinner .g { font-size: 7.5px; color: #9aa3b4; }
+
+  #mocklabel { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center;
+    color: rgba(255,255,255,.32); font-size: 9px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <img id="bg" src="assets/backgrounds/battlefield_beach.png" alt="" />
+
+    <div id="topbar">
+      <div id="player">
+        <div class="avatar"></div>
+        <div>
+          <div id="pname">Hero-ehb8</div>
+          <div id="pmeta">Warrior · Job 2 — Strider</div>
+          <div id="streakchip">3-day streak</div>
+        </div>
+      </div>
+      <div id="day">Week 1<br>Mon</div>
+    </div>
+
+    <div id="bossbar">
+      <div id="bossname">THE NIGHTMARE</div>
+      <div id="bosssub">Weekly Boss · Tier 1</div>
+      <div id="bosshpframe">
+        <div id="bosshpfill"></div>
+        <div id="bosshptext">62,000 / 100,000</div>
+      </div>
+    </div>
+
+    <div id="rightnav">
+      <div class="navbtn" id="nav_guild"></div>
+      <div class="navbtn" id="nav_stats"></div>
+      <div class="navbtn" id="nav_help"></div>
+    </div>
+
+    <div id="jobxpframe"><div id="jobxpfill"></div></div>
+    <div id="jobbadge"><div class="num">2</div></div>
+    <div id="jobfrac">12,000 / 25,000 XP</div>
+
+    <div id="collect"><div id="collectbadge">+320</div></div>
+    <div id="collectlabel">COLLECT</div>
+
+    <div id="attackwrap">
+      <div id="attackbtn"></div>
+      <div id="attackcost">⚡ 4,200</div>
+      <div id="streakbadge">×1.2</div>
+    </div>
+
+    <div id="stepswrap">
+      <div id="stepsring"></div>
+      <div id="stepsinner"><div class="n">6,200</div><div class="g">/8,000</div></div>
+    </div>
+
+    <div id="mocklabel">PIXEL-ART UI — stone base + gold hierarchy</div>
+  </div>
+
+<script src="assets/fx-anchors.js"></script>
+<script src="assets/fx-special-anchors.js"></script>
+<script src="assets/fx-engine.js"></script>
+<script>
+  const stage = document.getElementById('stage');
+  const PX_PER_SRC = 1.7;
+  const SRC_HERO = 128, SRC_BOSS = 256;
+  const HERO_PX = SRC_HERO * PX_PER_SRC;
+  const BOSS_PX = SRC_BOSS * PX_PER_SRC;
+  const COL_L = -8, COL_R = 4;
+  const PARTY_DX = -18, PARTY_DY = 50;   // px nudge: negative DX = left, positive DY = down
+  const JOBS = {
+    mage:['1_apprentice','2_adept','3_conjurer','4_sorcerer','5_archmage'],
+    assassin:['1_footpad','2_prowler','3_nightblade','4_assassin','5_shadowlord'],
+    warrior:['1_rookie','2_strider','3_vanguard','4_champion','5_warlord'],
+    archer:['1_greenhorn','2_scout','3_hunter','4_ranger','5_sentinel'],
+    paladin:['1_squire','2_knight','3_crusader','4_paladin','5_lightbringer'],
+    bard:['1_busker','2_minstrel','3_troubadour','4_bard','5_maestro'],
+    medic:['1_acolyte','2_healer','3_cleric','4_priest','5_hierophant'],
+    warlock:['1_initiate','2_cultist','3_hexer','4_warlock','5_dreadlord'],
+  };
+  // Front hero sits at PARTY_BASE so his feet line up with the boss's feet
+  // (boss box bottom is 22%); each row behind steps up PARTY_STEP.
+  const PARTY_BASE = 22, PARTY_STEP = 5;
+  const HEROES = [
+    { cls:'mage',     left:COL_R, z:9 },
+    { cls:'assassin', left:COL_L, z:8 },
+    { cls:'warrior',  left:COL_R, z:7 },
+    { cls:'archer',   left:COL_L, z:6 },
+    { cls:'paladin',  left:COL_R, z:5 },
+    { cls:'bard',     left:COL_L, z:4 },
+    { cls:'medic',    left:COL_R, z:3 },
+    { cls:'warlock',  left:COL_L, z:2 },
+  ].map((h,i)=>({ ...h, bottom: PARTY_BASE + i*PARTY_STEP }));
+  const BOSS = { dir:'characters/bosses/horse_256/idle', frames:9, fps:9 };
+  const CYCLE_MS = 3600, STAGGER_MS = 420, SPECIAL_EVERY = 4;  // basics every cycle; each hero's 4th attack = special
+
+  const bossEl=document.createElement('div'); bossEl.id='boss'; bossEl.style.height=BOSS_PX+'px';
+  bossEl.style.transform='translateX(30%)';
+  const bossImg=document.createElement('img'); bossImg.className='sprite';
+  const bf=FXEngine.framesOf(BOSS.dir,BOSS.frames); bossImg.src=bf[0]; FXEngine.preload(bf);
+  bossEl.appendChild(bossImg); stage.appendChild(bossEl);
+  let bi=0; setInterval(()=>{bi=(bi+1)%bf.length;bossImg.src=bf[bi];},1000/BOSS.fps);
+  FXEngine.setBoss(bossImg,bossEl);
+
+  let jobTier=5;
+  const fighters=HEROES.map(hd=>{
+    const el=document.createElement('div'); el.className='hero';
+    el.style.left=`calc(${hd.left}% + ${PARTY_DX}px)`; el.style.bottom=`calc(${hd.bottom}% - ${PARTY_DY}px)`;
+    el.style.height=HERO_PX+'px'; el.style.zIndex=hd.z; el.style.cursor='pointer';
+    const img=document.createElement('img'); img.className='sprite';
+    const shadow=document.createElement('div'); shadow.className='shadow';
+    el.appendChild(shadow); el.appendChild(img); stage.appendChild(el);
+    const fighter=FXEngine.makeFighter(img,hd.cls,JOBS[hd.cls][jobTier-1]);
+    el.onclick=()=>fighter.special();   // tap a hero → fire their ultimate now
+    return fighter;
+  });
+
+  // Boss auto-scale: never shorter than the party stack — his visible top must
+  // reach the top party member's head. (Fractions: horse art starts 6px into
+  // its 256px canvas; hero heads sit ~20% into their canvas.)
+  const BOSS_TOP_PAD=6/256, HERO_TOP_PAD=0.20, BOSS_BOTTOM_PCT=0.22;
+  const heroEls=[...document.querySelectorAll('.hero')];
+  function sizeBoss(){
+    const hr=heroEls[heroEls.length-1].getBoundingClientRect();
+    const partyTopY=hr.top+hr.height*HERO_TOP_PAD;
+    const bossBottomY=innerHeight*(1-BOSS_BOTTOM_PCT);
+    const needed=(bossBottomY-partyTopY)/(1-BOSS_TOP_PAD);
+    bossEl.style.height=Math.max(BOSS_PX,needed)+'px';
+  }
+  sizeBoss(); addEventListener('resize',sizeBoss);
+
+  let cycle=0;
+  setInterval(()=>{
+    cycle++;
+    fighters.forEach((f,i)=>setTimeout(()=>{
+      ((cycle+i)%SPECIAL_EVERY===0) ? f.special() : f.basic();
+    }, i*STAGGER_MS));
+  },CYCLE_MS);
+
+  // job-tier switcher (dev): swaps every hero to that tier's sprites + anchors
+  const sel=document.createElement('select');
+  sel.id='jobswitch';
+  sel.style.cssText='position:absolute;left:12px;top:150px;z-index:120;background:#1c1723;color:#d8c9a0;border:1px solid #6b5a3e;border-radius:6px;font-size:11px;font-weight:700;padding:3px 6px;';
+  for(let t=1;t<=5;t++){const o=document.createElement('option');o.value=t;o.textContent='JOB '+t;if(t===jobTier)o.selected=true;sel.appendChild(o);}
+  sel.onchange=()=>{jobTier=+sel.value;fighters.forEach((f,i)=>f.setJob(JOBS[HEROES[i].cls][jobTier-1]));};
+  stage.appendChild(sel);
+</script>
+</body>
+</html>
