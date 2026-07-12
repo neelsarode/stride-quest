@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — Resting Preview (campfire)</title>
+<!-- QA rig for STR-38: does each class's idle read as a cozy "resting by the fire"
+     pose at battle-scene scale (1.7x)? Serve the repo root (e.g.
+     `python3 -m http.server 8822`) and open /resting-preview.html.
+     Class/job pickers top-left; heroes idle at low fps beside the animated
+     campfire prop (assets/props/campfire/) with the Zzz wisp (assets/props/zzz/). -->
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; background:#0b0910; overflow:hidden;
+    font-family:-apple-system,"Segoe UI",system-ui,sans-serif; }
+  img.sprite { image-rendering:pixelated; image-rendering:crisp-edges; }
+  #stage { position:fixed; inset:0; overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 100%, #16121c 0%, #0b0910 60%); }
+  #ground { position:absolute; left:0; right:0; bottom:0; height:24%;
+    background:linear-gradient(180deg, #141019 0%, #0e0b12 100%); }
+  /* warm cozy glow around the fire — presentation only, never red/alarming */
+  #glow { position:absolute; width:420px; height:260px; border-radius:50%;
+    background:radial-gradient(closest-side, rgba(255,157,59,.34), rgba(255,157,59,0));
+    pointer-events:none; animation:breathe 2.6s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { opacity:.85 } 50% { opacity:1 } }
+  .hero { position:absolute; transform-origin:bottom center; }
+  .hero img { display:block; height:100%; filter:saturate(.8) brightness(.92)
+    drop-shadow(0 10px 8px rgba(0,0,0,.55)); }
+  #fire { position:absolute; transform-origin:bottom center; }
+  #fire img { display:block; height:100%; filter:drop-shadow(0 8px 8px rgba(0,0,0,.5)); }
+  #zzz { position:absolute; opacity:0; animation:zfloat 3.2s ease-in-out infinite; }
+  #zzz img { display:block; height:100%; }
+  @keyframes zfloat { 0% { transform:translateY(10px); opacity:0 }
+    22% { opacity:.95 } 78% { opacity:.85 } 100% { transform:translateY(-26px); opacity:0 } }
+  #panel { position:absolute; top:10px; left:10px; z-index:200; display:flex; gap:8px; flex-wrap:wrap;
+    background:rgba(12,10,16,.85); border:1px solid #46405a; border-radius:10px; padding:10px; }
+  select,button { background:#1c1723; color:#d8c9a0; border:1px solid #6b5a3e; border-radius:6px;
+    font-size:13px; font-weight:700; padding:6px 10px; cursor:pointer; }
+  #status { position:absolute; bottom:8px; left:10px; z-index:200; color:#8f97a8; font-size:11px; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="ground"></div>
+    <div id="glow"></div>
+    <div id="panel">
+      <select id="clsSel"></select>
+      <select id="jobSel"></select>
+      <button id="btnZzz">ZZZ: ON</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+<script>
+  const stage = document.getElementById('stage');
+  const JOBS = {
+    warrior:['1_rookie','2_strider','3_vanguard','4_champion','5_warlord'],
+    mage:['1_apprentice','2_adept','3_conjurer','4_sorcerer','5_archmage'],
+    medic:['1_acolyte','2_healer','3_cleric','4_priest','5_hierophant'],
+    archer:['1_greenhorn','2_scout','3_hunter','4_ranger','5_sentinel'],
+    assassin:['1_footpad','2_prowler','3_nightblade','4_assassin','5_shadowlord'],
+    paladin:['1_squire','2_knight','3_crusader','4_paladin','5_lightbringer'],
+    warlock:['1_initiate','2_cultist','3_hexer','4_warlock','5_dreadlord'],
+    bard:['1_busker','2_minstrel','3_troubadour','4_bard','5_maestro'],
+  };
+  // Battle-scene scale: heroes render at 128*1.7 in battlefield-ui / fx-test.
+  const HERO_PX = 128 * 1.7;
+  const FIRE_PX = 118;         // campfire prop display height (knee-ish height)
+  const ZZZ_PX = 44;
+  const IDLE_FPS = 3;          // low fps = calm breathing, not battle-ready
+  const FIRE_FPS = 6;
+
+  const pad = (i) => String(i).padStart(3, '0');
+  // Probe a frame dir until 404 (props may store 4 or 5 frames).
+  async function detectFrames(dir, max = 8) {
+    const out = [];
+    for (let i = 0; i < max; i++) {
+      const src = `${dir}/frame_${pad(i)}.png`;
+      const ok = await new Promise((res) => {
+        const im = new Image();
+        im.onload = () => res(true); im.onerror = () => res(false);
+        im.src = src;
+      });
+      if (!ok) break;
+      out.push(src);
+    }
+    return out;
+  }
+  function animate(img, frames, fps) {
+    let i = 0;
+    img.src = frames[0];
+    return setInterval(() => { i = (i + 1) % frames.length; img.src = frames[i]; }, 1000 / fps);
+  }
+
+  // Layout: hero sits on the left facing right (south = front-3/4 facing right),
+  // looking INTO the fire placed to their right. Glow centered on the fire.
+  // NOTE: sprite canvases are square with transparent padding — the visible
+  // character sits mid-canvas, so positions below are tuned by eye at 420px.
+  const heroEl = document.createElement('div'); heroEl.className = 'hero';
+  heroEl.style.left = '6%'; heroEl.style.bottom = '20%'; heroEl.style.height = HERO_PX + 'px';
+  const heroImg = document.createElement('img'); heroImg.className = 'sprite';
+  heroEl.appendChild(heroImg); stage.appendChild(heroEl);
+
+  const fireEl = document.createElement('div'); fireEl.id = 'fire';
+  fireEl.style.left = '40%'; fireEl.style.bottom = '19.5%'; fireEl.style.height = FIRE_PX + 'px';
+  const fireImg = document.createElement('img'); fireImg.className = 'sprite';
+  fireEl.appendChild(fireImg); stage.appendChild(fireEl);
+
+  const glow = document.getElementById('glow');
+  glow.style.left = 'calc(40% - 130px)'; glow.style.bottom = '12%';
+
+  const zzzEl = document.createElement('div'); zzzEl.id = 'zzz';
+  zzzEl.style.left = 'calc(6% + ' + Math.round(HERO_PX * 0.52) + 'px)';
+  zzzEl.style.bottom = 'calc(20% + ' + Math.round(HERO_PX * 0.88) + 'px)';
+  zzzEl.style.height = ZZZ_PX + 'px';
+  const zzzImg = document.createElement('img'); zzzImg.className = 'sprite';
+  zzzEl.appendChild(zzzImg); stage.appendChild(zzzEl);
+
+  const clsSel = document.getElementById('clsSel'), jobSel = document.getElementById('jobSel');
+  Object.keys(JOBS).forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c.toUpperCase(); clsSel.appendChild(o); });
+  function fillJobs(cls) { jobSel.innerHTML = ''; JOBS[cls].forEach(j => { const o = document.createElement('option'); o.value = j; o.textContent = j; jobSel.appendChild(o); }); }
+  fillJobs('warrior');
+
+  const status = document.getElementById('status');
+  let heroTimer = null;
+  async function setHero(cls, job) {
+    if (heroTimer) clearInterval(heroTimer);
+    const dir = `characters/${cls}/${job}/animations/idle`;
+    const frames = await detectFrames(dir, 6);
+    if (frames.length) heroTimer = animate(heroImg, frames, IDLE_FPS);
+    status.textContent = `${cls}/${job} — idle ${frames.length}f @ ${IDLE_FPS}fps, fire @ ${FIRE_FPS}fps`;
+  }
+  clsSel.onchange = () => { fillJobs(clsSel.value); jobSel.value = JOBS[clsSel.value][0]; setHero(clsSel.value, jobSel.value); };
+  jobSel.onchange = () => setHero(clsSel.value, jobSel.value);
+
+  let fireTimer = null, zzzOn = true;
+  (async () => {
+    const frames = await detectFrames('assets/props/campfire', 8);
+    if (frames.length) fireTimer = animate(fireImg, frames, FIRE_FPS);
+    else fireEl.style.display = 'none';
+    const zf = await detectFrames('assets/props/zzz', 8);
+    if (zf.length) animate(zzzImg, zf, 2.2);
+    else zzzEl.style.display = 'none';
+    await setHero('warrior', '1_rookie');
+    window.__ready = true;
+  })();
+  document.getElementById('btnZzz').onclick = (e) => {
+    zzzOn = !zzzOn; zzzEl.style.visibility = zzzOn ? 'visible' : 'hidden';
+    e.target.textContent = zzzOn ? 'ZZZ: ON' : 'ZZZ: OFF';
+  };
+
+  // playwright hook
+  window.__rest = { set(cls, job) { clsSel.value = cls; fillJobs(cls); jobSel.value = job; return setHero(cls, job); } };
+</script>
+</body>
+</html>
