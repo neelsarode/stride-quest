@@ -25,6 +25,7 @@ import { applyDeploy, ensureCurrentChallenge } from "./combat";
 import { stepsForDate } from "./steps";
 import { grantFuel, grantStarterFuelIfNew } from "./fuel";
 import { STARTER_FUEL } from "./fuelMath";
+import { settleShieldEarning } from "./shields";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -197,6 +198,9 @@ async function injectFor(
   const now = await effectiveNow(ctx);
   await grantStarterFuelIfNew(ctx, userId, now);
   await grantFuel(ctx, userId, now, Math.max(0, clamped - prevDayMax) * FUEL.fuelPerStep);
+  // Shield earning settles on injects exactly like real syncs (STR-10) — the
+  // dev inject-a-goal-day × advanceDay loop is how shield scenarios are built.
+  await settleShieldEarning(ctx, userId, now);
 }
 
 export const injectStepsFor = mutation({
@@ -359,6 +363,8 @@ export const resetAccount = mutation({
       fuelSettledAt: now,
       overdriveExcessSpent: 0,
       overdriveActiveUntil: undefined,
+      shieldsHeld: 0,
+      shieldLastEarnedWeek: undefined,
     });
   },
 });

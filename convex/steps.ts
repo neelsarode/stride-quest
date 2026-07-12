@@ -10,6 +10,7 @@ import { getUserGroup } from "./players";
 import { effectiveDayForTz, effectiveNow, effectiveWeekForTz } from "./time";
 import { settleFuelAndIdle } from "./idle";
 import { grantFuel, grantStarterFuelIfNew } from "./fuel";
+import { settleShieldEarning } from "./shields";
 import { FUEL, jobLevelForWeeklySteps, multiplierForJobLevel } from "./gameConfig";
 
 // A clearly absurd upper bound — a placeholder for real anti-cheat. The point is
@@ -91,6 +92,10 @@ export const recordSteps = mutation({
     // so grantFuel's internal settle is a no-op; the 48h cap clamps inside).
     const earnedFuel = Math.max(0, clamped - prevDayMax) * FUEL.fuelPerStep;
     await grantFuel(ctx, userId, now, earnedFuel);
+
+    // Streak Shields (STR-10): this sync may have turned today into a goal day —
+    // settle earning so protection is in the pocket BEFORE it's needed.
+    await settleShieldEarning(ctx, userId, now);
 
     return await stepsForDate(ctx, userId, day);
   },

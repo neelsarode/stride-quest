@@ -64,6 +64,15 @@ export default defineSchema({
     // on the doc after expiry — settles clamp the ×3 boundary inside their own
     // window, so a stale value simply contributes 0 overdrive hours.
     overdriveActiveUntil: v.optional(v.number()),
+    // --- Phase 3 Streak Shields (STR-10, spec §6; PERSIST across weekly resets)
+    // Settled shield count (0..STREAK_SHIELD.maxHeld). Earned by hitting the
+    // daily goal on 5 days within one Mon–Sun week; auto-consumed silently to
+    // bridge a missed deploy day (the streak survives). Settle-on-interaction:
+    // earning settles on step syncs + deploys, consumption at the next deploy.
+    shieldsHeld: v.optional(v.number()),
+    // weekStart ("YYYY-MM-DD" Monday) of the latest week already credited a
+    // shield — the no-double-earn marker.
+    shieldLastEarnedWeek: v.optional(v.string()),
     // Dev-only simulated teammate bot (never authenticates). Lets us test co-op solo.
     isSimulated: v.optional(v.boolean()),
   })

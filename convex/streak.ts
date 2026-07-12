@@ -3,6 +3,11 @@
 // streak) from the step ledger so the multiplier honestly reflects how hard the
 // player walked while keeping the streak. Used by BOTH the deploy (combat.ts)
 // and the dashboard preview (game.ts) so the number shown == the number applied.
+//
+// Streak Shields (STR-10): the `streakCount` fed in here is the shield-aware
+// continuation from streakMath.continueStreak — a shielded (bridged) day counts
+// inside the streak's day range, so its (low) steps honestly dilute the
+// intensity average while the day count itself survives.
 // =============================================================================
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";

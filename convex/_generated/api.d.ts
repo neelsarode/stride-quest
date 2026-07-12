@@ -22,8 +22,10 @@ import type * as idle from "../idle.js";
 import type * as overdrive from "../overdrive.js";
 import type * as players from "../players.js";
 import type * as rally from "../rally.js";
+import type * as shields from "../shields.js";
 import type * as steps from "../steps.js";
 import type * as streak from "../streak.js";
+import type * as streakMath from "../streakMath.js";
 import type * as time from "../time.js";
 import type * as users from "../users.js";
 
@@ -48,8 +50,10 @@ declare const fullApi: ApiFromModules<{
   overdrive: typeof overdrive;
   players: typeof players;
   rally: typeof rally;
+  shields: typeof shields;
   steps: typeof steps;
   streak: typeof streak;
+  streakMath: typeof streakMath;
   time: typeof time;
   users: typeof users;
 }>;

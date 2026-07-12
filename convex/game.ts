@@ -25,6 +25,7 @@ import {
   nextJobThreshold,
 } from "./gameConfig";
 import { computeStreakMultiplier } from "./streak";
+import { continueStreak } from "./streakMath";
 import { fuelSnapshot, currentBurnPerHour } from "./fuel";
 import {
   TANK_CAP_FUEL,
@@ -131,20 +132,22 @@ export const dashboard = query({
       capMs: OFFLINE_CAP_MS,
     };
 
-    // Streak: shown as 0 if the chain is broken (no deploy today or yesterday).
-    const yesterday = dayString(now - 86_400_000, tz);
+    // Streak: shown as 0 only if the chain is truly lost. Shield-aware (STR-10):
+    // a missed day the pocketed Shields would silently bridge is NOT broken —
+    // the streak survives at the same count. Uses the SAME continuation rule the
+    // deploy applies (streakMath.continueStreak), so the shown streak and the
+    // button's "×N.NN" preview equal what a deploy right now actually lands.
+    // (Exposing shieldsHeld itself on the dashboard is STR-11.)
     const rawStreak = user.streakCount ?? 0;
     const deployedToday = user.lastDeployDate === date;
-    const streakAlive = deployedToday || user.lastDeployDate === yesterday;
-    const shownStreak = streakAlive ? rawStreak : 0;
-    // The multiplier PREVIEW reflects the deploy you'd make right now: continuing
-    // the chain adds a day (unless you already deployed today). Keeps the button's
-    // "×N.NN" readout equal to the damage the deploy will actually apply.
-    const prospectiveStreak = deployedToday
-      ? rawStreak
-      : streakAlive
-        ? rawStreak + 1
-        : 1;
+    const streakCont = continueStreak({
+      prevStreak: rawStreak,
+      shieldsHeld: user.shieldsHeld ?? 0,
+      lastDeployDate: user.lastDeployDate,
+      today: date,
+    });
+    const shownStreak = deployedToday || !streakCont.broken ? rawStreak : 0;
+    const prospectiveStreak = streakCont.streak;
     const { multiplier: streakMult, avgSteps: streakAvgSteps } =
       await computeStreakMultiplier(ctx, userId, tz, now, prospectiveStreak, jobLevel, date);
     const streak = {

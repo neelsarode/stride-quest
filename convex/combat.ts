@@ -10,13 +10,15 @@ import { mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { effectiveNow, effectiveDayForTz, effectiveWeekForTz, dayString } from "./time";
+import { effectiveNow, effectiveDayForTz, effectiveWeekForTz } from "./time";
 import { getUserGroup, memberCount } from "./players";
 import { energyEarned } from "./economy";
 import { settleFuelAndIdle } from "./idle";
 import { settleFuel } from "./fuel";
 import { stepsForWeek } from "./steps";
 import { computeStreakMultiplier } from "./streak";
+import { continueStreak } from "./streakMath";
+import { settleShieldEarning } from "./shields";
 import {
   BOSS,
   CRIT,
@@ -26,8 +28,6 @@ import {
   jobLevelForWeeklySteps,
   multiplierForJobLevel,
 } from "./gameConfig";
-
-const DAY_MS = 86_400_000;
 
 // --- shared helpers ----------------------------------------------------------
 
@@ -216,17 +216,22 @@ export async function applyDeploy(
   const earned = await energyEarned(ctx, userId);
   const available = Math.max(0, earned - (user.energySpent ?? 0));
 
-  // Streak: first deploy of the day extends/keeps it; a gap > 1 day breaks it.
+  // Streak (shield-aware, STR-10): first deploy of the day extends/keeps it; a
+  // missed day is silently bridged by an auto-applied Streak Shield (the streak
+  // survives — no increment for the shielded day, no reset); an uncovered gap
+  // breaks it. Earning settles FIRST so a freshly earned shield (e.g. the 5th
+  // goal day landed yesterday) is in the pocket before it's needed.
   const effNow = await effectiveNow(ctx);
   const today = await effectiveDayForTz(ctx, group.tzOffsetMinutes);
-  const yesterday = dayString(effNow - DAY_MS, group.tzOffsetMinutes ?? 0);
-  const last = user.lastDeployDate;
-  let streak = user.streakCount ?? 0;
-  let firstToday = false;
-  if (last !== today) {
-    firstToday = true;
-    streak = last === yesterday ? streak + 1 : 1;
-  }
+  const shieldsHeld = await settleShieldEarning(ctx, userId, effNow);
+  const cont = continueStreak({
+    prevStreak: user.streakCount ?? 0,
+    shieldsHeld,
+    lastDeployDate: user.lastDeployDate,
+    today,
+  });
+  const streak = cont.streak;
+  const firstToday = cont.firstToday;
   const longest = Math.max(user.longestStreak ?? 0, streak);
 
   const isCrit =
@@ -250,12 +255,14 @@ export async function applyDeploy(
   );
   const damage = Math.round(available * DAMAGE_PER_ENERGY * critMult * sMult);
 
-  // Spend the whole bank (energySpent := lifetime earned → balance 0).
+  // Spend the whole bank (energySpent := lifetime earned → balance 0) and
+  // settle the streak + any shields consumed to bridge the gap.
   await ctx.db.patch(userId, {
     energySpent: earned,
     streakCount: streak,
     longestStreak: longest,
     lastDeployDate: today,
+    shieldsHeld: shieldsHeld - cont.shieldsConsumed,
   });
 
   const progress = await ensureProgress(ctx, challenge, userId);
