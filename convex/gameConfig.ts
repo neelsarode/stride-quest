@@ -83,11 +83,60 @@ export const RECOGNITION = {
   baselineWindowDays: 7,
 } as const; // TUNABLE start
 
+// ============================================================================
+// PHASE 3 TUNABLES — fuel hybrid (spec: docs/superpowers/specs/
+// 2026-07-12-core-loop-fuel-hybrid-design.md). Every value is a STARTING value.
+// ============================================================================
+
+/** Fuel: steps power a hero who fights 24/7. 1 step = 1 fuel; the UI shows
+ *  time-to-empty. 300/h battling means a full 24h of fighting costs 7,200 steps —
+ *  just under the 8k daily goal, so goal-hitters bank a surplus instead of
+ *  treading water. Hero states: Battling (fuel above the winded threshold),
+ *  Winded (low fuel: half damage, half burn — the last nominal 6h stretch to 12),
+ *  Resting (empty: no damage, no burn, never punished). */
+export const FUEL = {
+  fuelPerStep: 1, // TUNABLE start
+  burnPerHourBattling: 300, // TUNABLE start — 24h of fighting ≈ 7,200 steps
+  tankCapHours: 48, // TUNABLE start — 14,400 fuel max banked
+  starterFuelHours: 24, // TUNABLE start — new heroes fight from minute one
+  windedThresholdHours: 6, // TUNABLE start — = 1,800 fuel
+  windedDamageMult: 0.5, // TUNABLE start
+  windedBurnMult: 0.5, // TUNABLE start
+} as const;
+
+/** Overdrive: player-activated fever mode, charged by steps PAST the daily goal.
+ *  Pure reward — normal fuel burn, never a cost. */
+export const OVERDRIVE = {
+  fullChargeExcessSteps: 4_000, // TUNABLE start — steps past DAILY_STEP_GOAL charge the meter
+  durationHours: 4, // TUNABLE start
+  idleDamageMult: 3, // TUNABLE start
+  maxStoredCharges: 1, // TUNABLE start
+} as const;
+
+/** Rally: gift a Winded/Resting teammate some fight time, at a small real cost
+ *  to the giver (gifts that cost something carry social weight). */
+export const RALLY = {
+  energyCost: 500, // TUNABLE start — ≈6% of a goal day
+  fuelHoursGiven: 6, // TUNABLE start
+  perGiverPerDay: 1, // TUNABLE start
+} as const;
+
+/** Streak Shields: auto-applied streak freezes (forgiveness). One sick day never
+ *  erases two weeks of momentum. */
+export const STREAK_SHIELD = {
+  goalDaysPerWeekToEarn: 5, // TUNABLE start — goal days within one Mon–Sun week
+  maxHeld: 2, // TUNABLE start
+  autoApply: true, // TUNABLE start
+} as const;
+
 /** Weekly boss. HP scales with crew size and difficulty tier so finishes stay
  *  close. bossMaxHP(tier, members) = baseHP × max(1,members) × tierScaling^(tier−1). */
 export const BOSS = {
   defaultName: "The Sloth Tyrant",
-  baseHP: 60_000, // per-member baseline — TUNABLE start (solo-beatable in ~a week)
+  // Retuned 60k → 150k for the fuel hybrid: per-member weekly output rises
+  // (24/7 fueled idle + daily crit deploys + Overdrive), so an engaged crew
+  // kills around day 5–6 instead of one-shotting it. — TUNABLE start
+  baseHP: 150_000,
   tierScaling: 1.4, // each kill-spawn is 40% tougher — TUNABLE start
   placeholderMaxHP: 100_000, // fallback only
 } as const;

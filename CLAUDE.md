@@ -220,10 +220,12 @@ that emits semantic events → legible placeholders now, real juice later.
   on improvement+consistency not raw steps; boss kill → "FALLS" banner + victory
   lap; weekly reset → tougher tier-2 boss (HP scales with members×tier), jobs reset
   to 1, energy/streaks persist.
-- **Open tune:** `BOSS.baseHP` (60k) is too low now that deploys are strong (a big
-  deploy one-shots it) — raise it during playtest. Recognition fairness fully
-  separates a light walker beating their own avg from a heavy flat walker once
-  there's a few days of step history.
+- **Tune resolved (STR-5):** `BOSS.baseHP` was 60k and too low once deploys got
+  strong (a big deploy one-shot it) — retuned to **150k** per member alongside the
+  fuel-hybrid config (spec §7), so an engaged crew kills around day 5–6. Still a
+  TUNABLE starting value. Recognition fairness fully separates a light walker
+  beating their own avg from a heavy flat walker once there's a few days of step
+  history.
 
 Tuning lives in `convex/gameConfig.ts` (all marked TUNABLE starting values);
 feel-layer timings/colors in `src/config/assets.ts` (`ANIM`/`FEEDBACK`/`BANNER`/`JUICE`).
