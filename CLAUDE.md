@@ -23,7 +23,11 @@ over features.
 **Stride Quest** — https://linear.app/stridequest/project/stride-quest-40ccda389ff9).
 Milestones M1 (fuel hybrid loop) / M2 (battle-scene RN port) / M3 (monetization)
 / M4 (platform & release) mirror the phases in §7. Keep issues updated as work
-happens (In Progress → Done); new work gets a ticket. GitHub sync pending (M4).
+happens (In Progress → Done); new work gets a ticket.
+
+**GitHub:** https://github.com/neelsarode/stride-quest (private). Branch names
+follow Linear's generated `neel/str-N-...` pattern so the Linear↔GitHub
+integration auto-links branches/PRs to issues once connected in Linear settings.
 
 ---
 
