@@ -8,7 +8,7 @@ import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getUserGroup } from "./players";
 import { effectiveDayForTz, effectiveNow, effectiveWeekForTz } from "./time";
-import { settleIdle } from "./idle";
+import { settleFuelAndIdle } from "./idle";
 import { grantFuel, grantStarterFuelIfNew } from "./fuel";
 import { FUEL, jobLevelForWeeklySteps, multiplierForJobLevel } from "./gameConfig";
 
@@ -56,17 +56,14 @@ export const recordSteps = mutation({
       createdAt: Date.now(),
     });
 
-    // Grant the earned fuel. grantFuel settles the pending burn at the OLD fuel
-    // level first (same "settle before the rate changes" rule as idle), then
-    // adds — clamped at the 48h tank cap.
     const now = await effectiveNow(ctx);
     await grantStarterFuelIfNew(ctx, userId, now);
-    const earnedFuel = Math.max(0, clamped - prevDayMax) * FUEL.fuelPerStep;
-    await grantFuel(ctx, userId, now, earnedFuel);
 
-    // If this step changed the job (multiplier), SETTLE pending idle at the old
-    // rate first, then snapshot the new multiplier — so idle never accrues at the
-    // wrong rate and there's no "bank idle then job-up to cash out high" exploit.
+    // SETTLE fuel + idle damage together BEFORE this sync changes any rate:
+    // the elapsed window accrued at the OLD fuel level and OLD job multiplier.
+    // New fuel (and a job-up's new multiplier) only apply from now on — no
+    // "bank a window, then upgrade to cash it out high" exploit, same rule the
+    // old flat accrual enforced on job changes.
     if (ug) {
       const { weekStart, weekEnd } = await effectiveWeekForTz(ctx, tz);
       const weekly = await stepsForWeek(ctx, userId, weekStart, weekEnd);
@@ -84,11 +81,16 @@ export const recordSteps = mutation({
             q.eq("challengeId", challenge._id).eq("userId", userId),
           )
           .first();
-        if (progress && (progress.idleMultiplierSnapshot ?? 1) !== newMult) {
-          await settleIdle(ctx, progress, await effectiveNow(ctx), newMult);
+        if (progress) {
+          await settleFuelAndIdle(ctx, userId, progress, now, newMult);
         }
       }
     }
+
+    // THEN grant the fuel earned by this sync (the settled window is empty now,
+    // so grantFuel's internal settle is a no-op; the 48h cap clamps inside).
+    const earnedFuel = Math.max(0, clamped - prevDayMax) * FUEL.fuelPerStep;
+    await grantFuel(ctx, userId, now, earnedFuel);
 
     return await stepsForDate(ctx, userId, day);
   },

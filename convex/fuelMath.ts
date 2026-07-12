@@ -15,7 +15,7 @@
 // NOTE the ".ts" import extension: it lets Node's type-stripping run this file
 // directly in tests/fuel.test.mjs (extensionless imports don't resolve in Node).
 // =============================================================================
-import { FUEL, OFFLINE_CAP_MS } from "./gameConfig.ts";
+import { BASE_IDLE_DPH, FUEL, OFFLINE_CAP_MS } from "./gameConfig.ts";
 
 const HOUR_MS = 3_600_000;
 
@@ -130,4 +130,79 @@ export function hoursToEmpty(fuel: number): number {
     Math.max(0, f - WINDED_THRESHOLD_FUEL) / FUEL.burnPerHourBattling;
   const windedHours = Math.min(f, WINDED_THRESHOLD_FUEL) / WINDED_BURN_PER_HOUR;
   return battlingHours + windedHours;
+}
+
+// --- fuel-driven idle damage (STR-7) -------------------------------------------
+
+/** Idle damage-per-hour in a state at a job multiplier: the hero only fights
+ *  while fueled — Battling at full rate, Winded at half, Resting at zero. */
+export function idleDphFor(state: FuelState, jobMult: number): number {
+  return BASE_IDLE_DPH * jobMult * damageMultForState(state);
+}
+
+/** Price idle damage over EXACTLY the segments a fuel walk produced, so burn
+ *  and damage always come from the same clock windows (unfloored — callers
+ *  floor once, at the end of a settle). */
+export function idleDamageForSegments(
+  segments: FuelSegment[],
+  jobMult: number,
+): number {
+  let damage = 0;
+  for (const s of segments) damage += s.hours * idleDphFor(s.state, jobMult);
+  return damage;
+}
+
+/**
+ * The ONE shared settle: walk the piecewise fuel segments once and price both
+ * the burn and the idle damage off the same walk, so they can never disagree.
+ *
+ * Takes the two stored stamps (users.fuelSettledAt, progress.lastIdleCollectedAt).
+ * In normal operation every settle stamps both, so they're equal, and the whole
+ * window earns burn + damage together. When they diverge the mismatched lead-in
+ * is settled one-sided first:
+ *  - fuel stamp older (e.g. a fresh progress row after the weekly boss spawn):
+ *    the lead-in burns fuel but deals NO damage — there was no current boss to
+ *    hit during it.
+ *  - idle stamp older (defensive; shouldn't happen once every settle is shared):
+ *    the lead-in deals damage at the CURRENT settled level's state — the fuel
+ *    trajectory before its own stamp is already settled and unknowable.
+ * Each stamp anchors its own OFFLINE_CAP window (absence pauses both).
+ */
+export function settleFuelAndIdleWindow(args: {
+  fuel: number;
+  fuelLastAt: number;
+  idleLastAt: number;
+  now: number;
+  jobMult: number;
+}): { fuel: number; burned: number; damage: number } {
+  const { now, jobMult } = args;
+  let fuel = Math.max(0, args.fuel);
+  let burned = 0;
+  let damage = 0;
+  let fuelLastAt = args.fuelLastAt;
+  let idleLastAt = args.idleLastAt;
+
+  if (fuelLastAt < idleLastAt) {
+    // Burn-only lead-in (no damage: the current boss didn't exist yet).
+    const w = walkFuel(fuel, cappedElapsedMs(fuelLastAt, Math.min(idleLastAt, now)));
+    fuel = w.endFuel;
+    burned += w.burned;
+    fuelLastAt = idleLastAt;
+  } else if (idleLastAt < fuelLastAt) {
+    // Damage-only lead-in at the current settled level's state (defensive path).
+    const ms = cappedElapsedMs(idleLastAt, Math.min(fuelLastAt, now));
+    damage += (ms / HOUR_MS) * idleDphFor(fuelStateFor(fuel), jobMult);
+    idleLastAt = fuelLastAt;
+  }
+
+  // The shared window: one walk prices burn AND damage from the same segments.
+  const shared = walkFuel(
+    fuel,
+    cappedElapsedMs(Math.max(fuelLastAt, idleLastAt), now),
+  );
+  fuel = shared.endFuel;
+  burned += shared.burned;
+  damage += idleDamageForSegments(shared.segments, jobMult);
+
+  return { fuel, burned, damage: Math.floor(damage) };
 }

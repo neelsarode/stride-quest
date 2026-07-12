@@ -20,8 +20,15 @@ import {
   cappedElapsedMs,
   addFuel,
   hoursToEmpty,
+  idleDphFor,
+  idleDamageForSegments,
+  settleFuelAndIdleWindow,
 } from "../convex/fuelMath.ts";
-import { FUEL, OFFLINE_CAP_HOURS } from "../convex/gameConfig.ts";
+import {
+  BASE_IDLE_DPH,
+  FUEL,
+  OFFLINE_CAP_HOURS,
+} from "../convex/gameConfig.ts";
 
 const HOUR_MS = 3_600_000;
 const approx = (a, b, msg) =>
@@ -143,4 +150,148 @@ test("hoursToEmpty stretches the winded tail to double duration", () => {
 
 test("burn-rate anchor: a full 24h of fighting costs less than the 8k goal day", () => {
   assert.ok(FUEL.burnPerHourBattling * 24 < 8_000); // 7,200 < 8,000
+});
+
+// ==================================================================================
+// STR-7 — fuel-driven idle damage: burn and damage priced off the SAME walk.
+// Damage rates: Battling = 150 × jobMult dph · Winded = 75 × jobMult · Resting = 0.
+// ==================================================================================
+
+test("idle dph per state: 150 battling, 75 winded, 0 resting (at job mult 1)", () => {
+  assert.equal(idleDphFor("battling", 1), BASE_IDLE_DPH); // 150
+  assert.equal(idleDphFor("winded", 1), 75); // 150 × 0.5
+  assert.equal(idleDphFor("resting", 1), 0);
+  assert.equal(idleDphFor("battling", 3.5), 525); // Job 3
+});
+
+test("the hand-computed fueled → winded → resting day earns 3,600 damage at ×2", () => {
+  // Same 3,600-fuel / 24h day as above, priced at job mult ×2:
+  //   battling 6h  × (150 × 2 × 1)   = 1,800
+  //   winded  12h  × (150 × 2 × 0.5) = 1,800
+  //   resting  6h  × 0               =     0
+  //   total damage = 3,600 (and burn = 3,600 → tank empty)
+  const w = walkFuel(3_600, 24 * HOUR_MS);
+  approx(idleDamageForSegments(w.segments, 2), 3_600);
+});
+
+test("shared settle (aligned stamps): burn 750 and damage 375 from one 4h walk", () => {
+  // fuel 2,100, 4h window, job mult 1:
+  //   battling 1h: burn 300, damage 1 × 150 = 150
+  //   winded   3h: burn 450, damage 3 ×  75 = 225
+  //   → burned 750, damage 375, end fuel 1,350
+  const t0 = 1_000_000;
+  const r = settleFuelAndIdleWindow({
+    fuel: 2_100,
+    fuelLastAt: t0,
+    idleLastAt: t0,
+    now: t0 + 4 * HOUR_MS,
+    jobMult: 1,
+  });
+  approx(r.burned, 750);
+  assert.equal(r.damage, 375);
+  approx(r.fuel, 1_350);
+});
+
+test("never-disagree invariant: damage tracks burn through every burning state", () => {
+  // With windedDamageMult == windedBurnMult (both 0.5), damage/burn is the SAME
+  // constant in battling and winded: (150 × mult) / 300 = mult / 2. So for any
+  // window that never rests, damage must equal burned × mult / 2 exactly —
+  // a direct check that both numbers came from the same segments.
+  const t0 = 0;
+  for (const [fuel, hours, mult] of [
+    [7_200, 3, 1],
+    [2_100, 4, 2],
+    [1_500, 5, 3.5],
+  ]) {
+    const r = settleFuelAndIdleWindow({
+      fuel,
+      fuelLastAt: t0,
+      idleLastAt: t0,
+      now: t0 + hours * HOUR_MS,
+      jobMult: mult,
+    });
+    assert.equal(r.damage, Math.floor((r.burned * mult) / 2));
+  }
+});
+
+test("OFFLINE_CAP pauses BOTH burn and damage after 10h", () => {
+  // 30h away, tank 7,200, mult 1: only 10h settle — all battling
+  //   (end fuel 4,200 > 1,800): burn 10 × 300 = 3,000, damage 10 × 150 = 1,500.
+  // The other 20h are paused: no burn, no damage. Absence pauses, never punishes.
+  const t0 = 5_000;
+  const r = settleFuelAndIdleWindow({
+    fuel: 7_200,
+    fuelLastAt: t0,
+    idleLastAt: t0,
+    now: t0 + 30 * HOUR_MS,
+    jobMult: 1,
+  });
+  approx(r.burned, 3_000);
+  assert.equal(r.damage, 1_500);
+  approx(r.fuel, 4_200);
+});
+
+test("weekly-rollover lead-in: older fuel stamp burns but deals no damage", () => {
+  // Fresh progress row (idle stamp) 4h after the last fuel settle — the boss
+  // didn't exist during the lead-in. fuel 3,000, mult 1, now = +6h:
+  //   lead-in  [0h → 4h] burn-only: battling (3,000−1,800)/300 = 4h exactly
+  //            → burn 1,200, damage 0, fuel 1,800
+  //   shared   [4h → 6h] winded 2h: burn 300, damage 2 × 75 = 150, fuel 1,500
+  const t0 = 0;
+  const r = settleFuelAndIdleWindow({
+    fuel: 3_000,
+    fuelLastAt: t0,
+    idleLastAt: t0 + 4 * HOUR_MS,
+    now: t0 + 6 * HOUR_MS,
+    jobMult: 1,
+  });
+  approx(r.burned, 1_500);
+  assert.equal(r.damage, 150);
+  approx(r.fuel, 1_500);
+});
+
+test("defensive path: older idle stamp earns damage at the settled level's state", () => {
+  // idle stamp 2h older than the fuel stamp; fuel already settled at 900
+  // (winded). The lead-in earns 2 × 75 = 150 damage, burns nothing new
+  // (that burn was already settled), and the shared window is empty.
+  const t0 = 0;
+  const r = settleFuelAndIdleWindow({
+    fuel: 900,
+    fuelLastAt: t0 + 2 * HOUR_MS,
+    idleLastAt: t0,
+    now: t0 + 2 * HOUR_MS,
+    jobMult: 1,
+  });
+  approx(r.burned, 0);
+  assert.equal(r.damage, 150);
+  approx(r.fuel, 900);
+});
+
+test("a resting hero deals no damage and burns nothing — never punished", () => {
+  const t0 = 0;
+  const r = settleFuelAndIdleWindow({
+    fuel: 0,
+    fuelLastAt: t0,
+    idleLastAt: t0,
+    now: t0 + 8 * HOUR_MS,
+    jobMult: 10,
+  });
+  assert.equal(r.damage, 0);
+  assert.equal(r.burned, 0);
+  assert.equal(r.fuel, 0); // still zero, never negative
+});
+
+test("damage floors once at the end of a settle (no per-segment rounding)", () => {
+  // fuel 101 (winded) empties in 101/150 h → damage 101/150 × 75 = 50.5 → 50.
+  const t0 = 0;
+  const r = settleFuelAndIdleWindow({
+    fuel: 101,
+    fuelLastAt: t0,
+    idleLastAt: t0,
+    now: t0 + 2 * HOUR_MS,
+    jobMult: 1,
+  });
+  approx(r.burned, 101);
+  assert.equal(r.damage, 50);
+  assert.equal(r.fuel, 0);
 });

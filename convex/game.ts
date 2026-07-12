@@ -18,7 +18,6 @@ import {
   MVP_CLASS,
   JOB_THRESHOLDS,
   XP_PER_STEP,
-  BASE_IDLE_DPH,
   OFFLINE_CAP_MS,
   DAILY_STEP_GOAL,
   jobLevelForWeeklySteps,
@@ -31,6 +30,8 @@ import {
   TANK_CAP_FUEL,
   WINDED_THRESHOLD_FUEL,
   hoursToEmpty,
+  idleDphFor,
+  settleFuelAndIdleWindow,
 } from "./fuelMath";
 
 export const dashboard = query({
@@ -105,12 +106,25 @@ export const dashboard = query({
       settledAt: user.fuelSettledAt ?? now,
     };
 
-    // Idle: rate the client uses to extrapolate a live "pending idle" ticker.
+    // Idle: fuel-driven (STR-7). `dph` is the rate at the tank's CURRENT state
+    // (Battling full, Winded half, Resting zero) for the client's live ticker;
+    // `pending` is the exact uncollected damage, priced over the same piecewise
+    // windows the settle will use (so the preview equals what lands).
     const idleMult =
       myProgress?.idleMultiplierSnapshot ?? multiplierForJobLevel(jobLevel);
+    const pendingIdle = myProgress
+      ? settleFuelAndIdleWindow({
+          fuel: user.fuel ?? 0,
+          fuelLastAt: user.fuelSettledAt ?? now,
+          idleLastAt: myProgress.lastIdleCollectedAt ?? now,
+          now,
+          jobMult: idleMult,
+        }).damage
+      : 0;
     const idle = {
       lastIdleCollectedAt: myProgress?.lastIdleCollectedAt ?? now,
-      dph: BASE_IDLE_DPH * idleMult,
+      dph: idleDphFor(tank.state, idleMult),
+      pending: pendingIdle,
       capMs: OFFLINE_CAP_MS,
     };
 

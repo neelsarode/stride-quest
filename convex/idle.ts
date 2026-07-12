@@ -1,42 +1,58 @@
 // =============================================================================
-// Idle accrual math (see Architecture #4). Kept in its own module (depends only
-// on config) so both steps.ts and combat.ts can use it without an import cycle.
+// Idle accrual — FUEL-DRIVEN (STR-7). Kept in its own module (no import cycle
+// with steps.ts / combat.ts).
 // =============================================================================
-// pendingIdleDamage = min(elapsed, OFFLINE_CAP) hours × BASE_IDLE_DPH × the
-// multiplier in force since the last settle. settleIdle banks that onto the
-// boss and re-stamps the clock + (optionally) the new multiplier — so each
-// sub-interval accrues at the correct rate with no mid-window exploit.
+// The hero only fights while fueled: Battling earns BASE_IDLE_DPH × job mult,
+// Winded earns half, Resting earns zero (and burns zero — resting is never
+// punished). Damage and fuel burn settle TOGETHER through one piecewise walk
+// (fuelMath.settleFuelAndIdleWindow) over the same clock windows, so the two
+// can never disagree. Elapsed time past OFFLINE_CAP_HOURS pauses BOTH.
+//
+// settleFuelAndIdle banks the damage onto the boss, drains the tank, and
+// re-stamps both clocks + (optionally) the new job multiplier — so each
+// sub-interval accrues at the correct rate with no mid-window exploit
+// (same rule as the old flat accrual's job-change settlement).
 // =============================================================================
 import type { MutationCtx } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
-import { BASE_IDLE_DPH, OFFLINE_CAP_MS } from "./gameConfig";
+import type { Doc, Id } from "./_generated/dataModel";
+import { settleFuelAndIdleWindow } from "./fuelMath";
 
-const HOUR_MS = 3_600_000;
+export type SettleResult = {
+  /** Idle damage banked onto the boss by this settle. */
+  collected: number;
+  /** Fuel burned across the settled window. */
+  burned: number;
+  /** The tank after settling. */
+  fuel: number;
+};
 
-export function pendingIdleDamage(
-  progress: Doc<"challengeProgress">,
-  effNow: number,
-): number {
-  const last = progress.lastIdleCollectedAt ?? effNow;
-  const mult = progress.idleMultiplierSnapshot ?? 1;
-  const elapsed = Math.min(Math.max(0, effNow - last), OFFLINE_CAP_MS);
-  return Math.floor((elapsed / HOUR_MS) * BASE_IDLE_DPH * mult);
-}
-
-/** Bank pending idle onto the boss; re-stamp the idle clock (and multiplier).
- *  Returns the amount collected. */
-export async function settleIdle(
+/** Settle fuel burn + idle damage in one shared walk; bank the damage, drain
+ *  the tank, re-stamp both clocks (and the job multiplier if it changed). */
+export async function settleFuelAndIdle(
   ctx: MutationCtx,
+  userId: Id<"users">,
   progress: Doc<"challengeProgress">,
   effNow: number,
   newMult?: number,
-): Promise<number> {
-  const collected = pendingIdleDamage(progress, effNow);
+): Promise<SettleResult> {
+  const user = await ctx.db.get(userId);
+  if (!user) throw new Error("User row missing.");
+
+  const settled = settleFuelAndIdleWindow({
+    fuel: user.fuel ?? 0,
+    fuelLastAt: user.fuelSettledAt ?? effNow,
+    idleLastAt: progress.lastIdleCollectedAt ?? effNow,
+    now: effNow,
+    jobMult: progress.idleMultiplierSnapshot ?? 1,
+  });
+
+  await ctx.db.patch(userId, { fuel: settled.fuel, fuelSettledAt: effNow });
   await ctx.db.patch(progress._id, {
-    damageContributed: progress.damageContributed + collected,
+    damageContributed: progress.damageContributed + settled.damage,
     lastIdleCollectedAt: effNow,
     idleMultiplierSnapshot: newMult ?? progress.idleMultiplierSnapshot ?? 1,
     updatedAt: Date.now(),
   });
-  return collected;
+
+  return { collected: settled.damage, burned: settled.burned, fuel: settled.fuel };
 }

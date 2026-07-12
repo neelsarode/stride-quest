@@ -66,7 +66,8 @@ export async function grantStarterFuelIfNew(
 }
 
 /** Settle the pending burn window and re-stamp the clock. Returns the settled
- *  tank. Mirrors idle.ts's settleIdle. */
+ *  tank. FUEL-ONLY: when the user has a live boss progress row, prefer
+ *  idle.ts's settleFuelAndIdle so damage settles over the same windows. */
 export async function settleFuel(
   ctx: MutationCtx,
   userId: Id<"users">,

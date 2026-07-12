@@ -13,7 +13,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { effectiveNow, effectiveDayForTz, effectiveWeekForTz, dayString } from "./time";
 import { getUserGroup, memberCount } from "./players";
 import { energyEarned } from "./economy";
-import { settleIdle } from "./idle";
+import { settleFuelAndIdle } from "./idle";
 import { settleFuel } from "./fuel";
 import { stepsForWeek } from "./steps";
 import { computeStreakMultiplier } from "./streak";
@@ -179,12 +179,15 @@ export const collectIdle = mutation({
     const ug = await getUserGroup(ctx, userId);
     if (!ug) return { collected: 0 };
     const now = await effectiveNow(ctx);
-    // The tank settles on every open too (fuel keeps draining while you fight).
-    await settleFuel(ctx, userId, now);
     const challenge = await ensureCurrentChallenge(ctx, ug.group);
-    if (challenge.status !== "active") return { collected: 0 };
+    if (challenge.status !== "active") {
+      // Victory lap: no boss to hit, but the tank still drains on open.
+      await settleFuel(ctx, userId, now);
+      return { collected: 0 };
+    }
     const progress = await ensureProgress(ctx, challenge, userId);
-    const collected = await settleIdle(ctx, progress, now);
+    // One shared settle: fuel burn + idle damage from the same piecewise walk.
+    const { collected } = await settleFuelAndIdle(ctx, userId, progress, now);
     await resolveBoss(ctx, challenge._id);
     return { collected };
   },
