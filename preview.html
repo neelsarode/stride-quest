@@ -46,6 +46,11 @@
   .stage img { image-rendering: pixelated; height: 100px; width:auto; }
   .anim.special .stage img { height:140px; }
   .fcount { font-size:9px; color:#5c6480; margin-top:3px; }
+  /* bosses */
+  .boss-block .card { width:300px; border-color:#b5532a; box-shadow:0 0 14px rgba(181,83,42,.18); }
+  .boss-block .stage { height:240px; }
+  .boss-block .stage img { height:230px; }
+  .boss-block .anim { min-width:130px; }
 
   /* activity feed */
   aside.feed {
@@ -101,9 +106,21 @@ const CLASSES = [
   ["Bard", "bard", [["1_busker","Busker"],["2_minstrel","Minstrel"],["3_troubadour","Troubadour"],["4_bard","Bard"],["5_maestro","Maestro"]]],
 ];
 const EXTRA = { "warrior/5_warlord": ["special"] };
+// Bosses: [display name, folder key under characters/bosses/]. 256px, face left, animatable.
+const BOSSES = [
+  ["Armored Werecat", "armored_cat_256", ["idle","attack"]],
+  ["Creepy Horse", "horse_256", ["idle","idle_alt","attack","hurt"]],
+];
 
 // Newest first. target = "class/job" or null.
 const UPDATES = [
+  ["fix","Boss · Creepy Horse — hurt redone","Proper recoil/stagger hurt; the old mouth-open clip is now a secondary idle (idle_alt, play every ~8 idle cycles).","boss/horse_256"],
+  ["new","Boss · Creepy Horse (256)","New animatable boss — gangly grinning horse-man; idle + attack.","boss/horse_256"],
+  ["new","Boss · Armored Werecat (256)","New animatable boss — armored werecat; idle + attack.","boss/armored_cat_256"],
+  ["fix","Paladin · Crusader (3)","Attack redone — real hammer wind-up + overhead smash (south-east).","paladin/3_crusader"],
+  ["fix","Warrior · Vanguard (3)","Attack redone — big visible sword swing with arc.","warrior/3_vanguard"],
+  ["fix","Archer · Greenhorn (1)","Attack redone — full bow draw + release (was too subtle).","archer/1_greenhorn"],
+  ["fix","Assassin · Nightblade (3)","Attack redone — exaggerated wide dual-blade combo.","assassin/3_nightblade"],
   ["new","Bard · Maestro (5)","Attack → epic 16-frame musical-flurry finale.","bard/5_maestro"],
   ["new","Warlock · Dreadlord (5)","Attack → epic 16-frame green-hellfire flurry.","warlock/5_dreadlord"],
   ["new","Paladin · Lightbringer (5)","Attack → epic 16-frame radiant hammer flurry.","paladin/5_lightbringer"],
@@ -164,6 +181,22 @@ async function buildAnim(container, basedir, type, special=false) {
 }
 async function build() {
   const root = document.getElementById("root"); root.innerHTML = "";
+  // Boss section (256px, animatable) — shown first
+  {
+    const bb = document.createElement("div"); bb.className = "class-block boss-block";
+    bb.innerHTML = `<div class="class-title">Bosses · 256px (face left)</div>`;
+    const brow = document.createElement("div"); brow.className = "row";
+    for (const [bName, bKey, types] of BOSSES) {
+      const card = document.createElement("div"); card.className = "card";
+      card.id = cardId("boss", bKey);
+      card.innerHTML = `<div class="job-name">${bName}</div><div class="job-rank">Boss · 256px · ~3-6x a hero (upscale 2x in-game)</div>`;
+      const anims = document.createElement("div"); anims.className = "anims"; card.appendChild(anims);
+      brow.appendChild(card);
+      const base = `characters/bosses/${bKey}`;
+      for (const t of types) await buildAnim(anims, base, t);
+    }
+    bb.appendChild(brow); root.appendChild(bb);
+  }
   for (const [clsName, clsKey, jobs] of CLASSES) {
     const block = document.createElement("div"); block.className="class-block";
     block.innerHTML = `<div class="class-title">${clsName}</div>`;

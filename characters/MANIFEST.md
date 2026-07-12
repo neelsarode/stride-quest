@@ -19,14 +19,28 @@ Types:
                   (Warlord keeps its attack + has the bonus `special/`.)
 - `evolution/`  — level-up transformation (power-up glow, weapon raised, 13f).
                   Jobs **1-4 only** (the advance to the next rank). 32 total.
-- `special/`    — warlord (warrior job 5) ONLY: epic 17f dash-in + spinning greatsword
-                  combo with energy arcs + explosive finish. Test/example.
+- `special/`    — class-themed ULTIMATE move (generated 2026-07-11). ALL 40 jobs:
+                  job 5 = 17f, jobs 1-4 = 13f. One choreography per class (warrior
+                  spin-slash, mage arcane channel, medic divine burst, archer volley,
+                  assassin dagger flurry, paladin radiant smash, warlock fire eruption,
+                  bard crescendo).
 
-Counts: 40 idle + 40 attack + 32 evolution + 1 special.
-Preview: open `walking-app/preview.html` in a browser to see every animation play.
+Counts: 40 idle + 40 attack + 32 evolution + 40 special.
+Preview: open `walking-app/preview.html` for the sprite gallery, `battlefield-ui.html`
+for the live battle scene (all attacks + specials firing), or `fx-test.html` to trigger
+any class/job's basic or special on demand.
 Attack prompts are weapon-specific (see scratchpad attack_prompts.md).
 
-Status: all 40 jobs complete (320 PNGs, all valid).
+Status: all 40 jobs complete (idle/attack/evolution + special, all valid).
+
+## Attack VFX (`assets/effects/<class>/`)
+Per class (all 8): `basic/` 5f projectile loop (64px), `special/` 5f ultimate
+projectile loop (96px), `impact/` 7f one-shot burst (64px), all PixelLab
+sidescroller objects tagged `sq-vfx-*` in the library. Weapon-tip anchors and
+release frames are pixel-measured per job into `assets/fx-anchors.js` (attack)
+and `assets/fx-special-anchors.js` (special); the shared choreography engine is
+`assets/fx-engine.js`. Verified 2026-07-11: all 40 jobs × basic+special fly
+straight from the weapon tip to the boss with impact + damage number, zero 404s.
 
 ### Warrior (steel / blue-gold)
 - 1_rookie    `95abc995-83d1-41f8-a07a-2c973be024cd`
@@ -83,3 +97,14 @@ Status: all 40 jobs complete (320 PNGs, all valid).
 - 3_troubadour `f5628f50-a824-4374-85b9-f0652e7f5f0d` (v2, carved harp)
 - 4_bard       `9d83d2f7-731d-44e0-bee0-4beb81bfd12f` (v2, golden lyre)
 - 5_maestro    `7dcbe849-4b63-4528-9d47-e13fd503e23d` (v2, magical multi-instrument orchestra)
+
+## Bosses (`characters/bosses/`)
+SPEC: bosses are generated at **256x256** — PixelLab's animatable max (`create_1_direction_object`
+view `sidescroller`, animated via `animate_object`). Face **left** (boss anchored to the right edge
+of a vertical mobile screen, heroes on left, ~50% cut off — Pianus/MapleStory style).
+Upscale 2x nearest-neighbor → 512px for display (keeps animation crisp).
+400px `create_map_object` is bigger but STATIC (no animation).
+
+- `armored_cat_256/`         — 256px werecat boss, facing left: `static.png` + `idle/` (9f). Animatable. ← canonical boss format
+- `armored_cat_colossal_400_left.png` — 400px static, facing left (max size, no animation)
+- `armored_cat_colossal_400.png`      — 400px static, front-facing
