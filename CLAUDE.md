@@ -26,8 +26,9 @@ Milestones M1 (fuel hybrid loop) / M2 (battle-scene RN port) / M3 (monetization)
 happens (In Progress → Done); new work gets a ticket.
 
 **GitHub:** https://github.com/neelsarode/stride-quest (private). Branch names
-follow Linear's generated `neel/str-N-...` pattern so the Linear↔GitHub
-integration auto-links branches/PRs to issues once connected in Linear settings.
+follow Linear's generated `neel/str-N-...` pattern; the Linear↔GitHub
+integration (connected 2026-07-12, all-repos scope) auto-links branches/PRs to
+issues and closes them on merge.
 
 ---
 
