@@ -188,3 +188,29 @@ test("idleDphFor sanity under overdrive config: mult is data-driven", () => {
   // The ×3 lives in OVERDRIVE.idleDamageMult (gameConfig), not hard-coded.
   assert.equal(idleDphFor("battling", 1) * OVERDRIVE.idleDamageMult, 450);
 });
+
+// ==================================================================================
+// STR-12 — dev "fill Overdrive": adjusting the SAME consumed-counter the real
+// derivation reads (spent := earned − fullCharge) yields exactly 100%, for any
+// ledger — including one with no excess at all (spent goes negative, a dev-only
+// credit the clamp handles). A real activation then consumes it exactly as in
+// production (spent := earned → 0%).
+// ==================================================================================
+
+test("dev fill: spent = earned − fullCharge reads back as exactly 100%", () => {
+  for (const earned of [0, 1_000, 4_000, 25_000]) {
+    const spent = earned - OVERDRIVE.fullChargeExcessSteps;
+    assert.equal(overdriveChargeFraction(earned, spent), 1);
+    // …and never OVER 100% (one stored charge max still holds).
+    assert.ok(overdriveChargeFraction(earned, spent) <= 1);
+    // A real activation from the filled state zeroes the meter as usual.
+    assert.equal(overdriveChargeFraction(earned, earned), 0);
+  }
+});
+
+test("dev fill survives extra walking: more excess never breaks the clamp", () => {
+  // Fill at earned=1,000 (spent=−3,000), then the player walks 2,000 more
+  // excess: earned − spent = 6,000 → still reads a clean 100%.
+  const spent = 1_000 - OVERDRIVE.fullChargeExcessSteps;
+  assert.equal(overdriveChargeFraction(3_000, spent), 1);
+});

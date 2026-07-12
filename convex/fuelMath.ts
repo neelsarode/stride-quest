@@ -146,6 +146,16 @@ export function battlingHoursForFuel(fuel: number): number {
   return Math.max(0, fuel) / FUEL.burnPerHourBattling;
 }
 
+/** The inverse: a tank level for N nominal battling-hours, clamped to
+ *  [0, TANK_CAP_FUEL] like every other way fuel enters the tank. Used by the
+ *  dev "set fuel to N hours" control (STR-12). */
+export function fuelForBattlingHours(hours: number): number {
+  return Math.min(
+    Math.max(0, hours) * FUEL.burnPerHourBattling,
+    TANK_CAP_FUEL,
+  );
+}
+
 /** REAL hours of fighting left in the tank from this level ("your hero can
  *  fight for 9 more hours") — the winded stretch burns at half rate, so the
  *  last 1,800 nominal fuel lasts 12 real hours, not 6. */

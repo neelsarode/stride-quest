@@ -21,6 +21,7 @@ import {
   cappedElapsedMs,
   addFuel,
   battlingHoursForFuel,
+  fuelForBattlingHours,
   hoursToEmpty,
   idleDphFor,
   idleDamageForSegments,
@@ -353,4 +354,27 @@ test("battlingHoursForFuel: the display unit the spec sizes everything in", () =
   approx(battlingHoursForFuel(-50), 0); // defensive: never negative
   // A rally's fuelGiven reads back as ≈6 hours (the +1 wake margin is ~12s).
   assert.ok(Math.abs(battlingHoursForFuel(RALLY_FUEL_GRANT) - 6) < 0.01);
+});
+
+// ==================================================================================
+// STR-12 — dev fuel controls: "set fuel to N hours" uses the same clamp rules
+// as every other way fuel enters the tank.
+// ==================================================================================
+
+test("fuelForBattlingHours: dev set-tank clamps like real fuel entry", () => {
+  approx(fuelForBattlingHours(24), STARTER_FUEL); // 24h → 7,200
+  approx(fuelForBattlingHours(0), 0);
+  approx(fuelForBattlingHours(-3), 0); // never negative
+  approx(fuelForBattlingHours(999), TANK_CAP_FUEL); // capped at 48h
+  // Round-trips with the display conversion inside the cap.
+  approx(battlingHoursForFuel(fuelForBattlingHours(13)), 13);
+});
+
+test("dev quick buttons land in the intended hero states", () => {
+  // "Drain → Resting" (0h), "Drain → Winded" (3h ≤ the 6h threshold),
+  // "Tank → 24h" (battling) — the states the M1 scenarios drive from.
+  assert.equal(fuelStateFor(fuelForBattlingHours(0)), "resting");
+  assert.equal(fuelStateFor(fuelForBattlingHours(3)), "winded");
+  assert.equal(fuelStateFor(fuelForBattlingHours(6)), "winded"); // boundary: 6h exactly is still winded
+  assert.equal(fuelStateFor(fuelForBattlingHours(24)), "battling");
 });

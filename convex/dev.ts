@@ -20,12 +20,22 @@ import {
   weekRange,
 } from "./time";
 import { getUserGroup } from "./players";
-import { FUEL, multiplierForJobLevel } from "./gameConfig";
-import { applyDeploy, ensureCurrentChallenge } from "./combat";
+import { FUEL, OVERDRIVE, RALLY, multiplierForJobLevel } from "./gameConfig";
+import {
+  applyDeploy,
+  ensureCurrentChallenge,
+  ensureProgress,
+  resolveBoss,
+} from "./combat";
 import { stepsForDate } from "./steps";
-import { grantFuel, grantStarterFuelIfNew } from "./fuel";
-import { STARTER_FUEL } from "./fuelMath";
+import { grantFuel, grantStarterFuelIfNew, settleFuel } from "./fuel";
+import { settleFuelAndIdle } from "./idle";
+import { STARTER_FUEL, fuelForBattlingHours } from "./fuelMath";
 import { settleShieldEarning } from "./shields";
+import { shieldsAfterEarning } from "./streakMath";
+import { overdriveExcessEarned } from "./overdrive";
+import { applyRally } from "./rally";
+import { energyEarned } from "./economy";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -384,4 +394,119 @@ export const simulateTeammateDeploy = mutation({
   },
 });
 
-// (triggerWeeklyReset arrives with ensureCurrentChallenge in chunk 2b-9.)
+// --- fuel / overdrive / rally / shield controls (STR-12) ----------------------
+// Every M1 acceptance scenario is drivable from the browser DevPanel: drain the
+// tank to Winded/Resting, fill the Overdrive meter, receive a rally from a bot,
+// and stock/spend Streak Shields — all through the SAME derivations and settle
+// paths the real game uses (no magic fields that could diverge).
+
+/** Teleport the caller's tank to N nominal battling-hours (0 → Resting,
+ *  ≤6 → Winded, >6 → Battling; clamped to the 48h cap). The elapsed window is
+ *  SETTLED FIRST at the old level — banking idle damage over the same walk when
+ *  a boss is live — so the standing settle-before-change invariant holds even
+ *  under dev teleports. */
+export const setFuelHours = mutation({
+  args: { hours: v.number() },
+  handler: async (ctx, { hours }) => {
+    assertDevEnabled();
+    const caller = await getAuthUserId(ctx);
+    if (caller === null) throw new Error("Not signed in.");
+    const now = await effectiveNow(ctx);
+    const ug = await getUserGroup(ctx, caller);
+    if (ug) {
+      const challenge = await ensureCurrentChallenge(ctx, ug.group);
+      if (challenge.status === "active") {
+        const progress = await ensureProgress(ctx, challenge, caller);
+        await settleFuelAndIdle(ctx, caller, progress, now);
+        await resolveBoss(ctx, challenge._id);
+      } else {
+        await settleFuel(ctx, caller, now);
+      }
+    } else {
+      await settleFuel(ctx, caller, now);
+    }
+    // THEN set the tank (the settle above also re-stamped fuelSettledAt = now).
+    await ctx.db.patch(caller, { fuel: fuelForBattlingHours(hours) });
+  },
+});
+
+/** Fill the Overdrive meter to exactly 100%. The charge is DERIVED
+ *  ((excessEarned(ledger) − overdriveExcessSpent) / fullCharge, clamped), so
+ *  this adjusts the SAME consumed-counter the derivation reads — never a
+ *  parallel "charge" field that could diverge. `spent` may go negative here
+ *  (a dev-only credit); the fraction clamps at 100%, and a real activation
+ *  snaps spent back to the earned pool exactly as in production. */
+export const fillOverdrive = mutation({
+  args: {},
+  handler: async (ctx) => {
+    assertDevEnabled();
+    const caller = await getAuthUserId(ctx);
+    if (caller === null) throw new Error("Not signed in.");
+    const earned = await overdriveExcessEarned(ctx, caller);
+    await ctx.db.patch(caller, {
+      overdriveExcessSpent: earned - OVERDRIVE.fullChargeExcessSteps,
+    });
+  },
+});
+
+/** Have a simulated teammate send the CALLER a rally, through the REAL
+ *  applyRally path — rate limit (1/giver/day), receiver settle + Winded/Resting
+ *  check, energy spend, and the rallies row (sender attribution, seen:false for
+ *  the STR-15 celebration) all behave exactly like a friend's rally. The bot's
+ *  Energy is topped up via the normal inject path first if it can't afford the
+ *  500. Typical scenario: "Drain → Winded", then this. */
+export const simulateTeammateRally = mutation({
+  args: { giverId: v.id("users") },
+  handler: async (ctx, { giverId }) => {
+    assertDevEnabled();
+    const caller = await getAuthUserId(ctx);
+    if (caller === null) throw new Error("Not signed in.");
+    const giver = await ctx.db.get(giverId);
+    if (!giver?.isSimulated) {
+      throw new Error("Pick a simulated teammate as the giver.");
+    }
+    const ug = await getUserGroup(ctx, caller);
+    if (!ug) throw new Error("No guild.");
+    const balance = Math.max(
+      0,
+      (await energyEarned(ctx, giverId)) - (giver.energySpent ?? 0),
+    );
+    if (balance < RALLY.energyCost) {
+      const now = await effectiveNow(ctx);
+      const today = dayString(now, ug.group.tzOffsetMinutes ?? 0);
+      const dayMax = await stepsForDate(ctx, giverId, today);
+      await injectFor(ctx, giverId, dayMax + (RALLY.energyCost - balance), today);
+    }
+    return await applyRally(ctx, giverId, caller);
+  },
+});
+
+/** Put one Streak Shield in the caller's pocket, through the same cap rule real
+ *  earning uses (max 2 — overflow is lost). Ledger earning settles first so the
+ *  grant stacks on the true pocket. */
+export const grantShield = mutation({
+  args: {},
+  handler: async (ctx) => {
+    assertDevEnabled();
+    const caller = await getAuthUserId(ctx);
+    if (caller === null) throw new Error("Not signed in.");
+    const now = await effectiveNow(ctx);
+    const held = await settleShieldEarning(ctx, caller, now);
+    await ctx.db.patch(caller, { shieldsHeld: shieldsAfterEarning(held) });
+  },
+});
+
+/** Take one Shield back out of the pocket (floors at 0). */
+export const consumeShield = mutation({
+  args: {},
+  handler: async (ctx) => {
+    assertDevEnabled();
+    const caller = await getAuthUserId(ctx);
+    if (caller === null) throw new Error("Not signed in.");
+    const user = await ctx.db.get(caller);
+    if (!user) throw new Error("User row missing.");
+    await ctx.db.patch(caller, {
+      shieldsHeld: Math.max(0, (user.shieldsHeld ?? 0) - 1),
+    });
+  },
+});

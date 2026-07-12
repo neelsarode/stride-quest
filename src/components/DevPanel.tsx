@@ -32,6 +32,11 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const simDeploy = useMutation(api.dev.simulateTeammateDeploy);
   const removeTeammates = useMutation(api.dev.removeSimulatedTeammates);
   const resetAccount = useMutation(api.dev.resetAccount);
+  const setFuelHours = useMutation(api.dev.setFuelHours);
+  const fillOverdrive = useMutation(api.dev.fillOverdrive);
+  const simRally = useMutation(api.dev.simulateTeammateRally);
+  const grantShield = useMutation(api.dev.grantShield);
+  const consumeShield = useMutation(api.dev.consumeShield);
 
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -98,6 +103,15 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
             ))}
           </Section>
 
+          <Section title="FUEL">
+            <Btn label="Tank → 24h" onPress={run(() => setFuelHours({ hours: 24 }))} busy={busy} />
+            <Btn label="Drain → Winded" onPress={run(() => setFuelHours({ hours: 3 }))} busy={busy} />
+            <Btn label="Drain → Resting" onPress={run(() => setFuelHours({ hours: 0 }))} busy={busy} />
+            <Btn label="⚡ Overdrive 100%" onPress={run(() => fillOverdrive({}))} busy={busy} />
+            <Btn label="+1 Shield" onPress={run(() => grantShield({}))} busy={busy} />
+            <Btn label="−1 Shield" onPress={run(() => consumeShield({}))} busy={busy} />
+          </Section>
+
           <Section title="TEAMMATES (co-op)">
             <Btn label="+ Add teammate" onPress={run(() => addTeammate({ name: undefined }))} busy={busy} />
             <Btn label="Remove all" onPress={run(() => removeTeammates({}))} busy={busy} />
@@ -123,6 +137,13 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
                   <Btn
                     label="⚔ Deploy"
                     onPress={run(() => simDeploy({ userId: tm.userId }))}
+                    busy={busy}
+                  />
+                  {/* Rally ME (drain to Winded/Resting first — the real
+                      eligibility check applies, like a friend's rally). */}
+                  <Btn
+                    label="📣 Rally me"
+                    onPress={run(() => simRally({ giverId: tm.userId }))}
                     busy={busy}
                   />
                 </View>
