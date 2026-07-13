@@ -93,6 +93,8 @@
     #jobxpframe { bottom: max(12px, env(safe-area-inset-bottom)); }
     #jobbadge { bottom: calc(max(12px, env(safe-area-inset-bottom)) - 7px); }
     #mocklabel { display: none; }   /* dev watermark collides with the XP bar at 390px */
+    .avatar { width: 40px; height: 40px; }          /* 20 art px @ 2x */
+    #attackwrap { width: 112px; height: 78px; }     /* 56x37 art px @ 2x */
   }
 </style>
 </head>
@@ -240,10 +242,11 @@
 // the ui-kit hi-fi layer at 1 art-px = 3 css-px; zero image chrome, no CSS text.
 'use strict';
 {
-  const UI_S = 3;                      // css px per art px (primary: boss bar, ATTACK)
-  // Phone fit: SECONDARY chrome (nav, portraits, collect, ring, badge, popups)
-  // renders at 2x on iPhone-class widths — primary hierarchy stays 3x.
-  const S2 = matchMedia('(max-width: 430px)').matches ? 2 : UI_S;
+  // css px per art px: 3x desktop, 2x on iPhone-class widths — ALL chrome.
+  // Hierarchy comes from ART size (ATTACK is 56 art px wide vs 18 for nav),
+  // not from mixed pixel scales.
+  const UI_S = matchMedia('(max-width: 430px)').matches ? 2 : 3;
+  const S2 = UI_S;
   const AG = M('silver'), AU = M('gold');
   const GOLD_FAM = { light:'gold1', mid:'gold2', dark:'gold4' };
   const SKY_FAM  = { light:'sky_light', mid:'sky_mid', dark:'sky_dark' };
@@ -289,7 +292,7 @@
   }
 
   /* ---- top status ---- */
-  textEl('pname', 'HERO-EHB8', 'white', 3);
+  textEl('pname', 'HERO-EHB8', 'white', UI_S);
   textEl('pmeta', 'WARRIOR - JOB 2 STRIDER', 'sky_mid', 2);
   textEl('streakchip', '3-DAY STREAK', 'red_light', 2);
   textEl('day', ['WEEK 1', 'MON'], 'sky_mid', 2, 'right');
@@ -305,7 +308,7 @@
   }
 
   /* ---- boss banner: LIVE silver-framed bar, radiant gold fill ---- */
-  textEl('bossname', 'THE NIGHTMARE', 'gold1', 3, 'center');
+  textEl('bossname', 'THE NIGHTMARE', 'gold1', UI_S, 'center');
   const boss = { max: 100000, hp: 100000, disp: 100000, ghost: 100000, ghostDelay: 0, flash: 0, downTimer: 0 };
   const BOSS_BAR_W = Math.floor((innerWidth - 18) / UI_S);   // full width inside the 9px outer padding
   const bossBarC = uiCanvas(BOSS_BAR_W, 20);
