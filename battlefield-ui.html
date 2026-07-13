@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Stride Quest — UI (stone + gold)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -21,81 +21,79 @@
   #boss { position: absolute; right: 0; bottom: 22%; transform: translateX(30%); transform-origin: right bottom; }
   #boss img { display: block; height: 100%; filter: drop-shadow(0 14px 10px rgba(0,0,0,.5)); }
 
-  #topbar, #bossbar, #rightnav, #jobxpframe, #jobbadge, #jobfrac,
+  #topbar, #bossbar, #rightnav, #jobxpframe, #jobbadge,
   #collect, #collectlabel, #attackwrap, #stepswrap, #mocklabel { z-index: 100; }
+
+  /* ALL HUD chrome below is PROCEDURAL — canvases drawn by assets/ui-kit.js.
+     Divs only position; zero image files, zero CSS gradients in the chrome. */
+  canvas.px { display: block; }
 
   /* ---- top status ---- */
   #topbar { position: absolute; top: 0; left: 0; right: 0; padding: 46px 14px 8px;
     display: flex; justify-content: space-between; align-items: flex-start;
     background: linear-gradient(180deg, rgba(8,6,10,.9), rgba(8,6,10,0)); }
   #player { display: flex; gap: 9px; align-items: center; }
-  .avatar { width: 44px; height: 44px; background: url(assets/ui/prod/badge_round.png) center/contain no-repeat;
-    image-rendering: pixelated; }
-  #pname { color: #e8ecf4; font-size: 14px; font-weight: 800; }
-  #pmeta { font-size: 11px; color: #b9c0cf; }
-  #streakchip { font-size: 11px; color: #ff7b39; font-weight: 700; }
-  #day { font-size: 10px; color: #9aa3b4; text-align: right; }
+  .avatar { width: 60px; height: 60px; }
+  #pname, #pmeta, #streakchip { margin-bottom: 4px; }
+  #day canvas { margin-left: auto; }
 
   /* ---- boss banner: GOLD hp bar (highest hierarchy) ---- */
-  #bossbar { position: absolute; top: 104px; left: 0; right: 0; text-align: center; }
-  #bossname { color: #ffce6b; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 4px #000; }
-  #bosssub { font-size: 10px; color: #caa6b2; margin-top: 1px; text-shadow: 0 1px 2px #000; }
-  #bosshpframe { position: relative; width: 308px; height: 74px; margin: 1px auto 0; overflow: hidden;
-    background: url(assets/ui/variations/bar_gold.png) center/308px auto no-repeat; image-rendering: pixelated; }
-  #bosshpfill { position: absolute; left: 11.5%; width: 46%; top: 33%; height: 33%;
-    background: linear-gradient(180deg, #ff5a5f, #b81419); }
-  #bosshptext { position: absolute; left: 0; right: 0; top: 35%; text-align: center;
-    font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+  #bossbar { position: absolute; top: 104px; left: 0; right: 0; }
+  #bossbar canvas { margin: 0 auto 3px; }
 
   /* ---- right nav: STONE buttons (emblems baked in) ---- */
-  #rightnav { position: absolute; right: 9px; top: 178px; display: flex; flex-direction: column; gap: 9px; }
-  .navbtn { width: 50px; height: 50px; background-size: contain; background-repeat: no-repeat; background-position: center;
-    image-rendering: pixelated; }
-  #nav_guild { background-image: url(assets/ui/prod/nav_guild.png); }
-  #nav_stats { background-image: url(assets/ui/prod/nav_stats.png); }
-  #nav_help  { background-image: url(assets/ui/prod/nav_help.png); }
+  #rightnav { position: absolute; right: 9px; top: 204px; display: flex; flex-direction: column; gap: 9px; }
 
-  /* ---- bottom: STONE XP bar + STONE shield badge ---- */
-  #jobxpframe { position: absolute; left: 58px; right: 16px; bottom: 150px; height: 30px; overflow: hidden;
-    background: url(assets/ui/variations/bar_stone.png) center/100% auto no-repeat; image-rendering: pixelated; }
-  #jobxpfill { position: absolute; left: 7%; width: 42%; top: 30%; height: 38%;
-    background: linear-gradient(180deg, #ffe08a, #e6b22b); }
-  #jobbadge { position: absolute; left: 6px; bottom: 138px; width: 50px; height: 50px;
-    background: url(assets/ui/prod/badge_shield.png) center/contain no-repeat; image-rendering: pixelated;
-    display: flex; align-items: center; justify-content: center; }
-  #jobbadge .num { font-size: 15px; font-weight: 800; color: #e8ecf4; text-shadow: 0 1px 2px #000; margin-top: 2px; }
-  #jobfrac { position: absolute; right: 14px; bottom: 164px; font-size: 10px; color: #d8c9a0; text-shadow: 0 1px 2px #000; }
+  /* ---- party rail: horizontal row centered under the boss HP bar
+     (a vertical column covered the party sprites) ---- */
+  #partyrail { position: absolute; left: 0; right: 0; top: 196px; display: flex;
+    flex-direction: row; align-items: center; justify-content: center; gap: 6px;
+    z-index: 100; pointer-events: none; }
+  #partyrail canvas { pointer-events: auto; }
+  #popwrap { position: absolute; z-index: 140; }
+  #toastwrap { position: absolute; left: 0; right: 0; top: 250px; display: flex;
+    justify-content: center; z-index: 150; pointer-events: none; }
+  #scrim { position: fixed; inset: 0; background: rgba(6,8,12,.6); z-index: 300;
+    display: none; align-items: center; justify-content: center; }
 
-  /* ---- Collect (STONE burst button) bottom-left ---- */
-  #collect { position: absolute; left: 16px; bottom: 42px; width: 66px; height: 66px;
-    background: url(assets/ui/prod/nav_collect2.png) center/contain no-repeat; image-rendering: pixelated; }
-  #collectlabel { position: absolute; left: 16px; bottom: 28px; width: 66px; text-align: center;
-    font-size: 8px; color: #cdb98a; letter-spacing: .5px; }
-  #collectbadge { position: absolute; top: -4px; right: -4px; background: #3fb950; color: #06210d;
-    font-size: 9px; font-weight: 800; border-radius: 9px; padding: 2px 6px; }
+  /* ---- bottom: buttons band over a full-width XP bar (mirrors the boss bar) ---- */
+  #jobxpframe { position: absolute; left: 9px; right: 9px; bottom: 18px; height: 42px; }
+  #jobbadge { position: absolute; left: 4px; bottom: 11px; }
 
-  /* ---- ATTACK (GOLD sword button, highest hierarchy) bottom-center ---- */
-  #attackwrap { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: 168px; height: 126px; }
-  #attackbtn { position: absolute; inset: 0; background: url(assets/ui/prod/attack_gold2.png) center/contain no-repeat;
-    image-rendering: pixelated; }
-  #attackcost { position: absolute; left: 50%; transform: translateX(-50%); bottom: 2px;
-    background: rgba(10,8,6,.82); border: 1px solid rgba(255,206,61,.55); border-radius: 8px;
-    font-size: 11px; font-weight: 800; color: #ffd166; padding: 1px 9px; white-space: nowrap; }
-  #streakbadge { position: absolute; top: 6px; right: 6px; background: #2a0f0a; color: #ff7b39;
-    border: 1px solid rgba(255,123,57,.6); border-radius: 10px; font-size: 10px; font-weight: 800; padding: 2px 6px; }
+  /* ---- Collect (silver burst button) bottom-left ---- */
+  #collect { position: absolute; left: 16px; bottom: 84px; }
+  #collectlabel { position: absolute; left: 16px; bottom: 70px; width: 72px; }
+  #collectlabel canvas { margin: 0 auto; }
 
-  /* ---- Steps ring bottom-right (dynamic → code) ---- */
-  #stepswrap { position: absolute; right: 16px; bottom: 42px; width: 66px; height: 66px; }
-  #stepsring { position: absolute; inset: 0; border-radius: 50%;
-    background: conic-gradient(#9be37a 0% 78%, rgba(255,255,255,.1) 78% 100%);
-    -webkit-mask: radial-gradient(circle at center, transparent 27px, #000 28px);
-            mask: radial-gradient(circle at center, transparent 27px, #000 28px); }
-  #stepsinner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
-  #stepsinner .n { font-size: 12px; font-weight: 800; color: #e8ecf4; }
-  #stepsinner .g { font-size: 7.5px; color: #9aa3b4; }
+  /* ---- ATTACK (GOLD hi-fi button, highest hierarchy) bottom-center;
+     cost lives INSIDE the button ---- */
+  #attackwrap { position: absolute; left: 50%; bottom: 78px; transform: translateX(-50%); width: 168px; height: 116px; }
+  #attackbtn { position: absolute; top: 0; left: 0; }
+  #streakbadge { position: absolute; top: -6px; right: -8px; }
+
+  /* ---- Steps ring bottom-right ---- */
+  #stepswrap { position: absolute; right: 16px; bottom: 84px; }
 
   #mocklabel { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center;
     color: rgba(255,255,255,.32); font-size: 9px; letter-spacing: 1px; }
+
+  /* ---- phone fit (iPhone-class widths): tighter tops via real safe-area
+     insets, secondary chrome drops 3x → 2x (JS PHONE flag), lower bottom band.
+     Desktop layout above is untouched. ---- */
+  @media (max-width: 430px) {
+    #topbar { padding: max(14px, env(safe-area-inset-top)) 14px 8px; }
+    #bossbar   { top: calc(max(14px, env(safe-area-inset-top)) + 56px); }
+    #partyrail { top: calc(max(14px, env(safe-area-inset-top)) + 146px); }
+    #rightnav  { top: calc(max(14px, env(safe-area-inset-top)) + 146px); }
+    #toastwrap { top: calc(max(14px, env(safe-area-inset-top)) + 200px); }
+    #attackwrap { bottom: 46px; }
+    #collect { bottom: 62px; }
+    #collectlabel { bottom: 48px; width: 64px; }
+    #stepswrap { bottom: 62px; }
+    #jobxpframe { bottom: max(12px, env(safe-area-inset-bottom)); }
+    #jobbadge { bottom: calc(max(12px, env(safe-area-inset-bottom)) - 7px); }
+    #mocklabel { display: none; }   /* dev watermark collides with the XP bar at 390px */
+  }
 </style>
 </head>
 <body>
@@ -106,56 +104,52 @@
       <div id="player">
         <div class="avatar"></div>
         <div>
-          <div id="pname">Hero-ehb8</div>
-          <div id="pmeta">Warrior · Job 2 — Strider</div>
-          <div id="streakchip">3-day streak</div>
+          <div id="pname"></div>
+          <div id="pmeta"></div>
+          <div id="streakchip"></div>
         </div>
       </div>
-      <div id="day">Week 1<br>Mon</div>
+      <div id="day"></div>
     </div>
 
     <div id="bossbar">
-      <div id="bossname">THE NIGHTMARE</div>
-      <div id="bosssub">Weekly Boss · Tier 1</div>
-      <div id="bosshpframe">
-        <div id="bosshpfill"></div>
-        <div id="bosshptext">62,000 / 100,000</div>
-      </div>
+      <div id="bossname"></div>
+      <div id="bosshpwrap"></div>
     </div>
 
-    <div id="rightnav">
-      <div class="navbtn" id="nav_guild"></div>
-      <div class="navbtn" id="nav_stats"></div>
-      <div class="navbtn" id="nav_help"></div>
-    </div>
+    <div id="rightnav"></div>
+    <div id="partyrail"></div>
+    <div id="popwrap"></div>
+    <div id="toastwrap"></div>
 
-    <div id="jobxpframe"><div id="jobxpfill"></div></div>
-    <div id="jobbadge"><div class="num">2</div></div>
-    <div id="jobfrac">12,000 / 25,000 XP</div>
+    <div id="jobxpframe"></div>
+    <div id="jobbadge"></div>
 
-    <div id="collect"><div id="collectbadge">+320</div></div>
-    <div id="collectlabel">COLLECT</div>
+    <div id="collect"></div>
+    <div id="collectlabel"></div>
 
     <div id="attackwrap">
       <div id="attackbtn"></div>
-      <div id="attackcost">⚡ 4,200</div>
-      <div id="streakbadge">×1.2</div>
+      <div id="streakbadge"></div>
     </div>
 
-    <div id="stepswrap">
-      <div id="stepsring"></div>
-      <div id="stepsinner"><div class="n">6,200</div><div class="g">/8,000</div></div>
-    </div>
+    <div id="stepswrap"></div>
 
-    <div id="mocklabel">PIXEL-ART UI — stone base + gold hierarchy</div>
+    <div id="mocklabel">S8 CELESTIAL SILVER — hi-fi procedural UI, zero image chrome (assets/ui-kit.js)</div>
   </div>
+  <!-- body-level so it stacks above the FX layer (projectiles are z61 on body) -->
+  <div id="scrim"></div>
 
+<script src="assets/ui-kit.js"></script>
 <script src="assets/fx-anchors.js"></script>
 <script src="assets/fx-special-anchors.js"></script>
 <script src="assets/fx-engine.js"></script>
 <script>
   const stage = document.getElementById('stage');
-  const PX_PER_SRC = 1.7;
+  // Phone fit: smaller heroes + a tighter stack so the boss autoscale stays sane
+  // on 390px screens. Desktop keeps the original scale.
+  const PHONE = matchMedia('(max-width: 430px)').matches;
+  const PX_PER_SRC = PHONE ? 1.4 : 1.7;
   const SRC_HERO = 128, SRC_BOSS = 256;
   const HERO_PX = SRC_HERO * PX_PER_SRC;
   const BOSS_PX = SRC_BOSS * PX_PER_SRC;
@@ -173,7 +167,7 @@
   };
   // Front hero sits at PARTY_BASE so his feet line up with the boss's feet
   // (boss box bottom is 22%); each row behind steps up PARTY_STEP.
-  const PARTY_BASE = 22, PARTY_STEP = 5;
+  const PARTY_BASE = 22, PARTY_STEP = PHONE ? 4.2 : 5;
   const HEROES = [
     { cls:'mage',     left:COL_R, z:9 },
     { cls:'assassin', left:COL_L, z:8 },
@@ -194,6 +188,7 @@
   bossEl.appendChild(bossImg); stage.appendChild(bossEl);
   let bi=0; setInterval(()=>{bi=(bi+1)%bf.length;bossImg.src=bf[bi];},1000/BOSS.fps);
   FXEngine.setBoss(bossImg,bossEl);
+  FXEngine.layer = stage;   // effects (z 60-62) render below HUD chrome (z 100+), above heroes
 
   let jobTier=5;
   const fighters=HEROES.map(hd=>{
@@ -233,10 +228,332 @@
   // job-tier switcher (dev): swaps every hero to that tier's sprites + anchors
   const sel=document.createElement('select');
   sel.id='jobswitch';
-  sel.style.cssText='position:absolute;left:12px;top:150px;z-index:120;background:#1c1723;color:#d8c9a0;border:1px solid #6b5a3e;border-radius:6px;font-size:11px;font-weight:700;padding:3px 6px;';
+  sel.style.cssText='position:absolute;left:12px;z-index:120;background:#1c1723;color:#d8c9a0;border:1px solid #6b5a3e;border-radius:6px;font-size:11px;font-weight:700;padding:3px 6px;'
+    + (PHONE ? 'top:calc(max(14px, env(safe-area-inset-top)) + 146px);' : 'top:204px;');
   for(let t=1;t<=5;t++){const o=document.createElement('option');o.value=t;o.textContent='JOB '+t;if(t===jobTier)o.selected=true;sel.appendChild(o);}
   sel.onchange=()=>{jobTier=+sel.value;fighters.forEach((f,i)=>f.setJob(JOBS[HEROES[i].cls][jobTier-1]));};
   stage.appendChild(sel);
+</script>
+<script>
+// ============ PROCEDURAL HUD v2 — S8 "CELESTIAL SILVER" (hi-fi kit) ============
+// Silver hi-fi frames, midnight wells, radiant gold vitals. Everything drawn by
+// the ui-kit hi-fi layer at 1 art-px = 3 css-px; zero image chrome, no CSS text.
+'use strict';
+{
+  const UI_S = 3;                      // css px per art px (primary: boss bar, ATTACK)
+  // Phone fit: SECONDARY chrome (nav, portraits, collect, ring, badge, popups)
+  // renders at 2x on iPhone-class widths — primary hierarchy stays 3x.
+  const S2 = matchMedia('(max-width: 430px)').matches ? 2 : UI_S;
+  const AG = M('silver'), AU = M('gold');
+  const GOLD_FAM = { light:'gold1', mid:'gold2', dark:'gold4' };
+  const SKY_FAM  = { light:'sky_light', mid:'sky_mid', dark:'sky_dark' };
+  const T_S8 = { mat: AG, well:'night_w', wellD:'night_wd', hp: GOLD_FAM };
+  const RAMP_GREEN = makeRamp('acc_green', [PALETTE.green_light, PALETTE.green_mid, PALETTE.green_dark], 6, false);
+  const RAMP_RED   = makeRamp('acc_red',   [PALETTE.red_light, PALETTE.red_mid, PALETTE.red_dark], 6, false);
+
+  function uiCanvas(w, h, cssScale = UI_S){
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.style.width = w * cssScale + 'px';
+    c.style.height = h * cssScale + 'px';
+    c.className = 'px';
+    c.getContext('2d').imageSmoothingEnabled = false;
+    return c;
+  }
+  // Static pixel-text canvas. lines = string | [strings]. cssScale 2 = small caption.
+  function textEl(id, lines, key, cssScale, align = 'left'){
+    lines = Array.isArray(lines) ? lines : [lines];
+    const w = Math.max(...lines.map(l => textWidth(l))) + 2;
+    const h = lines.length * 7;
+    const c = uiCanvas(w, h, cssScale);
+    const ctx = c.getContext('2d');
+    lines.forEach((l, i) => {
+      const lx = align === 'right' ? w - 1 - textWidth(l)
+        : align === 'center' ? Math.round((w - textWidth(l)) / 2) : 1;
+      drawText(ctx, l, lx, 1 + i * 7, key);
+    });
+    document.getElementById(id).appendChild(c);
+    return c;
+  }
+  // Interactive hi-fi button (pressed = contents shift down 1px).
+  function hifiButtonCanvas(w, h, m, content, onClick, cssScale = UI_S){
+    const c = uiCanvas(w, h + 1, cssScale);      // +1 for the drop-shadow row
+    const ctx = c.getContext('2d');
+    const redraw = pressed => { ctx.clearRect(0, 0, c.width, c.height); hifiButton(ctx, 0, 0, w, h, m, content, pressed); };
+    c.style.cursor = 'pointer';
+    c.addEventListener('mousedown',  () => redraw(true));
+    c.addEventListener('mouseup',    () => { redraw(false); if (onClick) onClick(); });
+    c.addEventListener('mouseleave', () => redraw(false));
+    redraw(false);
+    return c;
+  }
+
+  /* ---- top status ---- */
+  textEl('pname', 'HERO-EHB8', 'white', 3);
+  textEl('pmeta', 'WARRIOR - JOB 2 STRIDER', 'sky_mid', 2);
+  textEl('streakchip', '3-DAY STREAK', 'red_light', 2);
+  textEl('day', ['WEEK 1', 'MON'], 'sky_mid', 2, 'right');
+  {
+    // Profile pic = the player's ACTUAL class/job head (Warrior Job 2 Strider)
+    // cropped from the game sprite into a silver portrait frame.
+    const c = uiCanvas(20, 20, S2), ctx = c.getContext('2d');
+    hifiPortrait(ctx, 0, 0, 20, AG, 'night_wd', null);
+    const img = new Image();
+    img.onload = () => { ctx.clearRect(0, 0, 20, 20); hifiPortrait(ctx, 0, 0, 20, AG, 'night_wd', img, PORTRAIT_CROPS.warrior_j2); };
+    img.src = 'characters/warrior/2_strider/south.png';
+    document.querySelector('.avatar').appendChild(c);
+  }
+
+  /* ---- boss banner: LIVE silver-framed bar, radiant gold fill ---- */
+  textEl('bossname', 'THE NIGHTMARE', 'gold1', 3, 'center');
+  const boss = { max: 100000, hp: 100000, disp: 100000, ghost: 100000, ghostDelay: 0, flash: 0, downTimer: 0 };
+  const BOSS_BAR_W = Math.floor((innerWidth - 18) / UI_S);   // full width inside the 9px outer padding
+  const bossBarC = uiCanvas(BOSS_BAR_W, 20);
+  document.getElementById('bosshpwrap').appendChild(bossBarC);
+  const bossBarCtx = bossBarC.getContext('2d');
+  FXEngine.onDamage = (amount) => {
+    if (boss.hp <= 0) return;
+    boss.hp = Math.max(0, boss.hp - amount);
+    boss.flash = 10;
+    boss.ghostDelay = 16;
+    if (boss.hp === 0) boss.downTimer = 160;   // ~2.7s of DEFEATED!, then respawn
+  };
+  const fmt = n => Math.round(n).toLocaleString('en-US');
+  (function bossLoop(){
+    const b = boss, d = b.hp - b.disp;
+    b.disp = Math.abs(d) < b.max * .002 ? b.hp : b.disp + d * .12;
+    if (b.ghost < b.disp) b.ghost = b.disp;
+    if (b.ghost > b.disp){
+      if (b.ghostDelay > 0) b.ghostDelay--;
+      else b.ghost = Math.max(b.disp, b.ghost - Math.max(b.max * .004, (b.ghost - b.disp) * .08));
+    }
+    if (b.flash > 0) b.flash--;
+    if (b.downTimer > 0 && --b.downTimer === 0){ b.hp = b.max; b.disp = b.max; b.ghost = b.max; }
+    const dead = b.hp <= 0;
+    let label = dead ? 'DEFEATED!' : fmt(b.disp) + ' / ' + fmt(b.max);
+    if (dead && (b.downTimer % 24) >= 16) label = null;   // frame-count blink while down
+    bossBarCtx.clearRect(0, 0, BOSS_BAR_W, 20);
+    hifiBar(bossBarCtx, 0, 0, BOSS_BAR_W, 20, T_S8,
+      { value: b.disp / b.max, ghost: b.ghost / b.max, flash: b.flash, label, labelKey: dead ? 'gold1' : 'white' });
+    requestAnimationFrame(bossLoop);
+  })();
+
+  /* ---- right nav: silver hi-fi buttons, emblems baked in ---- */
+  const chartDraw = (ctx, x, y, w, h) => {           // stats = bar chart
+    const bx = x + Math.round((w - 12) / 2), by = y + Math.round((h - 10) / 2);
+    const bar = (ox, bh, key) => {
+      outlineRect(ctx, bx + ox, by + 10 - bh, 4, bh);
+      px(ctx, bx + ox + 1, by + 11 - bh, 2, bh - 2, key);
+    };
+    bar(0, 5, 'silver1'); bar(4, 10, 'gold2'); bar(8, 7, 'silver1');
+  };
+  const nav = document.getElementById('rightnav');
+  nav.appendChild(hifiButtonCanvas(18, 18, AG, { sprite: scaleSprite(BANNER, 2) }, null, S2));
+  nav.appendChild(hifiButtonCanvas(18, 18, AG, { draw: chartDraw }, null, S2));
+  nav.appendChild(hifiButtonCanvas(18, 18, AG, { text: '?', scale: 2 }, () => openHelp(), S2));
+
+  /* ---- job XP: slim silver bar, sky fill + silver badge roundel ---- */
+  const xpWrap = document.getElementById('jobxpframe');
+  const xpC = document.createElement('canvas');
+  xpC.className = 'px';
+  xpWrap.appendChild(xpC);
+  function drawXP(){
+    const w = Math.max(40, Math.floor(xpWrap.clientWidth / S2));
+    xpC.width = w; xpC.height = 14;
+    xpC.style.width = w * S2 + 'px'; xpC.style.height = 14 * S2 + 'px';
+    const ctx = xpC.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    hifiBar(ctx, 0, 0, w, 14, T_S8,
+      { value: 12000 / 25000, fam: SKY_FAM, slim: true, label: '12,000 / 25,000 XP' });
+  }
+  drawXP(); addEventListener('resize', drawXP);
+  {
+    const c = uiCanvas(18, 19, S2), ctx = c.getContext('2d');
+    hifiBadge(ctx, 0, 0, '2', AG);
+    document.getElementById('jobbadge').appendChild(c);
+  }
+
+  /* ---- collect: silver hi-fi button + banked-idle chip ---- */
+  {
+    const c = uiCanvas(32, 30, S2), ctx = c.getContext('2d');
+    const redraw = pressed => {
+      ctx.clearRect(0, 0, 32, 30);
+      hifiButton(ctx, 0, 5, 24, 24, AG, { sprite: STAR }, pressed);
+      hifiChip(ctx, 7, 0, '+320', AG, RAMP_GREEN);
+    };
+    c.style.cursor = 'pointer';
+    c.addEventListener('mousedown',  () => redraw(true));
+    c.addEventListener('mouseup',    () => redraw(false));
+    c.addEventListener('mouseleave', () => redraw(false));
+    redraw(false);
+    document.getElementById('collect').appendChild(c);
+  }
+  textEl('collectlabel', 'COLLECT', 'sky_mid', 2, 'center');
+
+  /* ---- ATTACK: GOLD hi-fi button (high hierarchy) → real party volley.
+     Face = small crossed swords over the energy cost, all inside the button ---- */
+  const attackFace = (ctx, x, y, w, h) => {
+    const label = '4,200';
+    const stackH = 11 + 2 + 7;                       // swords + gap + cost row
+    const top = y + Math.round((h - stackH) / 2);
+    drawSprite(ctx, CROSSED_SWORDS, x + Math.round((w - 11) / 2), top);
+    const lw = 8 + 2 + textWidth(label);             // gem + gap + text
+    const lx = x + Math.round((w - lw) / 2);
+    drawSprite(ctx, GEM, lx, top + 13);
+    drawText(ctx, label, lx + 10, top + 14, 'white');
+  };
+  document.getElementById('attackbtn').appendChild(
+    hifiButtonCanvas(56, 36, AU, { draw: attackFace },
+      () => fighters.forEach((f, i) => setTimeout(() => f.basic(), i * 120))));
+  {
+    const c = uiCanvas(textWidth('X1.2') + 10, 11), ctx = c.getContext('2d');
+    hifiChip(ctx, 0, 0, 'X1.2', AG, RAMP_RED);
+    document.getElementById('streakbadge').appendChild(c);
+  }
+
+  /* ---- steps ring: pixel donut, radiant gold progress ---- */
+  {
+    const c = uiCanvas(30, 30, S2), ctx = c.getContext('2d');
+    drawPixelRing(ctx, 15, 15, 14, 11, 6200 / 8000, 'gold2', 'night_w');
+    drawText(ctx, '6,200', Math.round((30 - textWidth('6,200')) / 2), 9, 'white');
+    drawText(ctx, '8,000', Math.round((30 - textWidth('8,000')) / 2), 16, 'sky_mid');
+    document.getElementById('stepswrap').appendChild(c);
+  }
+
+  /* ---- party rail: full-body portraits + fuel-state dots → tap for stats ---- */
+  const T8 = { mat: AG, sec: AU, well:'night_w', wellD:'night_wd', text:'silver1', textDim:'sky_mid' };
+  const MATES = [
+    { name:'MAYA', cls:'mage',   job:'5_archmage',   state:'battling', steps:'9,842', dmg:'38,210', streak:'6 DAYS' },
+    { name:'JAKE', cls:'archer', job:'5_sentinel',   state:'winded',   steps:'4,120', dmg:'22,405', streak:'2 DAYS' },
+    { name:'SAM',  cls:'medic',  job:'5_hierophant', state:'resting',  steps:'1,050', dmg:'8,750',  streak:'0 DAYS' },
+  ];
+  const rail = document.getElementById('partyrail');
+  const popwrap = document.getElementById('popwrap');
+  const toastwrap = document.getElementById('toastwrap');
+  function showToast(msg){
+    const c = uiCanvas(textWidth(msg) + 12, 14, S2);
+    hifiToast(c.getContext('2d'), 0, 0, msg, AG, 'night_wd');
+    toastwrap.textContent = '';
+    toastwrap.appendChild(c);
+    setTimeout(() => { if (c.parentNode) c.remove(); }, 1800);
+  }
+  function closePopover(){ popwrap.textContent = ''; popwrap.dataset.open = ''; }
+  function openPopover(mate, anchorEl){
+    closePopover();
+    popwrap.dataset.open = mate.name;
+    const hasRally = mate.state === 'resting';
+    const H = hasRally ? 64 : 44;
+    const c = uiCanvas(135, H + 4, S2);
+    const ctx = c.getContext('2d');
+    // row layout: popover hangs BELOW the tapped portrait; arrow x is set after placement
+    const anchorMidX = anchorEl.getBoundingClientRect().left + anchorEl.getBoundingClientRect().width / 2;
+    const popW = 135 * S2;
+    const popLeft = Math.max(8, Math.min(Math.round(anchorMidX - 30), innerWidth - popW - 8));
+    const arrowAt = Math.max(8, Math.min(Math.round((anchorMidX - popLeft) / S2), 124));
+    const pw = hifiPopover(ctx, 0, 3, 132, H, T8, 'top', arrowAt);
+    drawText(ctx, mate.name + ' - ' + mate.cls.toUpperCase(), pw.wx + 4, pw.wy + 3, 'silver1');
+    drawText(ctx, mate.state.toUpperCase(),
+      pw.wx + pw.ww - 4 - textWidth(mate.state.toUpperCase()), pw.wy + 3, STATE_COLORS[mate.state]);
+    const line = (lab, val, y) => {
+      drawText(ctx, lab, pw.wx + 4, y, 'sky_mid');
+      drawText(ctx, val, pw.wx + pw.ww - 4 - textWidth(val), y, 'silver1');
+    };
+    line('STEPS TODAY', mate.steps, pw.wy + 13);
+    line('DMG WEEK', mate.dmg, pw.wy + 22);
+    line('STREAK', mate.streak, pw.wy + 31);
+    let rallyRect = null;
+    if (hasRally){
+      hifiButton(ctx, pw.wx + 3, pw.wy + 42, pw.ww - 6, 15, AU, { text: 'SEND RALLY 500' });
+      rallyRect = { x: pw.wx + 3, y: pw.wy + 42, w: pw.ww - 6, h: 16 };
+    }
+    c.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!rallyRect) return;
+      const r = c.getBoundingClientRect();
+      const mx = Math.floor((e.clientX - r.left) / (r.width / c.width));
+      const my = Math.floor((e.clientY - r.top) / (r.height / c.height));
+      if (mx >= rallyRect.x && mx < rallyRect.x + rallyRect.w &&
+          my >= rallyRect.y && my < rallyRect.y + rallyRect.h){
+        showToast('RALLY SENT TO ' + mate.name + '!');
+        closePopover();
+      }
+    });
+    popwrap.appendChild(c);
+    const railRect = rail.getBoundingClientRect();
+    popwrap.style.left = popLeft + 'px';
+    popwrap.style.top = Math.round(railRect.bottom + 4) + 'px';
+  }
+  // Rally beacon: a resting (out-of-fuel) teammate breathes a soft gold ring —
+  // gold = "action available" (same key as SEND RALLY) — swell, hold, fade, pause.
+  const BEACON_SEQ = [0,0,0,0,0,0,1,2,3,3,3,3,3,2,1,0];   // 10fps → swell, 500ms hold, fade, rest
+  const BEACON_KEYS = [null, 'gold4', 'gold2', 'gold1'];
+  MATES.forEach(mate => {
+    const needsRally = mate.state === 'resting';
+    // 18 art-px @ 3x — same recipe as the right-nav buttons; +1px margin for the
+    // beacon ring, drawn flush against the portrait frame (a touching gold border)
+    const PAD = needsRally ? 1 : 0, S = 18 + PAD * 2;
+    const c = uiCanvas(S, S, S2), ctx = c.getContext('2d');
+    let spriteImg = null, beat = 0;
+    const draw = () => {
+      ctx.clearRect(0, 0, S, S);
+      const key = needsRally ? BEACON_KEYS[BEACON_SEQ[beat]] : null;
+      if (key){                                            // rounded 1px ring, notched corners
+        px(ctx, 2, 0, S-4, 1, key); px(ctx, 2, S-1, S-4, 1, key);
+        px(ctx, 0, 2, 1, S-4, key); px(ctx, S-1, 2, 1, S-4, key);
+        px(ctx, 1, 1, 1, 1, key); px(ctx, S-2, 1, 1, 1, key);
+        px(ctx, 1, S-2, 1, 1, key); px(ctx, S-2, S-2, 1, 1, key);
+      }
+      hifiPortrait(ctx, PAD, PAD, 18, AG, 'night_wd', spriteImg, PORTRAIT_CROPS[mate.cls]);
+      // out-of-fuel reads RED on the roster (teammate call-to-action, not self-shame)
+      hifiStatusDot(ctx, PAD + 12, PAD + 12, needsRally ? 'red_mid' : mate.state);
+    };
+    draw();
+    const img = new Image();
+    img.onload = () => { spriteImg = img; draw(); };
+    img.src = `characters/${mate.cls}/${mate.job}/south.png`;
+    if (needsRally) setInterval(() => { beat = (beat + 1) % BEACON_SEQ.length; draw(); }, 100);
+    c.style.cursor = 'pointer';
+    c.addEventListener('click', e => {
+      e.stopPropagation();
+      if (popwrap.dataset.open === mate.name) closePopover();
+      else openPopover(mate, c);
+    });
+    rail.appendChild(c);
+  });
+  document.addEventListener('click', () => closePopover());
+
+  /* ---- help modal (the ? nav button) ---- */
+  const scrim = document.getElementById('scrim');
+  scrim.addEventListener('click', () => { scrim.style.display = 'none'; });
+  function openHelp(){
+    scrim.textContent = '';
+    scrim.style.display = 'flex';
+    const c = uiCanvas(135, 170, S2);
+    const ctx = c.getContext('2d');
+    const md = hifiModal(ctx, 2, 4, 131, 160, T8, 'HOW TO PLAY');
+    const lines = [
+      ['WALK EVERY DAY.', 'silver1'],
+      ['STEPS BECOME ENERGY.', 'sky_mid'],
+      ['DEPLOY TO STRIKE THE', 'silver1'],
+      ['WEEKLY BOSS TOGETHER.', 'sky_mid'],
+      ['IDLE DAMAGE TICKS 24/7.', 'sky_mid'],
+      ['RALLY RESTING FRIENDS.', 'sky_mid'],
+      ['JOBS RESET MONDAYS.', 'sky_mid'],
+    ];
+    lines.forEach(([ln, key], i) => drawText(ctx, ln, md.well.wx + 6, 22 + i * 10, key));
+    const ok = { x: 2 + Math.round((131 - 44)/2), y: 4 + 160 - 24, w: 44, h: 16 };
+    hifiButton(ctx, ok.x, ok.y, ok.w, ok.h - 1, AG, { text: 'OK' });
+    c.addEventListener('click', e => {
+      e.stopPropagation();
+      const r = c.getBoundingClientRect();
+      const mx = Math.floor((e.clientX - r.left) / (r.width / c.width));
+      const my = Math.floor((e.clientY - r.top) / (r.height / c.height));
+      const inR = q => mx >= q.x && mx < q.x + q.w && my >= q.y && my < q.y + q.h;
+      if (inR(md.closeRect) || inR(ok)) scrim.style.display = 'none';
+    });
+    scrim.appendChild(c);
+  }
+}
 </script>
 </body>
 </html>
