@@ -40,7 +40,7 @@ deliberately not chosen.)
 |---|---|---|---|---|
 | **Battling** | fuel > 1,800 (6h) | `BASE_IDLE_DPH` (150) × job mult | 300/h | attack loop |
 | **Winded** | 0 < fuel ≤ 1,800 | ×0.5 | 150/h (so the last 6 nominal hours stretch to 12 real hours) | slower attack loop |
-| **Resting** | fuel = 0 | 0 | 0 | idle anim at campfire — cozy, never shameful; no HP loss, no party damage, no red UI |
+| **Resting** | fuel = 0 | 0 | 0 | hero sits/kneels on the battlefield, catching breath (dedicated `rest` animation per job; supersedes the original campfire concept, 2026-07-13) — dignified, never shameful; no HP loss, no party damage, no red UI |
 
 **Tank:** cap 48h (14,400 fuel) — a big weekend carries a player through 2 rest
 days. New users start with 24h (7,200 fuel) so the first session never shows a
