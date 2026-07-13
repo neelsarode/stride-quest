@@ -347,18 +347,25 @@ export const resetAccount = mutation({
     for (const p of progress) {
       await ctx.db.patch(p._id, {
         damageContributed: 0,
+        bonusDamageContributed: 0,
         lastIdleCollectedAt: now,
         idleMultiplierSnapshot: 1,
         updatedAt: Date.now(),
       });
     }
 
-    // …ensure THIS week's boss exists and is active (cleared damage ⇒ not defeated)…
+    // …ensure THIS week's boss exists and is active (cleared damage ⇒ not
+    // defeated). Reviving a won boss also un-stamps its Bonus Boss fields —
+    // they're only ever valid on a "won" challenge (M1.5 invariant).
     const ug = await getUserGroup(ctx, caller);
     if (ug) {
       const challenge = await ensureCurrentChallenge(ctx, ug.group);
       if (challenge.status !== "active") {
-        await ctx.db.patch(challenge._id, { status: "active" });
+        await ctx.db.patch(challenge._id, {
+          status: "active",
+          bonusStartedAt: undefined,
+          bonusBossName: undefined,
+        });
       }
     }
 
@@ -414,7 +421,10 @@ export const resetOnboarding = mutation({
   },
 });
 
-/** Make a simulated teammate deploy (drives a bot through the SAME deploy path). */
+/** Make a simulated teammate deploy (drives a bot through the SAME deploy path).
+ *  No status gate (M1.5): like the real deploy, a bot deploy during the bonus
+ *  phase runs the identical pipeline and lands on the bonus meter — which is
+ *  exactly what makes the whole phase browser-testable (spec §5). */
 export const simulateTeammateDeploy = mutation({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
@@ -424,7 +434,6 @@ export const simulateTeammateDeploy = mutation({
     const ug = await getUserGroup(ctx, caller);
     if (!ug) throw new Error("No guild.");
     const challenge = await ensureCurrentChallenge(ctx, ug.group);
-    if (challenge.status !== "active") throw new Error("No active boss.");
     return await applyDeploy(ctx, userId, ug.group, challenge);
   },
 });

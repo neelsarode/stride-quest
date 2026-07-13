@@ -8,18 +8,19 @@
 // =============================================================================
 import { mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { ConvexError } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { effectiveNow, effectiveDayForTz, effectiveWeekForTz } from "./time";
 import { getUserGroup, memberCount } from "./players";
 import { energyEarned } from "./economy";
 import { settleFuelAndIdle } from "./idle";
-import { settleFuel } from "./fuel";
 import { stepsForWeek } from "./steps";
 import { computeStreakMultiplier } from "./streak";
 import { continueStreak } from "./streakMath";
 import { settleShieldEarning } from "./shields";
 import {
+  BONUS_BOSS,
   BOSS,
   CRIT,
   DAMAGE_PER_ENERGY,
@@ -159,13 +160,21 @@ async function totalDamage(
   return rows.reduce((s, r) => s + r.damageContributed, 0);
 }
 
-/** Mark the boss won if total damage has reached its HP (the kill transition). */
+/** Mark the boss won if total damage has reached its HP (the kill transition).
+ *  The SAME write spawns the Bonus Boss (M1.5, spec §3/§5): the status guard
+ *  above makes this the single shared active→won transition, so the crowned
+ *  form can't double-fire. The bonus phase itself is DERIVED — status "won" ∧
+ *  week not over — never a new status literal. */
 export async function resolveBoss(ctx: MutationCtx, challengeId: Id<"challenges">) {
   const challenge = await ctx.db.get(challengeId);
   if (!challenge || challenge.status !== "active") return;
   const total = await totalDamage(ctx, challengeId);
   if (total >= challenge.bossMaxHP) {
-    await ctx.db.patch(challengeId, { status: "won" });
+    await ctx.db.patch(challengeId, {
+      status: "won",
+      bonusStartedAt: await effectiveNow(ctx),
+      bonusBossName: `${BONUS_BOSS.namePrefix} ${challenge.bossName}`,
+    });
   }
 }
 
@@ -180,15 +189,16 @@ export const collectIdle = mutation({
     if (!ug) return { collected: 0 };
     const now = await effectiveNow(ctx);
     const challenge = await ensureCurrentChallenge(ctx, ug.group);
-    if (challenge.status !== "active") {
-      // Victory lap: no boss to hit, but the tank still drains on open.
-      await settleFuel(ctx, userId, now);
-      return { collected: 0 };
-    }
     const progress = await ensureProgress(ctx, challenge, userId);
     // One shared settle: fuel burn + idle damage from the same piecewise walk.
+    // While the challenge is "won" (bonus phase, M1.5 spec §3) the settle banks
+    // the damage into bonusDamageContributed instead of boss HP — the old
+    // victory-lap branch settled fuel but DISCARDED the damage (a subtle
+    // punishment; fixed). OFFLINE_CAP semantics are unchanged inside the walk.
     const { collected } = await settleFuelAndIdle(ctx, userId, progress, now);
-    await resolveBoss(ctx, challenge._id);
+    if (challenge.status === "active") {
+      await resolveBoss(ctx, challenge._id);
+    }
     return { collected };
   },
 });
@@ -266,11 +276,22 @@ export async function applyDeploy(
   });
 
   const progress = await ensureProgress(ctx, challenge, userId);
-  await ctx.db.patch(progress._id, {
-    damageContributed: progress.damageContributed + damage,
-    updatedAt: Date.now(),
-  });
-  await resolveBoss(ctx, challenge._id);
+  if (challenge.status === "won") {
+    // Bonus phase (M1.5 spec §3 — the STR-53 fix): the pipeline above ran
+    // IDENTICALLY (whole bank spent, first-of-day guaranteed crit, streak
+    // multiplier + tick, shields settled) — only the destination changes:
+    // the accumulating bonus meter, not boss HP. Nothing to resolve.
+    await ctx.db.patch(progress._id, {
+      bonusDamageContributed: (progress.bonusDamageContributed ?? 0) + damage,
+      updatedAt: Date.now(),
+    });
+  } else {
+    await ctx.db.patch(progress._id, {
+      damageContributed: progress.damageContributed + damage,
+      updatedAt: Date.now(),
+    });
+    await resolveBoss(ctx, challenge._id);
+  }
 
   return { damage, crit: isCrit, streakMult: sMult, streakCount: streak, spent: available, firstToday };
 }
@@ -281,11 +302,17 @@ export const deploy = mutation({
     const userId = await getAuthUserId(ctx);
     if (userId === null) throw new Error("Not signed in.");
     const ug = await getUserGroup(ctx, userId);
-    if (!ug) throw new Error("No guild yet.");
-    const challenge = await ensureCurrentChallenge(ctx, ug.group);
-    if (challenge.status !== "active") {
-      throw new Error("Boss already defeated — next boss arrives Monday.");
+    if (!ug) {
+      throw new ConvexError({
+        code: "no_guild",
+        message: "Join or start a guild first — a deploy needs a boss to hit.",
+      });
     }
+    // NO status gate (M1.5, spec §5): "active" deploys hit the boss; "won"
+    // deploys run the identical pipeline against the Bonus Boss. The old
+    // "Boss already defeated" rejection is gone — it silently no-oped early
+    // killers' deploys and cost them their streak (the STR-53 finding).
+    const challenge = await ensureCurrentChallenge(ctx, ug.group);
     return await applyDeploy(ctx, userId, ug.group, challenge);
   },
 });

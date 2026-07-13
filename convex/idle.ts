@@ -12,6 +12,13 @@
 // re-stamps both clocks + (optionally) the new job multiplier — so each
 // sub-interval accrues at the correct rate with no mid-window exploit
 // (same rule as the old flat accrual's job-change settlement).
+//
+// Bonus phase (M1.5, spec §3): while the progress row's challenge is "won",
+// the SAME settled damage banks into bonusDamageContributed (the accumulating
+// meter) instead of boss HP. Routed HERE, at the single write site, so every
+// settle path — collect, step sync, dev teleport — behaves identically and
+// post-kill idle damage is never discarded (the old victory-lap "settle fuel,
+// throw the damage away" was a subtle punishment; fixed).
 // =============================================================================
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -50,9 +57,19 @@ export async function settleFuelAndIdle(
     overdriveUntil: user.overdriveActiveUntil,
   });
 
+  // Damage routing (M1.5 spec §3): a "won" challenge is in its bonus phase —
+  // bank onto the accumulating meter; otherwise onto boss HP as always.
+  const challenge = await ctx.db.get(progress.challengeId);
+  const bonusPhase = challenge?.status === "won";
+
   await ctx.db.patch(userId, { fuel: settled.fuel, fuelSettledAt: effNow });
   await ctx.db.patch(progress._id, {
-    damageContributed: progress.damageContributed + settled.damage,
+    ...(bonusPhase
+      ? {
+          bonusDamageContributed:
+            (progress.bonusDamageContributed ?? 0) + settled.damage,
+        }
+      : { damageContributed: progress.damageContributed + settled.damage }),
     lastIdleCollectedAt: effNow,
     idleMultiplierSnapshot: newMult ?? progress.idleMultiplierSnapshot ?? 1,
     updatedAt: Date.now(),

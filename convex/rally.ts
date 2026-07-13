@@ -16,7 +16,7 @@
 //    the receiver's client plays (STR-15) — the nudge comes from a friend.
 // =============================================================================
 import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -39,13 +39,24 @@ export async function applyRally(
   giverId: Id<"users">,
   receiverId: Id<"users">,
 ) {
+  // User-facing rejections are ConvexError with a structured {code, message}
+  // payload (the STR-44 pattern from guild.ts) so the STR-15 UI can show the
+  // friendly `message` instead of a generic "Server Error".
   if (receiverId === giverId) {
-    throw new Error("You can't rally yourself.");
+    throw new ConvexError({
+      code: "self_rally",
+      message: "You can't rally yourself — pick a teammate who needs a boost.",
+    });
   }
   const giver = await ctx.db.get(giverId);
   if (giver === null) throw new Error("User row missing.");
   const ug = await getUserGroup(ctx, giverId);
-  if (!ug) throw new Error("No guild yet.");
+  if (!ug) {
+    throw new ConvexError({
+      code: "no_guild",
+      message: "Join or start a guild first — rallies flow between teammates.",
+    });
+  }
 
   // Same-guild check: rallies flow between teammates only.
   const receiverMembership = await ctx.db
@@ -55,7 +66,10 @@ export async function applyRally(
     )
     .first();
   if (!receiverMembership) {
-    throw new Error("You can only rally a member of your guild.");
+    throw new ConvexError({
+      code: "not_teammate",
+      message: "You can only rally a member of your own guild.",
+    });
   }
 
   const now = await effectiveNow(ctx);
@@ -69,14 +83,20 @@ export async function applyRally(
     )
     .take(RALLY.perGiverPerDay);
   if (sentToday.length >= RALLY.perGiverPerDay) {
-    throw new Error("You've already sent today's rally.");
+    throw new ConvexError({
+      code: "already_sent_today",
+      message: "You've already sent today's rally — tomorrow brings another.",
+    });
   }
 
   // Giver must afford it (Energy is derived: ledger − spent, like deploy).
   const earned = await energyEarned(ctx, giverId);
   const balance = Math.max(0, earned - (giver.energySpent ?? 0));
   if (balance < RALLY.energyCost) {
-    throw new Error(`A rally costs ${RALLY.energyCost} Energy.`);
+    throw new ConvexError({
+      code: "not_enough_energy",
+      message: `A rally costs ${RALLY.energyCost} Energy — walk a little more first.`,
+    });
   }
 
   // SETTLE the receiver FIRST at their old fuel level (and bank any idle
@@ -93,7 +113,11 @@ export async function applyRally(
     settledFuel = (await settleFuel(ctx, receiverId, now)).fuel;
   }
   if (fuelStateFor(settledFuel) === "battling") {
-    throw new Error("That hero is still battling — save the rally for a friend who needs it.");
+    throw new ConvexError({
+      code: "receiver_battling",
+      message:
+        "That hero is still battling — save the rally for a friend who needs it.",
+    });
   }
 
   // Spend the giver's Energy (monotonic counter — the derived balance drops).

@@ -21,6 +21,7 @@
 // =============================================================================
 import { mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { ConvexError } from "convex/values";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { effectiveNow } from "./time";
@@ -92,15 +93,25 @@ export const activateOverdrive = mutation({
     const user = await ctx.db.get(userId);
     if (user === null) throw new Error("User row missing.");
 
+    // User-facing rejections are ConvexError with a structured {code, message}
+    // payload (the STR-44 pattern from guild.ts) so the STR-14 UI can show the
+    // friendly `message` instead of a generic "Server Error".
     const now = await effectiveNow(ctx);
     if ((user.overdriveActiveUntil ?? 0) > now) {
-      throw new Error("Overdrive is already active.");
+      throw new ConvexError({
+        code: "already_active",
+        message: "Overdrive is already running — enjoy the rampage!",
+      });
     }
 
     const earned = await overdriveExcessEarned(ctx, userId);
     const spent = user.overdriveExcessSpent ?? 0;
     if (overdriveChargeFraction(earned, spent) < 1) {
-      throw new Error("Overdrive isn't fully charged yet.");
+      throw new ConvexError({
+        code: "not_charged",
+        message:
+          "Overdrive isn't fully charged yet — steps past your daily goal fill the meter.",
+      });
     }
 
     // SETTLE the elapsed window FIRST, at the rates in force (old fuel level,
@@ -125,7 +136,11 @@ export const activateOverdrive = mutation({
 
     // The hero must be awake AFTER the settle (the honest current state).
     if (fuelStateFor(settledFuel) === "resting") {
-      throw new Error("Your hero is resting — no fuel to fight with.");
+      throw new ConvexError({
+        code: "hero_resting",
+        message:
+          "Your hero is resting — walk some fuel into the tank before going Overdrive.",
+      });
     }
 
     const activeUntil = now + OVERDRIVE.durationHours * HOUR_MS;

@@ -148,6 +148,12 @@ export default defineSchema({
     // Difficulty tier — bumped +1 each time the crew kills a boss (next boss is
     // tougher). Drives bossMaxHP via the formula in gameConfig.
     tier: v.optional(v.number()),
+    // --- Bonus Boss (M1.5, spec §5). Stamped by resolveBoss in the SAME write
+    // as the active→won kill transition (the single shared write, so the
+    // crowned form can't double-fire). The bonus phase itself is DERIVED:
+    // status "won" AND the week isn't over — no new status literal.
+    bonusStartedAt: v.optional(v.number()), // effective ms of the kill
+    bonusBossName: v.optional(v.string()), // "Crowned <bossName>"
     previousChallengeId: v.optional(v.id("challenges")), // chain, for analytics
     createdAt: v.number(),
   })
@@ -163,6 +169,11 @@ export default defineSchema({
     userId: v.id("users"),
     // The ONE materialized game number: boss HP = bossMaxHP − Σ(damageContributed).
     damageContributed: v.number(),
+    // Bonus Boss (M1.5, spec §3/§5): post-kill damage (deploys + idle) banked
+    // while the challenge is "won". The party's accumulating meter is
+    // Σ across members — same derived pattern as boss HP (each member writes
+    // only their own row, no write contention). Defaults 0 when absent.
+    bonusDamageContributed: v.optional(v.number()),
     // Idle accrual bookkeeping (see Architecture #4): when we last settled idle
     // damage onto the boss, and the idle multiplier in force since then.
     lastIdleCollectedAt: v.optional(v.number()), // effective ms

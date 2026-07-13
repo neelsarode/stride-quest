@@ -79,6 +79,7 @@ export const dashboard = query({
     }
 
     let currentHP = challenge?.bossMaxHP ?? 0;
+    let bonusDamageTotal = 0;
     let myProgress: Doc<"challengeProgress"> | null = null;
     if (challenge) {
       const ch = challenge;
@@ -88,6 +89,12 @@ export const dashboard = query({
         .collect();
       const totalDamage = rows.reduce((s, r) => s + r.damageContributed, 0);
       currentHP = Math.max(0, ch.bossMaxHP - totalDamage);
+      // Bonus meter (M1.5): Σ bonusDamageContributed across members — the
+      // accumulating party total while the challenge is "won" (0 otherwise).
+      bonusDamageTotal = rows.reduce(
+        (s, r) => s + (r.bonusDamageContributed ?? 0),
+        0,
+      );
       myProgress = rows.find((r) => r.userId === userId) ?? null;
     }
 
@@ -290,6 +297,13 @@ export const dashboard = query({
             defeated: challenge.status === "won",
             startDate: challenge.startDate,
             endDate: challenge.endDate,
+            // --- Bonus Boss, MINIMAL exposure (STR-55): just enough for the
+            // DevPanel readout to verify the phase. The full bonus/boost UI
+            // payload (tiers, currentMult, nextTier preview) is STR-56.
+            // bonusBossName is only ever stamped by the kill write, so it's
+            // null exactly until status === "won".
+            bonusBossName: challenge.bonusBossName ?? null,
+            bonusDamageTotal,
           }
         : null,
       steps: { today: stepsToday, thisWeek: stepsThisWeek },
