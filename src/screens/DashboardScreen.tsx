@@ -36,7 +36,7 @@ import {
 export function DashboardScreen() {
   const data = useQuery(api.game.dashboard, {});
   const recordSteps = useMutation(api.steps.recordSteps);
-  const bootstrap = useMutation(api.users.bootstrap);
+  const ensureSession = useMutation(api.users.ensureSession);
   const deployMut = useMutation(api.combat.deploy);
   const collectIdleMut = useMutation(api.combat.collectIdle);
   const { emit } = useFeedback();
@@ -90,15 +90,17 @@ export function DashboardScreen() {
     }
   }
 
-  // One-time first-run setup; tells the server our timezone for day/week math.
-  const didBootstrap = useRef(false);
+  // One-time per-launch session maintenance (STR-44: formerly bootstrap — it
+  // no longer creates a guild; the onboarding fork owns that). Tells the server
+  // our timezone for day/week math.
+  const didEnsureSession = useRef(false);
   useEffect(() => {
-    if (didBootstrap.current) return;
-    didBootstrap.current = true;
-    bootstrap({ tzOffsetMinutes: new Date().getTimezoneOffset() }).catch((e) =>
-      setNote(`Setup error: ${String(e)}`),
+    if (didEnsureSession.current) return;
+    didEnsureSession.current = true;
+    ensureSession({ tzOffsetMinutes: new Date().getTimezoneOffset() }).catch(
+      (e) => setNote(`Setup error: ${String(e)}`),
     );
-  }, [bootstrap]);
+  }, [ensureSession]);
 
   async function syncHealthKit() {
     setBusy(true);

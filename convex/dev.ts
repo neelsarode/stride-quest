@@ -36,6 +36,7 @@ import { shieldsAfterEarning } from "./streakMath";
 import { overdriveExcessEarned } from "./overdrive";
 import { applyRally } from "./rally";
 import { energyEarned } from "./economy";
+import { deleteGuildCascade, hasOtherHumans } from "./guild";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -376,6 +377,40 @@ export const resetAccount = mutation({
       shieldsHeld: 0,
       shieldLastEarnedWeek: undefined,
     });
+  },
+});
+
+/** Re-run onboarding from Beat 1 (the STR-44 re-test loop): clear the two
+ *  routing stamps (class, onboardedAt) and tear down the caller's guild so the
+ *  fork runs again too. Solo (or bots-only) guild → full cascade, mirroring the
+ *  joinGuildByCode switch cleanup; a guild with OTHER HUMANS is never deleted —
+ *  only the caller's own membership + progress rows leave with them. Account
+ *  state (fuel/energy/streak/shields + the step ledger) survives on `users`,
+ *  exactly like a real guild switch — use resetAccount for a true clean slate. */
+export const resetOnboarding = mutation({
+  args: {},
+  handler: async (ctx) => {
+    assertDevEnabled();
+    const caller = await getAuthUserId(ctx);
+    if (caller === null) throw new Error("Not signed in.");
+
+    await ctx.db.patch(caller, { class: undefined, onboardedAt: undefined });
+
+    const ug = await getUserGroup(ctx, caller);
+    if (!ug) return;
+    if (await hasOtherHumans(ctx, ug.group._id, caller)) {
+      // Teammates keep their guild; only the caller walks out.
+      const progress = await ctx.db
+        .query("challengeProgress")
+        .withIndex("by_user", (q) => q.eq("userId", caller))
+        .collect();
+      for (const p of progress) {
+        if (p.groupId === ug.group._id) await ctx.db.delete(p._id);
+      }
+      await ctx.db.delete(ug.membership._id);
+    } else {
+      await deleteGuildCascade(ctx, ug.group);
+    }
   },
 });
 

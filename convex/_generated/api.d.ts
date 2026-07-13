@@ -19,6 +19,7 @@ import type * as gameConfig from "../gameConfig.js";
 import type * as guild from "../guild.js";
 import type * as http from "../http.js";
 import type * as idle from "../idle.js";
+import type * as inviteCode from "../inviteCode.js";
 import type * as overdrive from "../overdrive.js";
 import type * as players from "../players.js";
 import type * as rally from "../rally.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   guild: typeof guild;
   http: typeof http;
   idle: typeof idle;
+  inviteCode: typeof inviteCode;
   overdrive: typeof overdrive;
   players: typeof players;
   rally: typeof rally;
