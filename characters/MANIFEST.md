@@ -24,14 +24,22 @@ Types:
                   spin-slash, mage arcane channel, medic divine burst, archer volley,
                   assassin dagger flurry, paladin radiant smash, warlock fire eruption,
                   bard crescendo).
+- `rest/`       — Resting fuel-state loop (generated 2026-07-13). ALL 40 jobs, 6f.
+                  Battlefield kneel: hero drops to one knee, weapon planted/lowered
+                  (warrior/paladin plant the blade/hammer, mage/medic/warlock lean on
+                  the staff, archer grounds the bow, assassin lowers daggers, bard
+                  cradles the instrument), slow breathing loop. TONE GUARDRAIL: reads
+                  as "catching breath / taking a knee" — dignified, alive, recoverable;
+                  never dead, collapsed, or defeated. Supersedes the campfire concept
+                  (user decision 2026-07-13, STR-38).
 
-Counts: 40 idle + 40 attack + 32 evolution + 40 special.
+Counts: 40 idle + 40 attack + 32 evolution + 40 special + 40 rest.
 Preview: open `walking-app/preview.html` for the sprite gallery, `battlefield-ui.html`
 for the live battle scene (all attacks + specials firing), or `fx-test.html` to trigger
 any class/job's basic or special on demand.
 Attack prompts are weapon-specific (see scratchpad attack_prompts.md).
 
-Status: all 40 jobs complete (idle/attack/evolution + special, all valid).
+Status: all 40 jobs complete (idle/attack/evolution + special + rest, all valid).
 
 ## Attack VFX (`assets/effects/<class>/`)
 Per class (all 8): `basic/` 5f projectile loop (64px), `special/` 5f ultimate
