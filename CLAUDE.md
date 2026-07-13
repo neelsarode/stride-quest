@@ -280,11 +280,15 @@ anchor, player-activated Overdrive, Rally, auto-applied Streak Shields.
   boss on DAY 5; Monday rollover: tier-2 boss = exactly 210,000, jobs reset,
   fuel/energy/shields/OD charge all persist.
 - ⚠️ **Finding (STR-53): deploy vs an already-dead boss silently no-ops** — no
-  energy spent, no streak tick, no error → a player who kills the boss early
-  CANNOT maintain their streak for the rest of the week (streak died 5→0 through
-  a held shield: two "missed" days = unsalvageable). Violates the never-punish-
-  engagement guardrail; needs a design decision (tick streak on victory-lap
-  deploys / bank overkill / goal-day-based streaks).
+  energy spent, no streak tick, no error → early killers couldn't maintain their
+  streak (died 5→0 through a held shield). **DIRECTION DECIDED 2026-07-13: the
+  Bonus Boss resolves this** — on an early kill the boss's crowned form rises for
+  the rest of the week (no HP bar, an ACCUMULATING damage meter); post-kill
+  deploys/idle hit IT (energy spends, streaks tick), and at rollover the guild
+  earns a tiered next-week damage boost (×1.1/×1.2/×1.35, cap ×1.5). Spec:
+  `docs/superpowers/specs/2026-07-14-bonus-boss-design.md`; Linear milestone
+  **M1.5 — Bonus Boss (victory week)** (STR-53 superseded → its acceptance
+  criteria live in the M1.5 backend ticket).
 - Polish notes: backend rejections are generic Convex "Server Error" — STR-14/15
   UIs need `ConvexError` for friendly messages; activating Overdrive consumes
   ALL banked excess incl. >100% overage; dev fast-forward idle damage lands on
