@@ -21,9 +21,10 @@ over features.
 
 **Work tracking lives in Linear** (workspace team `Stridequest`, project
 **Stride Quest** — https://linear.app/stridequest/project/stride-quest-40ccda389ff9).
-Milestones M1 (fuel hybrid loop) / M2 (battle-scene RN port) / M3 (monetization)
-/ M4 (platform & release) mirror the phases in §7. Keep issues updated as work
-happens (In Progress → Done); new work gets a ticket.
+Milestones M1 (fuel hybrid loop) / M2 (battle-scene RN port) / M2.5 (onboarding
+& first session — spec: docs/superpowers/specs/2026-07-13-onboarding-design.md)
+/ M3 (monetization) / M4 (platform & release) mirror the phases in §7. Keep
+issues updated as work happens (In Progress → Done); new work gets a ticket.
 
 **GitHub:** https://github.com/neelsarode/stride-quest (private). Branch names
 follow Linear's generated `neel/str-N-...` pattern so the Linear↔GitHub
@@ -63,11 +64,14 @@ walking-app/
 │   └── <class>/<jobN_name>/{<dir>.png, animations/{idle,attack,special,evolution}/frame_*.png}
 ├── assets/
 │   ├── effects/<class>/{basic,special,impact}/  # per-class attack VFX (5/5/7 frames)
-│   ├── fx-engine.js         # shared attack-choreography engine (preview pages)
+│   ├── fx-engine.js         # shared attack-choreography engine (preview pages); optional FXEngine.onDamage(amount, big) hook feeds page HUDs
+│   ├── ui-kit.js            # PROCEDURAL pixel-art UI kit — zero-image HUD chrome, fillRect only. Flat layer (palette/sprites/pixel font/bars/panels/buttons) + HI-FI layer (material ramps, rounded rasterizer, dithered gradients, hifi* renderers)
 │   ├── fx-anchors.js        # GENERATED weapon anchors — regen via fx-test.html?scan=1; never hand-edit
 │   └── fx-special-anchors.js# GENERATED (same rule)
 ├── preview.html             # sprite/animation gallery (open in browser)
-├── battlefield-ui.html      # live battle mock: 8-hero party vs boss + stone/gold HUD
+├── ui-procedural.html       # procedural UI gallery/acceptance page for ui-kit.js (2x/3x/4x, all states)
+├── ui-style-lab.html        # ⭐ UI SOURCE OF TRUTH — hi-fi procedural CLASS KITS, one per class (S1 paladin, S2 bard, S4 mage, S5 medic, S6 warlock, S7 archer, S8 warrior=LIVE, S10 assassin). Full kit + overlays (member popover w/ SEND RALLY, help modal, banner, toast, tooltip, fuel-state dots). FULL-BODY sprite portraits via kit PORTRAIT_CROPS (ui-variations.html = the older PixelLab-image style page)
+├── battlefield-ui.html      # live battle mock: 8-hero party vs boss; HUD = ui-kit.js hi-fi chrome in S8 "Celestial Silver" (user-picked). Interactive: party rail (tap member → stats popover + SEND RALLY toast), help modal on ?, live boss bar, tap-ATTACK volley. PixelLab PNG chrome in assets/ui/ kept for comparison
 ├── fx-test.html             # FX QA rig — ?verify=1 runs 80-attack self-test, ?scan=1 regens anchors
 ├── docs/fx-rn-port-plan.md  # DECIDED plan to port the battle scene into the RN app
 ├── .claude/skills/generate-vfx/  # PixelLab pipeline playbook — read BEFORE any mcp__pixellab__* call
@@ -135,8 +139,10 @@ In `convex/gameConfig.ts`:
   multiplier + juice live HERE, not on idle). *Phase 2.*
 - **Streaks, fairness (personal-goal celebration, improvement-based
   recognition), boss resolution.** *Phase 2.*
-- **Classes:** data-driven registry; MVP ships **Warrior** only (job folders map
-  to `characters/warrior/`). Adding the other 4 classes = a data change.
+- **Classes:** data-driven registry. ~~MVP ships Warrior only~~ **SUPERSEDED
+  2026-07-13:** all 8 classes ship as the onboarding "choose your hero" pick
+  (art + VFX complete for all 8; `MVP_CLASS` becomes the fallback for
+  class-less/legacy users). Spec: docs/superpowers/specs/2026-07-13-onboarding-design.md.
 
 ---
 
