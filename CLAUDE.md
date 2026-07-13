@@ -258,16 +258,39 @@ in the RN app — port plan is `docs/fx-rn-port-plan.md`, decisions already made
   QA rig; **`?verify=1` must print `PASS — 80/80`** after any FX/anchor change.
 - Verified 2026-07-12: 80/80 attacks pass, zero console errors.
 
-### Phase 3 — Core-loop evolution: FUEL HYBRID (designed 2026-07-12, NOT built)
-Direction + tuning v1 approved by the user. Spec:
-`docs/superpowers/specs/2026-07-12-core-loop-fuel-hybrid-design.md`; research +
-rationale PDF: `docs/gameplay-loop-design.pdf`. In one line: steps = fuel for a
-24/7 fighting hero (Battling → Winded → Resting at camp, never punished), DEPLOY
-survives as the daily anchor, plus player-activated Overdrive (charged by steps
-past the daily goal), Rally (gift a resting friend 6h fuel for 500 energy), and
-auto-applied Streak Shields. Boss baseHP retunes 60k → 150k with it. Guardrails
-locked: never punish the party for a member's inactivity; loss-framing only on
-bonuses, never earned progress. Next step: implementation plan (writing-plans).
+### Phase 3 — Core-loop evolution: FUEL HYBRID (backend ✅ VERIFIED 2026-07-13; UI pending)
+Spec: `docs/superpowers/specs/2026-07-12-core-loop-fuel-hybrid-design.md`;
+research PDF: `docs/gameplay-loop-design.pdf`. Steps = fuel for a 24/7 fighting
+hero (Battling → Winded → Resting, never punished), DEPLOY stays the daily
+anchor, player-activated Overdrive, Rally, auto-applied Streak Shields.
+- ✅ **Backend built (STR-5…12)**: `convex/fuelMath.ts` (pure piecewise walk —
+  ONE walk prices burn + idle damage from the same clock windows), `fuel.ts`,
+  `overdrive.ts`, `rally.ts`, `shields.ts`, dashboard exposure, DevPanel
+  time-travel controls (+ M1 numeric readout & real `activateOverdrive` button).
+- ✅ **STR-16 E2E VERIFIED in browser (2026-07-13), all 7 scenarios pass** on the
+  cloud dev deployment via DevPanel + fresh anonymous account:
+  tank cap (15,199→14,400) & winded threshold exact; lapse walk 900→0 with
+  EXACTLY 450 winded damage, zero punishment, instant comeback deploy (damage =
+  energy × exact streak mult × first-of-day crit, verified to the digit);
+  Overdrive: 20k-over-2-days = exactly 100%, reject-at-50%, holds at 100%,
+  settled window priced 4h×3 + 6h×1 at Job 2 = −5,400 exact, burn untouched;
+  Rally: eligibility + the +1 wake margin (empty→BATTLING) + per-giver daily
+  limit; Shields: earned on 5th goal-day, consumed silently to bridge a skipped
+  day (streak 2→3, not reset); Boss pacing: engaged solo 10k/day kills the 150k
+  boss on DAY 5; Monday rollover: tier-2 boss = exactly 210,000, jobs reset,
+  fuel/energy/shields/OD charge all persist.
+- ⚠️ **Finding (STR-53): deploy vs an already-dead boss silently no-ops** — no
+  energy spent, no streak tick, no error → a player who kills the boss early
+  CANNOT maintain their streak for the rest of the week (streak died 5→0 through
+  a held shield: two "missed" days = unsalvageable). Violates the never-punish-
+  engagement guardrail; needs a design decision (tick streak on victory-lap
+  deploys / bank overkill / goal-day-based streaks).
+- Polish notes: backend rejections are generic Convex "Server Error" — STR-14/15
+  UIs need `ConvexError` for friendly messages; activating Overdrive consumes
+  ALL banked excess incl. >100% overage; dev fast-forward idle damage lands on
+  the next interaction (cosmetic, dev-only).
+- Remaining M1: frontend STR-13/14/15 (fuel gauge + states, Overdrive button,
+  Rally UI) — design target: `dashboard-ui.html` + `ui-style-lab.html`.
 
 ### Phase 3+ — Deferred (architect for, don't build)
 Other classes, recognition screens, IAP, cosmetics, guild-vs-guild / global.

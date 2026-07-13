@@ -22,6 +22,9 @@ function fmtOffset(ms: number): string {
 
 export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const status = useQuery(api.dev.status, {});
+  // M1 readout: same reactive query the real screens use (dedup'd by Convex),
+  // so every scenario in STR-16 is numerically observable from this panel.
+  const dash = useQuery(api.game.dashboard, {});
   const recordSteps = useMutation(api.steps.recordSteps);
   const advanceDay = useMutation(api.dev.advanceDay);
   const fastForwardIdle = useMutation(api.dev.fastForwardIdle);
@@ -37,14 +40,23 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const simRally = useMutation(api.dev.simulateTeammateRally);
   const grantShield = useMutation(api.dev.grantShield);
   const consumeShield = useMutation(api.dev.consumeShield);
+  // The REAL activation mutation (what STR-14's button will call) — exposed
+  // here so Overdrive's ×3 window is testable before that UI exists.
+  const activateOverdrive = useMutation(api.overdrive.activateOverdrive);
 
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const run = (fn: () => Promise<unknown>) => async () => {
     setBusy(true);
+    setLastError(null);
     try {
       await fn();
+    } catch (e: unknown) {
+      // Surface rejections (rally daily limit, uncharged activate, …) in-panel
+      // so negative paths are verifiable without the console.
+      setLastError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -79,6 +91,33 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
         <Text style={styles.dim}>
           week {status?.enabled ? `${status.weekStart} → ${status.weekEnd}` : ""}
         </Text>
+        {dash && (
+          <>
+            <Text style={styles.readout}>
+              FUEL {dash.fuel.current.toLocaleString()} (
+              {dash.fuel.hoursToEmpty.toFixed(1)}h) ·{" "}
+              {dash.fuel.state.toUpperCase()}
+            </Text>
+            <Text style={styles.readout}>
+              OD {dash.overdrive.chargePct}%
+              {dash.overdrive.active
+                ? ` · ACTIVE ${dash.overdrive.remainingSeconds}s left`
+                : dash.overdrive.ready
+                  ? " · READY"
+                  : ""}{" "}
+              · SHIELDS {dash.shields.held}/{dash.shields.max}
+            </Text>
+            <Text style={styles.readout}>
+              ⚡{dash.meters.energy.toLocaleString()} · STREAK{" "}
+              {dash.streak.count} (×{dash.streak.multiplier.toFixed(2)}) · JOB{" "}
+              {dash.player.jobLevel}
+            </Text>
+            <Text style={styles.readout}>
+              BOSS {dash.boss ? `${dash.boss.currentHP.toLocaleString()}/${dash.boss.maxHP.toLocaleString()} T${dash.boss.tier}` : "—"}
+            </Text>
+          </>
+        )}
+        {lastError && <Text style={styles.err}>⛔ {lastError}</Text>}
       </View>
 
       {open && (
@@ -108,6 +147,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
             <Btn label="Drain → Winded" onPress={run(() => setFuelHours({ hours: 3 }))} busy={busy} />
             <Btn label="Drain → Resting" onPress={run(() => setFuelHours({ hours: 0 }))} busy={busy} />
             <Btn label="⚡ Overdrive 100%" onPress={run(() => fillOverdrive({}))} busy={busy} />
+            <Btn label="⚡ Activate ×3" onPress={run(() => activateOverdrive({}))} busy={busy} />
             <Btn label="+1 Shield" onPress={run(() => grantShield({}))} busy={busy} />
             <Btn label="−1 Shield" onPress={run(() => consumeShield({}))} busy={busy} />
           </Section>
@@ -199,6 +239,8 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   clockMain: { color: PALETTE.text, fontSize: 16, fontWeight: "700", fontFamily: "Courier" },
+  readout: { color: "#9fe8c8", fontSize: 12, fontFamily: "Courier", fontWeight: "600" },
+  err: { color: "#ff8a8a", fontSize: 12, fontFamily: "Courier", fontWeight: "700" },
   section: { gap: 6 },
   sectionTitle: { color: PALETTE.dev, fontSize: 11, fontWeight: "700", letterSpacing: 1 },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
