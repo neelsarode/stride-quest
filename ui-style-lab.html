@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — UI Kit (source of truth)</title>
+<!--
+  UI SOURCE OF TRUTH — full procedural hi-fi kit per CLASS (8 styles, one per
+  class; unassigned styles removed 2026-07-13). Chrome is 100% code
+  (assets/ui-kit.js); the only images are the game's own character sprites,
+  FULL-BODY cropped into portrait frames (dashboard-ui treatment — whole
+  character visible so each party member is recognizable).
+  Per card: player plate, party roster (status dots + HP slivers + empty slot),
+  boss bar, quest panel, buttons (primary/secondary/small/icon), toggles,
+  slider, badge, chip, segments, XP, icons, text hierarchy — plus OVERLAYS:
+  party-member popover (stats + SEND RALLY), help modal, banner, toast, tooltip.
+  Static previews (battlefield-ui.html is the wired demo). Feedback: "S4 modal".
+-->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #101216; color: #b9c0cf;
+    font-family: ui-monospace, Menlo, monospace; }
+  #page { max-width: 1080px; margin: 0 auto; padding: 22px 18px 60px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  section { border: 1px solid #24272f; border-radius: 6px; padding: 12px 14px 14px;
+    margin-top: 14px; background: #15181d; }
+  h2 { font-size: 11px; letter-spacing: 2px; color: #98a2b0; font-weight: 700;
+    margin: 0 0 4px; text-transform: uppercase; }
+  h2 b { color: #ffce6b; }
+  .cap { font-size: 10px; color: #667080; margin-bottom: 10px; letter-spacing: .5px; }
+  .note { font-size: 10px; color: #667080; margin-top: 8px; line-height: 1.6; }
+  .controls { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+  .controls label { font-size: 10px; color: #98a2b0; letter-spacing: 1px; }
+  button.ctl { background: #24272f; color: #cdd3de; border: 1px solid #3a4049;
+    border-radius: 4px; font: inherit; font-size: 11px; padding: 4px 10px; cursor: pointer; }
+  button.ctl.on { background: #ffce6b; color: #201607; border-color: #ffce6b; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="page">
+  <canvas id="title"></canvas>
+  <div class="note"><b>UI source of truth</b> — one complete kit per class (8 styles). Full-body
+    portraits per dashboard-ui. Includes overlays: party-member popover w/ stats + SEND RALLY,
+    help modal, job-up banner, toast, tooltip, fuel-state dots (battling/winded/resting) — plus
+    the loop vitals: fuel tank bar, Overdrive charge meter, daily steps ring.
+    Static here; <b>S8 is live + interactive in battlefield-ui.html</b>.</div>
+  <div class="controls" id="scalectl">
+    <label>SCALE</label>
+    <button class="ctl" data-s="2">2x</button>
+    <button class="ctl on" data-s="3">3x</button>
+    <button class="ctl" data-s="4">4x</button>
+  </div>
+  <div id="cards"></div>
+</div>
+
+<script src="assets/ui-kit.js"></script>
+<script>
+'use strict';
+const accentRamp = t => makeRamp('ar_' + t.key,
+  [PALETTE[t.accent.light], PALETTE[t.accent.mid], PALETTE[t.accent.dark]], 6, false);
+
+/* --------------------------- class sprite bodies -------------------------- */
+const CLASS_JOB5 = {
+  warrior:'5_warlord', mage:'5_archmage', medic:'5_hierophant', archer:'5_sentinel',
+  assassin:'5_shadowlord', paladin:'5_lightbringer', bard:'5_maestro', warlock:'5_dreadlord',
+};
+const PARTY = ['warrior', 'mage', 'archer', 'medic'];
+const PARTY_STATES = ['battling', 'battling', 'winded', 'resting'];
+const IMGS = {};
+function loadImg(src){
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+}
+
+/* -------------------------------- themes --------------------------------- */
+const F = (light, mid, dark) => ({ light, mid, dark });
+const THEMES = [
+  {
+    key:'S1', name:'GILDED BRONZE', cls:'paladin', clsLabel:'PALADIN',
+    desc:'warm gold frames over chocolate wells',
+    mat:M('gold'), sec:M('iron'), bg:'coffee_bg', well:'choc_w', wellD:'choc_wd',
+    text:'gold1', textDim:'oak2',
+    hp:F('green_light','green_mid','green_dark'), seg:F('blue_light','blue_mid','blue_dark'),
+    accent:F('green_light','green_mid','green_dark'),
+    emblem:{ sprite: CROSSED_SWORDS },
+    icons:[ [HEART,null], [GEM,null], [COIN,null] ],
+  },
+  {
+    key:'S2', name:'ROYAL VELVET', cls:'bard', clsLabel:'BARD',
+    desc:'gold over deep violet velvet — stage-and-throne theatrics',
+    mat:M('gold'), sec:M('amethyst'), bg:'royal_bg', well:'velvet_w', wellD:'velvet_wd',
+    text:'gold1', textDim:'amethyst2',
+    hp:F('green_light','green_mid','green_dark'), seg:F('gold1','gold2','gold4'),
+    accent:F('gold1','gold2','gold4'),
+    emblem:{ sprite: STAR },
+    icons:[ [HEART,null], [GEM,{L:'gold1',B:'gold2',D:'gold4'}], [STAR,null] ],
+  },
+  {
+    key:'S4', name:'ARCANE GLASS', cls:'mage', clsLabel:'MAGE',
+    desc:'amethyst crystal frames, void wells, mana vitals',
+    mat:M('amethyst'), sec:M('silver'), bg:'arcane_bg', well:'glass_w', wellD:'glass_wd',
+    text:'amethyst1', textDim:'amethyst2',
+    hp:F('amethyst1','amethyst2','amethyst4'), seg:F('blue_light','blue_mid','blue_dark'),
+    accent:F('amethyst1','amethyst2','amethyst4'),
+    emblem:{ sprite: GEM, override:{L:'amethyst0',B:'amethyst1',D:'amethyst3'} },
+    icons:[ [HEART,{R:'amethyst3',L:'amethyst1'}], [GEM,null], [STAR,{G:'amethyst2',L:'amethyst1',W:'amethyst0'}] ],
+  },
+  {
+    key:'S5', name:'CLEAN SLATE', cls:'medic', clsLabel:'MEDIC',
+    desc:'clinical calm — graphite frames, cool wells, healing-green accents',
+    mat:M('slate'), sec:M('slate'), bg:'min_bg', well:'slate_w', wellD:'slate_wd',
+    text:'slate1', textDim:'slate3',
+    hp:F('green_light','green_mid','green_dark'), seg:F('green_light','green_mid','green_dark'),
+    accent:F('green_light','green_mid','green_dark'),
+    emblem:{ sprite: HEART },
+    icons:[ [HEART,null], [GEM,{L:'ghoul_light',B:'ghoul_mid',D:'ghoul_dark'}], [STAR,null] ],
+  },
+  {
+    key:'S6', name:'BONE + SHADOW', cls:'warlock', clsLabel:'WARLOCK',
+    desc:'ivory frames on near-black, ghoul-green vitals',
+    mat:M('bone'), sec:M('iron'), bg:'occult_bg', well:'shadow_w', wellD:'shadow_wd',
+    text:'bone1', textDim:'bone4',
+    hp:F('ghoul_light','ghoul_mid','ghoul_dark'), seg:F('ghoul_light','ghoul_mid','ghoul_dark'),
+    accent:F('ghoul_light','ghoul_mid','ghoul_dark'),
+    emblem:{ sprite: SKULL },
+    icons:[ [HEART,{R:'ghoul_mid',L:'ghoul_light'}], [SKULL,null], [GEM,{L:'ghoul_light',B:'ghoul_mid',D:'ghoul_dark'}] ],
+  },
+  {
+    key:'S7', name:'ELDERWOOD', cls:'archer', clsLabel:'ARCHER',
+    desc:'living green-wood frames, forest-floor wells, honey stamina',
+    mat:M('elder'), sec:M('oak'), bg:'nature_bg', well:'leaf_w', wellD:'leaf_wd',
+    text:'elder1', textDim:'elder3',
+    hp:F('green_light','green_mid','green_dark'), seg:F('yellow_light','yellow_mid','yellow_dark'),
+    accent:F('yellow_light','yellow_mid','yellow_dark'),
+    emblem:{ sprite: ARROW_RIGHT, override:{A:'elder0',L:'elder1'} },
+    icons:[ [HEART,null], [ARROW_UP,{A:'elder1',L:'elder2'}], [STAR,{G:'elder2',L:'elder1',W:'elder0'}] ],
+  },
+  {
+    key:'S8', name:'CELESTIAL SILVER', cls:'warrior', clsLabel:'WARRIOR',
+    desc:'polished silver frames, midnight wells, radiant gold vitals — LIVE in battlefield-ui.html',
+    mat:M('silver'), sec:M('gold'), bg:'sky_bg', well:'night_w', wellD:'night_wd',
+    text:'silver1', textDim:'sky_mid',
+    hp:F('gold1','gold2','gold4'), seg:F('sky_light','sky_mid','sky_dark'),
+    accent:F('gold1','gold2','gold4'),
+    emblem:{ sprite: CROSSED_SWORDS },
+    icons:[ [HEART,null], [STAR,null], [GEM,{L:'sky_light',B:'sky_mid',D:'sky_dark'}] ],
+  },
+  {
+    key:'S10', name:'MOLTEN FORGE', cls:'assassin', clsLabel:'ASSASSIN',
+    desc:'blackened iron frames, blood wells, ember vitals',
+    mat:M('iron'), sec:M('ember'), bg:'arena_bg', well:'blood_w', wellD:'blood_wd',
+    text:'ember1', textDim:'iron2',
+    hp:F('ember1','ember2','ember4'), seg:F('red_light','red_mid','red_dark'),
+    accent:F('ember1','ember2','ember4'),
+    emblem:{ sprite: SWORD, override:{W:'ember1'} },
+    icons:[ [HEART,null], [SKULL,null], [CROSSED_SWORDS,null] ],
+  },
+];
+
+/* ---------------------------- full-kit renderer --------------------------- */
+const CARD_W = 302, CARD_H = 462;
+function statLine(ctx, label, val, x, y, w, t){
+  drawText(ctx, label, x, y, t.textDim);
+  drawText(ctx, val, x + w - textWidth(val), y, t.text);
+}
+function drawKitCard(ctx, t){
+  px(ctx, 0, 0, CARD_W, CARD_H, t.bg);
+  const m = t.mat;
+
+  /* ---- player plate ---- */
+  hifiPortrait(ctx, 6, 6, 30, m, t.wellD, t.cls ? IMGS[t.cls] : null, t.cls ? PORTRAIT_CROPS[t.cls] : null);
+  drawText(ctx, 'HERO-EHB8', 42, 8, t.text);
+  drawText(ctx, 'LV 12 ' + t.clsLabel, 42, 16, t.textDim);
+  hifiBar(ctx, 42, 24, 110, 12, t, { value: .82, slim: true });
+
+  /* ---- party roster: full-body portraits + fuel-state dots + hp ---- */
+  drawText(ctx, 'PARTY', 6, 42, t.textDim);
+  PARTY.forEach((cls, i) => {
+    const px0 = 6 + i * 26;
+    hifiPortrait(ctx, px0, 50, 22, m, t.wellD, IMGS[cls], PORTRAIT_CROPS[cls]);
+    hifiStatusDot(ctx, px0 + 16, 66, PARTY_STATES[i]);
+    const fuel = [1, .62, .38, 0][i];   // sliver = FUEL (members have fuel, not HP); 0 reads red = rally me
+    fillRounded(ctx, px0, 73, 22, 5, 2, m.out);
+    const fam = hpFamily(fuel);
+    px(ctx, px0 + 1, 74, Math.max(1, Math.round(20 * fuel)), 1, fam.light);
+    px(ctx, px0 + 1, 75, Math.max(1, Math.round(20 * fuel)), 2, fam.mid);
+  });
+  {
+    const well = hifiFrameSlim(ctx, 110, 50, 22, 22, 5, m, t.wellD);
+    drawText(ctx, '+', well.wx + Math.round((well.ww - textWidth('+'))/2),
+      well.wy + Math.round((well.wh - 5)/2), t.textDim);
+  }
+
+  /* ---- boss bar + quest panel + XP ---- */
+  hifiBar(ctx, 6, 84, 170, 20, t, { value: .62, label: '62,000 / 100,000' });
+  const well = hifiPanel(ctx, 6, 110, 170, 96, t, 'QUEST LOG',
+    ['WALK 8,000 STEPS', 'REWARD: 250 GOLD']);
+  hifiBar(ctx, well.wx + 4, well.wy + well.wh - 32, 104, 14, t,
+    { value: .55, fam: t.seg, slim: true });
+  hifiButton(ctx, well.wx + well.ww - 42, well.wy + well.wh - 33, 38, 15, t.sec, { text: 'GO' });
+  hifiBar(ctx, 6, 212, 170, 14, t, { value: .48, fam: t.seg, slim: true });
+  drawText(ctx, 'XP', 10, 216, t.textDim);
+
+  /* ---- right column: buttons, controls, tokens ---- */
+  hifiButton(ctx, 186, 6, 110, 28, m, t.emblem);
+  hifiButton(ctx, 186, 40, 110, 18, t.sec, { text: 'MENU' });
+  hifiButton(ctx, 186, 62, 18, 18, m, { sprite: BANNER });
+  hifiButton(ctx, 208, 62, 18, 18, m, { text: '?', scale: 2 });
+  hifiButton(ctx, 230, 62, 18, 18, m, { sprite: GEM });
+  hifiButton(ctx, 252, 63, 44, 15, t.sec, { text: 'OK' });
+  hifiToggle(ctx, 186, 88, true, m, t.accent, t.wellD);
+  drawText(ctx, 'ON', 214, 91, t.textDim);
+  hifiToggle(ctx, 232, 88, false, m, t.accent, t.wellD);
+  drawText(ctx, 'OFF', 260, 91, t.textDim);
+  hifiSlider(ctx, 186, 106, 110, .6, m, t.accent, t.wellD);
+  hifiBadge(ctx, 186, 126, '12', m);
+  hifiChip(ctx, 208, 129, '+320', m, accentRamp(t));
+  hifiSeg(ctx, 186, 150, 8, 11, 7, 5.5, t);
+  let ix = 186;
+  t.icons.forEach(([s, ov]) => { drawSprite(ctx, s, ix, 172 + (11 - spriteH(s)), ov); ix += spriteW(s) + 4; });
+  drawText(ctx, 'THE NIGHTMARE', 186, 192, t.text);
+  drawText(ctx, 'WEEKLY BOSS - TIER 3', 186, 201, t.textDim);
+  drawText(ctx, '62,000 / 100,000', 186, 210, t.textDim);
+
+  /* ================= OVERLAYS ================= */
+  drawText(ctx, 'OVERLAYS', 6, 236, t.textDim);
+
+  // party-member popover: tap SAM (resting) → stats + SEND RALLY
+  hifiPortrait(ctx, 10, 246, 22, m, t.wellD, IMGS.medic, PORTRAIT_CROPS.medic);
+  hifiStatusDot(ctx, 26, 262, 'resting');
+  {
+    const pw = hifiPopover(ctx, 6, 277, 132, 72, t, 'top', 15);
+    drawText(ctx, 'SAM - MEDIC', pw.wx + 4, pw.wy + 3, t.text);
+    drawText(ctx, 'RESTING', pw.wx + pw.ww - 4 - textWidth('RESTING'), pw.wy + 3, STATE_COLORS.resting);
+    statLine(ctx, 'STEPS TODAY', '1,050', pw.wx + 4, pw.wy + 13, pw.ww - 8, t);
+    statLine(ctx, 'DMG WEEK', '8,750', pw.wx + 4, pw.wy + 22, pw.ww - 8, t);
+    statLine(ctx, 'STREAK', '0 DAYS', pw.wx + 4, pw.wy + 31, pw.ww - 8, t);
+    hifiButton(ctx, pw.wx + 3, pw.wy + 42, pw.ww - 6, 15, t.sec, { text: 'SEND RALLY 500' });
+  }
+
+  // help modal (what the ? button opens)
+  {
+    const md = hifiModal(ctx, 150, 250, 146, 158, t, 'HOW TO PLAY');
+    const lines = [
+      ['WALK EVERY DAY.', t.text],
+      ['STEPS BECOME ENERGY.', t.textDim],
+      ['DEPLOY TO STRIKE THE', t.text],
+      ['WEEKLY BOSS TOGETHER.', t.textDim],
+      ['RALLY RESTING FRIENDS.', t.textDim],
+      ['JOBS RESET MONDAYS.', t.textDim],
+    ];
+    lines.forEach(([ln, key], i) => drawText(ctx, ln, md.well.wx + 6, 267 + i * 10, key));
+    hifiButton(ctx, 150 + Math.round((146 - 44)/2), 250 + 158 - 24, 44, 15, m, { text: 'OK' });
+  }
+
+  // banner + toast + tooltip
+  hifiBanner(ctx, 6, 360, 132, m, 'JOB UP!');
+  hifiToast(ctx, 6, 390, 'RALLY SENT!', m, t.wellD);
+  hifiTooltip(ctx, 84, 390, 'COSTS 500', m, t.wellD);
+  drawText(ctx, 'BANNER / TOAST / TOOLTIP', 6, 412, t.textDim);
+
+  /* ---- loop vitals: fuel tank, overdrive charge, daily steps ring ---- */
+  drawText(ctx, 'FUEL', 6, 426, t.textDim);
+  hifiBar(ctx, 32, 422, 144, 14, t, { value: .44, fam: t.seg, slim: true, label: 'FIGHTS 21H' });
+  drawText(ctx, 'OVRD', 6, 444, t.textDim);
+  hifiBar(ctx, 32, 440, 144, 12, t, { value: .62, fam: t.accent, slim: true, label: '62%' });
+  drawPixelRing(ctx, 200, 440, 14, 11, .78, t.hp.mid, t.well);
+  drawText(ctx, '6,200', 222, 430, t.text);
+  drawText(ctx, '/8,000 GOAL', 222, 439, t.textDim);
+  drawText(ctx, 'DAILY STEPS RING', 222, 448, t.textDim);
+}
+
+/* ------------------------------ page scaffold ---------------------------- */
+let SCALE = 3;
+const allCanvases = [];
+{
+  const t = 'STRIDE QUEST UI KIT - SOURCE OF TRUTH';
+  const c = document.getElementById('title');
+  c.width = textWidth(t) + 4; c.height = 9;
+  c.style.width = (c.width * SCALE) + 'px';
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  drawText(ctx, t, 2, 2, 'gold_mid');
+  allCanvases.push(c);
+}
+const cardsEl = document.getElementById('cards');
+const cardCtxs = [];
+THEMES.forEach(t => {
+  const sec = document.createElement('section');
+  const h = document.createElement('h2');
+  h.innerHTML = `${t.key} · ${t.name} — <b>${t.clsLabel}</b>`;
+  const cap = document.createElement('div');
+  cap.className = 'cap';
+  cap.textContent = t.desc;
+  sec.appendChild(h); sec.appendChild(cap);
+  const c = document.createElement('canvas');
+  c.width = CARD_W; c.height = CARD_H;
+  c.style.width = CARD_W * SCALE + 'px';
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  sec.appendChild(c);
+  allCanvases.push(c);
+  cardCtxs.push([ctx, t]);
+  cardsEl.appendChild(sec);
+});
+Promise.all(Object.entries(CLASS_JOB5).map(async ([cls, job]) => {
+  IMGS[cls] = await loadImg(`characters/${cls}/${job}/south.png`);
+})).then(() => cardCtxs.forEach(([ctx, t]) => drawKitCard(ctx, t)));
+
+document.querySelectorAll('#scalectl .ctl').forEach(b => {
+  b.addEventListener('click', () => {
+    SCALE = +b.dataset.s;
+    document.querySelectorAll('#scalectl .ctl').forEach(x => x.classList.toggle('on', x === b));
+    allCanvases.forEach(c => { c.style.width = (c.width * SCALE) + 'px'; });
+  });
+});
+</script>
+</body>
+</html>
