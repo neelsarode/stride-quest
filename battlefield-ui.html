@@ -426,9 +426,9 @@
   /* ---- party rail: full-body portraits + fuel-state dots → tap for stats ---- */
   const T8 = { mat: AG, sec: AU, well:'night_w', wellD:'night_wd', text:'silver1', textDim:'sky_mid' };
   const MATES = [
-    { name:'MAYA', cls:'mage',   job:'5_archmage',   state:'battling', steps:'9,842', dmg:'38,210', streak:'6 DAYS' },
-    { name:'JAKE', cls:'archer', job:'5_sentinel',   state:'winded',   steps:'4,120', dmg:'22,405', streak:'2 DAYS' },
-    { name:'SAM',  cls:'medic',  job:'5_hierophant', state:'resting',  steps:'1,050', dmg:'8,750',  streak:'0 DAYS' },
+    { name:'MAYA', cls:'mage',   job:'5_archmage',   state:'battling', steps:'9,842', dmg:'38,210', streak:'6 DAYS', fuel:.78, fuelLabel:'FIGHTS 16H' },
+    { name:'JAKE', cls:'archer', job:'5_sentinel',   state:'winded',   steps:'4,120', dmg:'22,405', streak:'2 DAYS', fuel:.28, fuelLabel:'WINDED 4H' },
+    { name:'SAM',  cls:'medic',  job:'5_hierophant', state:'resting',  steps:'1,050', dmg:'8,750',  streak:'0 DAYS', fuel:0,   fuelLabel:'EMPTY' },
   ];
   const rail = document.getElementById('partyrail');
   const popwrap = document.getElementById('popwrap');
@@ -445,7 +445,7 @@
     closePopover();
     popwrap.dataset.open = mate.name;
     const hasRally = mate.state === 'resting';
-    const H = hasRally ? 64 : 44;
+    const H = hasRally ? 73 : 53;
     const c = uiCanvas(135, H + 4, S2);
     const ctx = c.getContext('2d');
     // row layout: popover hangs BELOW the tapped portrait; arrow x is set after placement
@@ -464,10 +464,11 @@
     line('STEPS TODAY', mate.steps, pw.wy + 13);
     line('DMG WEEK', mate.dmg, pw.wy + 22);
     line('STREAK', mate.streak, pw.wy + 31);
+    line('FUEL', mate.fuelLabel, pw.wy + 40);
     let rallyRect = null;
     if (hasRally){
-      hifiButton(ctx, pw.wx + 3, pw.wy + 42, pw.ww - 6, 15, AU, { text: 'SEND RALLY 500' });
-      rallyRect = { x: pw.wx + 3, y: pw.wy + 42, w: pw.ww - 6, h: 16 };
+      hifiButton(ctx, pw.wx + 3, pw.wy + 51, pw.ww - 6, 15, AU, { text: 'SEND RALLY 500' });
+      rallyRect = { x: pw.wx + 3, y: pw.wy + 51, w: pw.ww - 6, h: 16 };
     }
     c.addEventListener('click', e => {
       e.stopPropagation();
@@ -495,10 +496,10 @@
     // 18 art-px @ 3x — same recipe as the right-nav buttons; +1px margin for the
     // beacon ring, drawn flush against the portrait frame (a touching gold border)
     const PAD = needsRally ? 1 : 0, S = 18 + PAD * 2;
-    const c = uiCanvas(S, S, S2), ctx = c.getContext('2d');
+    const c = uiCanvas(S, S + 6, S2), ctx = c.getContext('2d');   // +6: fuel sliver row
     let spriteImg = null, beat = 0;
     const draw = () => {
-      ctx.clearRect(0, 0, S, S);
+      ctx.clearRect(0, 0, S, S + 6);
       const key = needsRally ? BEACON_KEYS[BEACON_SEQ[beat]] : null;
       if (key){                                            // rounded 1px ring, notched corners
         px(ctx, 2, 0, S-4, 1, key); px(ctx, 2, S-1, S-4, 1, key);
@@ -509,6 +510,11 @@
       hifiPortrait(ctx, PAD, PAD, 18, AG, 'night_wd', spriteImg, PORTRAIT_CROPS[mate.cls]);
       // out-of-fuel reads RED on the roster (teammate call-to-action, not self-shame)
       hifiStatusDot(ctx, PAD + 12, PAD + 12, needsRally ? 'red_mid' : mate.state);
+      // fuel sliver under the portrait (lab convention: sliver = FUEL, empty = rally me)
+      fillRounded(ctx, PAD, S + 1, 18, 5, 2, AG.out);
+      const fam = hpFamily(mate.fuel);
+      px(ctx, PAD + 1, S + 2, Math.max(1, Math.round(16 * mate.fuel)), 1, fam.light);
+      px(ctx, PAD + 1, S + 3, Math.max(1, Math.round(16 * mate.fuel)), 2, fam.mid);
     };
     draw();
     const img = new Image();
@@ -523,6 +529,57 @@
     });
     rail.appendChild(c);
   });
+
+  /* ---- invite slot: empty well + chunky plus → guild-code popover ---- */
+  function openInvite(anchorEl){
+    closePopover();
+    popwrap.dataset.open = 'INVITE';
+    const H = 62;
+    const c = uiCanvas(135, H + 4, S2);
+    const ctx = c.getContext('2d');
+    const anchorMidX = anchorEl.getBoundingClientRect().left + anchorEl.getBoundingClientRect().width / 2;
+    const popW = 135 * S2;
+    const popLeft = Math.max(8, Math.min(Math.round(anchorMidX - 30), innerWidth - popW - 8));
+    const arrowAt = Math.max(8, Math.min(Math.round((anchorMidX - popLeft) / S2), 124));
+    const pw = hifiPopover(ctx, 0, 3, 132, H, T8, 'top', arrowAt);
+    drawText(ctx, 'INVITE A FRIEND', pw.wx + 4, pw.wy + 3, 'silver1');
+    drawText(ctx, 'SHARE YOUR GUILD CODE', pw.wx + 4, pw.wy + 13, 'sky_mid');
+    const code = 'WQ-EHB8';
+    drawText(ctx, code, pw.wx + Math.round((pw.ww - textWidth(code)) / 2), pw.wy + 24, 'gold1');
+    hifiButton(ctx, pw.wx + 3, pw.wy + 36, pw.ww - 6, 15, AU, { text: 'COPY CODE' });
+    const copyRect = { x: pw.wx + 3, y: pw.wy + 36, w: pw.ww - 6, h: 16 };
+    c.addEventListener('click', e => {
+      e.stopPropagation();
+      const r = c.getBoundingClientRect();
+      const mx = Math.floor((e.clientX - r.left) / (r.width / c.width));
+      const my = Math.floor((e.clientY - r.top) / (r.height / c.height));
+      if (mx >= copyRect.x && mx < copyRect.x + copyRect.w &&
+          my >= copyRect.y && my < copyRect.y + copyRect.h){
+        try { navigator.clipboard.writeText(code); } catch (_) {}
+        showToast('CODE COPIED!');
+        closePopover();
+      }
+    });
+    popwrap.appendChild(c);
+    const railRect = rail.getBoundingClientRect();
+    popwrap.style.left = popLeft + 'px';
+    popwrap.style.top = Math.round(railRect.bottom + 4) + 'px';
+  }
+  {
+    const S = 18;
+    const c = uiCanvas(S, S + 6, S2), ctx = c.getContext('2d');   // +6 aligns with mates' sliver row
+    const well = hifiFrameSlim(ctx, 0, 0, S, S, 5, AG, 'night_wd');
+    const pcx = well.wx + Math.floor(well.ww / 2), pcy = well.wy + Math.floor(well.wh / 2);
+    px(ctx, pcx - 3, pcy - 1, 7, 3, 'silver1');                   // chunky plus, readable as a button
+    px(ctx, pcx - 1, pcy - 3, 3, 7, 'silver1');
+    c.style.cursor = 'pointer';
+    c.addEventListener('click', e => {
+      e.stopPropagation();
+      if (popwrap.dataset.open === 'INVITE') closePopover();
+      else openInvite(c);
+    });
+    rail.appendChild(c);
+  }
   document.addEventListener('click', () => closePopover());
 
   /* ---- help modal (the ? nav button) ---- */
