@@ -130,6 +130,35 @@ export const BOSS = {
   placeholderMaxHP: 100_000, // fallback only
 } as const;
 
+// ============================================================================
+// M1.5 TUNABLES — Bonus Boss / victory week (spec: docs/superpowers/specs/
+// 2026-07-14-bonus-boss-design.md §4). Every value is a STARTING value.
+// ============================================================================
+
+/** Bonus Boss: when the weekly boss dies early, its crowned form rises for the
+ *  rest of the week. No HP — an ACCUMULATING damage meter. At Monday rollover
+ *  the guild earns a next-week damage multiplier tiered by total bonus damage.
+ *  Floor is ×1.0 (ignoring it costs nothing); the boost is EARNED by walking
+ *  only — never purchasable (M3 guardrail). */
+export const BONUS_BOSS = {
+  namePrefix: "Crowned", // display name: "Crowned <bossName>" — TUNABLE start
+  // Reward tiers — thresholds are FRACTIONS of the KILLED boss's bossMaxHP,
+  // which already scales with member count × difficulty tier (bossMaxHP()), so
+  // small guilds and late tiers inherit the right scale for free. Reaching a
+  // threshold is INCLUSIVE (damage ≥ threshold). Keep tiers ascending in BOTH
+  // fields — nextBonusTierTarget() walks them in order.
+  tiers: [
+    { thresholdFrac: 0.25, boostMult: 1.1 }, // TUNABLE start
+    { thresholdFrac: 0.5, boostMult: 1.2 }, // TUNABLE start
+    { thresholdFrac: 1.0, boostMult: 1.35 }, // a full second boss — TUNABLE start
+  ],
+  maxBoostMult: 1.5, // hard safety ceiling on the stamped mult — TUNABLE start
+  // What the boost multiplies. Decided: "all" (deploys + idle + next week's own
+  // bonus damage) — one sentence to explain, fair to every playstyle; the two
+  // multiply sites are gated on this, so re-scoping is a config flip.
+  boostAppliesTo: "all" as "all" | "deploys" | "idle", // TUNABLE start
+} as const;
+
 /** Guild membership + invite codes (M2.5 onboarding). Codes are read aloud and
  *  typed by hand between friends, so the alphabet deliberately drops the
  *  look-alike characters (0/O, 1/I/L). */
@@ -300,4 +329,51 @@ export function streakMultiplierFrom(
   );
   const jobBonus = STREAK.jobBonusPerLevel * Math.max(0, jobLevel - 1);
   return Math.min(1 + dayBonus + intensityBonus + jobBonus, STREAK.maxStreakMult);
+}
+
+/** Bonus Boss reward tier from the party's accumulating bonus damage.
+ *  `killedBossMaxHP` is the bossMaxHP of the boss the crew KILLED (member-count
+ *  × tier scaling already inside), so the tiers inherit every scale for free.
+ *  Tier 0 / ×1.0 below the first threshold; reaching a threshold is INCLUSIVE
+ *  (damage ≥ threshold); the mult is clamped by BONUS_BOSS.maxBoostMult. Pure
+ *  function so the rollover stamping (spawnBoss) and the UI tier preview
+ *  compute it identically — the number shown is ALWAYS the number applied. */
+export function bonusTierFor(
+  totalBonusDamage: number,
+  killedBossMaxHP: number,
+): { tier: number; mult: number } {
+  if (killedBossMaxHP <= 0) return { tier: 0, mult: 1 }; // defensive: no boss, no boost
+  let tier = 0;
+  let mult = 1;
+  for (let i = 0; i < BONUS_BOSS.tiers.length; i++) {
+    if (
+      totalBonusDamage >=
+      BONUS_BOSS.tiers[i].thresholdFrac * killedBossMaxHP
+    ) {
+      tier = i + 1;
+      mult = BONUS_BOSS.tiers[i].boostMult;
+    }
+  }
+  return { tier, mult: Math.min(mult, BONUS_BOSS.maxBoostMult) };
+}
+
+/** The NEXT bonus tier to chase ("38,400 damage to ×1.35"), or null once the
+ *  max tier is reached. Same inputs as bonusTierFor — and it goes THROUGH
+ *  bonusTierFor, so the preview readout can never disagree with what the
+ *  rollover will stamp. */
+export function nextBonusTierTarget(
+  totalBonusDamage: number,
+  killedBossMaxHP: number,
+): { damageToGo: number; mult: number } | null {
+  if (killedBossMaxHP <= 0) return null; // defensive: no boss, nothing to chase
+  const { tier } = bonusTierFor(totalBonusDamage, killedBossMaxHP);
+  if (tier >= BONUS_BOSS.tiers.length) return null;
+  const next = BONUS_BOSS.tiers[tier]; // tiers[tier] IS the next one (tier is 1-based)
+  return {
+    damageToGo: Math.max(
+      0,
+      next.thresholdFrac * killedBossMaxHP - totalBonusDamage,
+    ),
+    mult: Math.min(next.boostMult, BONUS_BOSS.maxBoostMult),
+  };
 }
