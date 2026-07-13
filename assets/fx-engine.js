@@ -52,7 +52,7 @@ window.FXEngine = (function () {
     const cx1 = Math.max(b.left + b.width * FX.bossChestX, cx0 + FX.minTravelPx);
     const p = document.createElement('img'); p.className = 'sprite';
     p.style.cssText = `position:fixed;top:${cy - sizePx / 2}px;width:${sizePx}px;height:${sizePx}px;z-index:60;pointer-events:none;transform:rotate(${angle}deg);`;
-    document.body.appendChild(p);
+    (api.layer || document.body).appendChild(p);
     let fi = 0; p.src = frames[0];
     const flicker = setInterval(() => { fi = (fi + 1) % frames.length; p.src = frames[fi]; }, 1000 / FX.projFps);
     const dur = Math.max(120, Math.min(320, (cx1 - cx0) / FX.speedPxMs));
@@ -69,7 +69,7 @@ window.FXEngine = (function () {
     const isize = sizePx * 1.3;
     const im = document.createElement('img'); im.className = 'sprite';
     im.style.cssText = `position:fixed;left:${cx - isize / 2}px;top:${cy - isize / 2}px;width:${isize}px;height:${isize}px;z-index:61;pointer-events:none;`;
-    document.body.appendChild(im);
+    (api.layer || document.body).appendChild(im);
     let fi = 0; im.src = frames[0];
     const iv = setInterval(() => {
       fi++;
@@ -80,12 +80,14 @@ window.FXEngine = (function () {
     bossImg.style.filter = bossBaseFilter + ' brightness(2.2)';
     bossEl.style.transform = bossBaseTransform + ` translateY(-${bump}px)`;
     setTimeout(() => { bossImg.style.filter = bossBaseFilter; bossEl.style.transform = bossBaseTransform; }, flashMs);
+    const amount = big ? (9000 + Math.floor(Math.random() * 3000)) : (1800 + Math.floor(Math.random() * 900));
+    if (api.onDamage) api.onDamage(amount, big);   // optional page hook (e.g. HUD boss HP bar)
     const dmg = document.createElement('div');
-    dmg.textContent = '-' + (big ? (9000 + Math.floor(Math.random() * 3000)) : (1800 + Math.floor(Math.random() * 900)));
+    dmg.textContent = '-' + amount;
     dmg.style.cssText = `position:fixed;left:${cx - 12}px;top:${cy - isize / 2 - 8}px;z-index:62;pointer-events:none;
       font-weight:800;font-size:${big ? 30 : 22}px;color:${big ? '#ffe9a3' : '#ffd166'};text-shadow:0 2px 3px #000;
       transition:transform .8s ease-out,opacity .8s ease-out;`;
-    document.body.appendChild(dmg);
+    (api.layer || document.body).appendChild(dmg);
     requestAnimationFrame(() => { dmg.style.transform = 'translateY(-46px)'; dmg.style.opacity = '0'; });
     setTimeout(() => dmg.remove(), 850);
   }
@@ -142,5 +144,10 @@ window.FXEngine = (function () {
     return f;
   }
 
-  return { FX, CLASS_FX, makeFighter, setBoss, framesOf, preload };
+  // api.layer: optional mount node for projectiles/impacts/damage numbers.
+  // Default (null) = document.body. Pages with a fixed-position stage should set
+  // it to the stage so effect z-indexes (60-62) slot BELOW HUD chrome (100+)
+  // inside the same stacking context instead of painting over popovers/toasts.
+  const api = { FX, CLASS_FX, makeFighter, setBoss, framesOf, preload, onDamage: null, layer: null };
+  return api;
 })();
