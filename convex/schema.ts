@@ -13,6 +13,7 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
+import { CLASS_KEYS } from "./gameConfig";
 
 export default defineSchema({
   // ---------------------------------------------------------------------------
@@ -37,6 +38,16 @@ export default defineSchema({
     // baselineSteps: the player's "typical" daily steps, used for FAIR scoring
     // later (improvement vs. a personal baseline, not raw step totals).
     baselineSteps: v.optional(v.number()),
+
+    // --- M2.5 onboarding (STR-42) ---
+    // Chosen hero class. Optional because mid-onboarding and legacy (warrior-
+    // only MVP) users have none — every read falls back via
+    // `user.class ?? MVP_CLASS`. The validator is DERIVED from the CLASSES
+    // registry so adding a class stays a data-only change in gameConfig.ts.
+    class: v.optional(v.union(...CLASS_KEYS.map((k) => v.literal(k)))),
+    // Stamped when onboarding completes (Beat 4 — first battle). The App.tsx
+    // state machine routes on server state, so unset ⇒ resume the flow.
+    onboardedAt: v.optional(v.number()),
 
     // --- Phase 2 account-level meta (PERSISTS across weekly resets) ---
     // Energy is DERIVED: balance = energyEarned(ledger) − energySpent. We store
@@ -89,7 +100,13 @@ export default defineSchema({
     // server uses this to decide the guild's "day"/"week" boundary so all co-op
     // members share ONE boss-week and one streak-day. Captured at bootstrap.
     tzOffsetMinutes: v.optional(v.number()),
-  }).index("by_owner", ["ownerId"]),
+    // 6-character code friends type to join this guild (M2.5 onboarding;
+    // length/alphabet in gameConfig.GUILD). Optional: guilds created before
+    // onboarding shipped don't have one yet.
+    inviteCode: v.optional(v.string()),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_invite_code", ["inviteCode"]),
 
   // memberships — which user belongs to which guild (its own table so a user can
   // join multiple guilds later and carry per-guild stats).

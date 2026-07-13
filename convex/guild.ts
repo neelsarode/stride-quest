@@ -22,6 +22,7 @@ import {
   IMPROVEMENT_FLOOR,
   RECOGNITION,
   jobLevelForWeeklySteps,
+  type ClassKey,
 } from "./gameConfig";
 
 const DAY_MS = 86_400_000;
@@ -91,11 +92,11 @@ export const overview = query({
       .query("memberships")
       .withIndex("by_group", (q) => q.eq("groupId", group._id))
       .collect();
-    const cls = CLASSES[MVP_CLASS];
 
     const members: Array<{
       userId: Id<"users">;
       displayName: string;
+      class: ClassKey; // chosen class key — feeds the battle-scene roster sprites
       isMe: boolean;
       isSimulated: boolean;
       damage: number;
@@ -112,6 +113,9 @@ export const overview = query({
     for (const m of memberships) {
       const u = await ctx.db.get(m.userId);
       if (!u) continue;
+      // Per-member class registry entry — class-less members (mid-onboarding,
+      // legacy) render as the warrior MVP fallback.
+      const cls = CLASSES[u.class ?? MVP_CLASS];
       const weekly = await stepsForWeek(ctx, m.userId, weekStart, weekEnd);
       const jobLevel = jobLevelForWeeklySteps(weekly);
       const todaySteps = await stepsForDate(ctx, m.userId, date);
@@ -129,6 +133,7 @@ export const overview = query({
       members.push({
         userId: m.userId,
         displayName: u.displayName ?? "Hero",
+        class: cls.key,
         isMe: m.userId === userId,
         isSimulated: u.isSimulated ?? false,
         damage: Math.round(dmgByUser.get(m.userId) ?? 0),

@@ -94,7 +94,9 @@ export const dashboard = query({
     const stepsToday = await stepsForDate(ctx, userId, date);
     const stepsThisWeek = await stepsForWeek(ctx, userId, weekStart, weekEnd);
     const jobLevel = jobLevelForWeeklySteps(stepsThisWeek);
-    const cls = CLASSES[MVP_CLASS];
+    // Class registry entry — class-less users (mid-onboarding, legacy) fall
+    // back to the warrior MVP class, so a missing pick is never an error.
+    const cls = CLASSES[user.class ?? MVP_CLASS];
 
     // Dual meters: Job XP (weekly cumulative, never spent) + Energy (spendable bank).
     const jobXp = stepsThisWeek * XP_PER_STEP;
@@ -301,6 +303,10 @@ export const dashboard = query({
       idle,
       overdrive,
       streak,
+      // First-deploy hint (M2.5 teaching layer): lastDeployDate is only ever
+      // written by a deploy, so its absence means this account has never hit
+      // the button — the DeployButton pulses until they do.
+      hasEverDeployed: user.lastDeployDate !== undefined,
       shields,
       rally,
       dailyGoal,

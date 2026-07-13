@@ -17,17 +17,6 @@ export const JOB_THRESHOLDS = [0, 10_000, 25_000, 50_000, 75_000] as const;
  *  Job 1 = ×1 … Job 5 = ×10. */
 export const JOB_MULTIPLIERS = [1, 2, 3.5, 6, 10] as const;
 
-/** Human-readable Warrior job names — matches the sprite folders in /characters.
- *  (MVP ships ONE class. The class/job system is data-driven so adding the other
- *  classes later is a data change, not a rewrite — see CLASSES below.) */
-export const WARRIOR_JOB_NAMES = [
-  "Rookie",
-  "Strider",
-  "Vanguard",
-  "Champion",
-  "Warlord",
-] as const;
-
 /** Idle combat: damage accrues even while the app is closed, but only up to this
  *  many hours. Opening the app "collects" the accrued damage onto the boss. */
 export const OFFLINE_CAP_HOURS = 10;
@@ -141,14 +130,25 @@ export const BOSS = {
   placeholderMaxHP: 100_000, // fallback only
 } as const;
 
-/** Data-driven class registry. MVP ships only "warrior" but the shape is here so
- *  the other classes slot in as DATA later (no logic changes). */
+/** Guild membership + invite codes (M2.5 onboarding). Codes are read aloud and
+ *  typed by hand between friends, so the alphabet deliberately drops the
+ *  look-alike characters (0/O, 1/I/L). */
+export const GUILD = {
+  maxMembers: 8, // TUNABLE start — the 3–8 friend-group design target
+  inviteCodeLength: 6,
+  inviteCodeAlphabet: "23456789ABCDEFGHJKMNPQRSTUVWXYZ", // no 0/O/1/I/L
+} as const;
+
+/** Data-driven class registry — all 8 classes, chosen at onboarding (M2.5).
+ *  Class is FLAVOR (sprites, job names, VFX): steps are the only power, so every
+ *  class shares the same job thresholds/multipliers. jobFolders are the sprite
+ *  folder names on disk under /characters/<class>/<jobFolder>/ — transcribed
+ *  from characters/MANIFEST.md, which is ground truth. */
 export const CLASSES = {
   warrior: {
     key: "warrior",
     displayName: "Warrior",
-    jobNames: WARRIOR_JOB_NAMES,
-    // sprite folder names under /characters/warrior/<jobFolder>/
+    jobNames: ["Rookie", "Strider", "Vanguard", "Champion", "Warlord"],
     jobFolders: [
       "1_rookie",
       "2_strider",
@@ -157,9 +157,99 @@ export const CLASSES = {
       "5_warlord",
     ],
   },
+  mage: {
+    key: "mage",
+    displayName: "Mage",
+    jobNames: ["Apprentice", "Adept", "Conjurer", "Sorcerer", "Archmage"],
+    jobFolders: [
+      "1_apprentice",
+      "2_adept",
+      "3_conjurer",
+      "4_sorcerer",
+      "5_archmage",
+    ],
+  },
+  medic: {
+    key: "medic",
+    displayName: "Medic",
+    jobNames: ["Acolyte", "Healer", "Cleric", "Priest", "Hierophant"],
+    jobFolders: [
+      "1_acolyte",
+      "2_healer",
+      "3_cleric",
+      "4_priest",
+      "5_hierophant",
+    ],
+  },
+  archer: {
+    key: "archer",
+    displayName: "Archer",
+    jobNames: ["Greenhorn", "Scout", "Hunter", "Ranger", "Sentinel"],
+    jobFolders: [
+      "1_greenhorn",
+      "2_scout",
+      "3_hunter",
+      "4_ranger",
+      "5_sentinel",
+    ],
+  },
+  assassin: {
+    key: "assassin",
+    displayName: "Assassin",
+    jobNames: ["Footpad", "Prowler", "Nightblade", "Assassin", "Shadowlord"],
+    jobFolders: [
+      "1_footpad",
+      "2_prowler",
+      "3_nightblade",
+      "4_assassin",
+      "5_shadowlord",
+    ],
+  },
+  paladin: {
+    key: "paladin",
+    displayName: "Paladin",
+    jobNames: ["Squire", "Knight", "Crusader", "Paladin", "Lightbringer"],
+    jobFolders: [
+      "1_squire",
+      "2_knight",
+      "3_crusader",
+      "4_paladin",
+      "5_lightbringer",
+    ],
+  },
+  warlock: {
+    key: "warlock",
+    displayName: "Warlock",
+    jobNames: ["Initiate", "Cultist", "Hexer", "Warlock", "Dreadlord"],
+    jobFolders: [
+      "1_initiate",
+      "2_cultist",
+      "3_hexer",
+      "4_warlock",
+      "5_dreadlord",
+    ],
+  },
+  bard: {
+    key: "bard",
+    displayName: "Bard",
+    jobNames: ["Busker", "Minstrel", "Troubadour", "Bard", "Maestro"],
+    jobFolders: [
+      "1_busker",
+      "2_minstrel",
+      "3_troubadour",
+      "4_bard",
+      "5_maestro",
+    ],
+  },
 } as const;
 
 export type ClassKey = keyof typeof CLASSES;
+/** Every class key, in registry (display) order. The schema derives the
+ *  `users.class` validator from this, so adding a class stays a data-only change. */
+export const CLASS_KEYS = Object.keys(CLASSES) as ClassKey[];
+/** FALLBACK class: users who haven't picked a hero yet (mid-onboarding, or
+ *  legacy accounts from the warrior-only MVP) resolve to this everywhere via
+ *  `user.class ?? MVP_CLASS` — a class-less doc is never an error. */
 export const MVP_CLASS: ClassKey = "warrior";
 
 /** Given cumulative weekly steps, returns the Job level (1–5). */
