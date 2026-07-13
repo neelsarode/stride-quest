@@ -192,9 +192,10 @@ function drawKitCard(ctx, t){
   {
     // invite slot: chunky pixel plus (font glyph was too small to read as a button)
     const well = hifiFrameSlim(ctx, 110, 50, 22, 22, 5, m, t.wellD);
-    const pcx = well.wx + Math.floor(well.ww / 2), pcy = well.wy + Math.floor(well.wh / 2);
-    px(ctx, pcx - 4, pcy - 1, 9, 2, t.textDim);
-    px(ctx, pcx - 1, pcy - 4, 2, 9, t.textDim);
+    // 8x8 grid, 2px stroke — all-even geometry so the arms are symmetric
+    const px0 = well.wx + Math.floor((well.ww - 8) / 2), py0 = well.wy + Math.floor((well.wh - 8) / 2);
+    px(ctx, px0, py0 + 3, 8, 2, t.textDim);
+    px(ctx, px0 + 3, py0, 2, 8, t.textDim);
   }
 
   /* ---- boss bar + quest panel + XP ---- */

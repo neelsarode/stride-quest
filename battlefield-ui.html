@@ -569,9 +569,10 @@
     const S = 18;
     const c = uiCanvas(S, S + 6, S2), ctx = c.getContext('2d');   // +6 aligns with mates' sliver row
     const well = hifiFrameSlim(ctx, 0, 0, S, S, 5, AG, 'night_wd');
-    const pcx = well.wx + Math.floor(well.ww / 2), pcy = well.wy + Math.floor(well.wh / 2);
-    px(ctx, pcx - 3, pcy - 1, 7, 2, 'silver1');                   // plus: 2px stroke, readable as a button
-    px(ctx, pcx - 1, pcy - 3, 2, 7, 'silver1');
+    // plus: 6x6 grid, 2px stroke — all-even geometry so the arms are symmetric
+    const px0 = well.wx + Math.floor((well.ww - 6) / 2), py0 = well.wy + Math.floor((well.wh - 6) / 2);
+    px(ctx, px0, py0 + 2, 6, 2, 'silver1');
+    px(ctx, px0 + 2, py0, 2, 6, 'silver1');
     c.style.cursor = 'pointer';
     c.addEventListener('click', e => {
       e.stopPropagation();
