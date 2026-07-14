@@ -168,7 +168,12 @@ npx convex dev
 # Terminal 2 — app in the browser (instant, no Xcode)
 npm run web
 ```
-iOS Simulator (once full Xcode is installed): `npx expo run:ios` then `npm start`.
+iOS Simulator ✅ WORKS (first native build 2026-07-14, zero errors — STR-24):
+`npx expo run:ios` (add `--no-bundler` if Metro already runs) — boots the dev
+client on iPhone 17 Pro against the cloud dev deployment. Rebuild only needed
+for native changes; JS hot-reloads. Xcode 26.6 + CocoaPods installed.
+Physical-iPhone option (pre-Apple-account): free personal-team signing works,
+7-day provisioning, HealthKit allowed → real steps testable early.
 
 Convex dashboard: https://dashboard.convex.dev/t/neel-sarode/walking-app
 
@@ -307,8 +312,8 @@ Other classes, recognition screens, IAP, cosmetics, guild-vs-guild / global.
 ---
 
 ## 8. Outstanding manual steps (human-only)
-- **Xcode** (full app, Mac App Store) — required for the iOS Simulator. *In
-  progress.* After install: license + iOS Simulator runtime + CocoaPods (I'll guide).
+- **Xcode** — ✅ DONE (2026-07-14). Xcode 26.6 + iOS 26.5 runtime + CocoaPods;
+  first native build succeeded, app boots in the Simulator (STR-24, see §6).
 - **Apple Developer Program ($99/yr)** — deferred; only for REAL steps on a
   physical iPhone. Enrollment can take 1–2 days when you decide to do it.
 - **Convex cloud account** — ✅ done (team `neel-sarode`, project `walking-app`).
