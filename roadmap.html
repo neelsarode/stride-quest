@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — Road to Launch</title>
+<style>
+  /* Linear design language: near-black canvas, Inter, quiet 1px borders,
+     small type, one restrained accent. */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #08090a;
+    --panel: #141516;
+    --card: #191a1c;
+    --border: rgba(255, 255, 255, 0.07);
+    --border-hover: rgba(255, 255, 255, 0.14);
+    --text: #f7f8f8;
+    --dim: #8a8f98;
+    --faint: #5e626a;
+    --accent: #5e6ad2;
+    --green: #4cb782;
+    --orange: #f2994a;
+    --blue: #4ea7fc;
+    --grey: #8a8f98;
+  }
+  html, body { background: var(--bg); color: var(--text); min-height: 100%;
+    font-family: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+
+  header { padding: 28px 32px 20px; border-bottom: 1px solid var(--border); }
+  .crumb { font-size: 12px; color: var(--faint); margin-bottom: 6px; }
+  .crumb b { color: var(--dim); font-weight: 500; }
+  h1 { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .sub { font-size: 13px; color: var(--dim); margin-top: 6px; max-width: 720px; line-height: 1.55; }
+  .sub a { color: var(--accent); text-decoration: none; }
+  .sub a:hover { text-decoration: underline; }
+
+  .progress { margin-top: 16px; max-width: 460px; }
+  .progress .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); margin-bottom: 6px; }
+  .bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .bar > div { height: 100%; width: 52%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--accent), #8b7cf6); }
+
+  #board { display: flex; gap: 14px; padding: 22px 32px 48px; overflow-x: auto; align-items: flex-start; }
+  .col { min-width: 300px; max-width: 320px; flex: 1; }
+  .colhead { display: flex; align-items: center; gap: 8px; padding: 4px 6px 12px; }
+  .colhead .name { font-size: 13px; font-weight: 600; }
+  .count { font-size: 11.5px; color: var(--dim); background: rgba(255,255,255,.06);
+    border-radius: 10px; padding: 1px 7px; }
+  .colnote { font-size: 11.5px; color: var(--faint); padding: 0 6px 12px; line-height: 1.5; margin-top: -6px; }
+
+  /* Linear-style status glyphs */
+  .dot { width: 13px; height: 13px; border-radius: 50%; flex: none; position: relative; }
+  .dot.you    { border: 1.5px solid var(--orange); }
+  .dot.you::after { content: ""; position: absolute; inset: 2.5px; border-radius: 50%;
+    background: var(--orange); clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%); }
+  .dot.next   { border: 1.5px solid var(--blue); }
+  .dot.later  { border: 1.5px dashed var(--grey); opacity: .8; }
+  .dot.done   { background: var(--green); border: 1.5px solid var(--green); }
+  .dot.done::after { content: ""; position: absolute; left: 3px; top: 5px; width: 6px; height: 3px;
+    border-left: 1.5px solid #08090a; border-bottom: 1.5px solid #08090a; transform: rotate(-45deg); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 13px; margin-bottom: 10px; transition: border-color .12s, transform .12s; }
+  .card:hover { border-color: var(--border-hover); transform: translateY(-1px); }
+  .card h3 { font-size: 13px; font-weight: 600; line-height: 1.4; letter-spacing: -0.005em; }
+  .card p { font-size: 12px; color: var(--dim); line-height: 1.55; margin-top: 5px; }
+  .meta { display: flex; align-items: center; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .pill { font-size: 10.5px; font-weight: 500; border-radius: 4px; padding: 2px 6px; letter-spacing: .01em; }
+  .pill.game   { color: #8b7cf6; background: rgba(139,124,246,.12); }
+  .pill.app    { color: var(--blue); background: rgba(78,167,252,.12); }
+  .pill.art    { color: #e5a13c; background: rgba(229,161,60,.12); }
+  .pill.apple  { color: #e6e8eb; background: rgba(255,255,255,.09); }
+  .pill.money  { color: var(--green); background: rgba(76,183,130,.12); }
+  .pill.social { color: #f27a9b; background: rgba(242,122,155,.12); }
+  .ref { font-size: 10.5px; color: var(--faint); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  .blocked { font-size: 11px; color: var(--orange); margin-top: 7px; display: flex; gap: 5px; align-items: center; }
+  .blocked::before { content: "⏳"; font-size: 10px; }
+
+  footer { padding: 0 32px 40px; font-size: 11.5px; color: var(--faint); }
+  @media (max-width: 720px) {
+    header, footer { padding-left: 18px; padding-right: 18px; }
+    #board { padding: 18px; }
+    .col { min-width: 280px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="crumb"><b>Stride Quest</b> · Road to launch</div>
+  <h1>Everything between here and your friends fighting the boss on their phones</h1>
+  <div class="sub">
+    The plain-language board. The finish line = your friend group installed via TestFlight,
+    walking real steps against one shared boss. Dev detail lives in
+    <a href="https://linear.app/stridequest/project/stride-quest-40ccda389ff9">Linear</a> —
+    the small grey numbers on each card point there.
+  </div>
+  <div class="progress">
+    <div class="row"><span>The game itself is done — what's left is mostly packaging</span><span>~52%</span></div>
+    <div class="bar"><div></div></div>
+  </div>
+</header>
+
+<div id="board">
+
+  <!-- ============ NEEDS YOU ============ -->
+  <div class="col">
+    <div class="colhead"><span class="dot you"></span><span class="name">Needs You</span><span class="count">4</span></div>
+    <div class="colnote">Things only you can do — accounts, purchases, and your designer's eye. Everything else waits on these less than it looks.</div>
+
+    <div class="card">
+      <h3>Finish installing Xcode, run the app once</h3>
+      <p>The app has only ever run in a browser. One successful run in the iPhone Simulator proves it works as a real app — and unblocks everything phone-related.</p>
+      <div class="meta"><span class="pill apple">Apple</span><span class="ref">STR-24</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Sign up for Apple's developer program ($99/yr)</h3>
+      <p>Apple makes you wait 1–2 days after paying, so starting early is free. This unlocks the three big ones: real step counting on your phone, TestFlight for friends, and (later) anything paid.</p>
+      <div class="meta"><span class="pill apple">Apple</span><span class="ref">STR-25</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Read the onboarding screens, fix the words</h3>
+      <p>Open <b>onboarding-ui.html</b> and click through all 14 screens. The layout and flow are done — the writing is a draft waiting for your voice.</p>
+      <div class="meta"><span class="pill app">App</span><span class="ref">STR-43</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Invite the crew on TestFlight</h3>
+      <p>The actual finish line: friends install it, join your guild with the code, and the first real boss week begins.</p>
+      <div class="blocked">Waits on: Apple account + the "Up Next" column</div>
+      <div class="meta"><span class="pill apple">Apple</span><span class="pill social">Friends</span><span class="ref">STR-29</span></div>
+    </div>
+  </div>
+
+  <!-- ============ UP NEXT ============ -->
+  <div class="col">
+    <div class="colhead"><span class="dot next"></span><span class="name">Up Next — Claude builds</span><span class="count">8</span></div>
+    <div class="colnote">The build queue. Say the word on any of these and an agent takes it.</div>
+
+    <div class="card">
+      <h3>Show fuel &amp; tired heroes in the real app</h3>
+      <p>The "your hero can fight 9 more hours" gauge, plus the kneeling-and-catching-breath state. The math and the kneel art both exist — this puts them on screen.</p>
+      <div class="meta"><span class="pill app">App</span><span class="ref">STR-13</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The Overdrive button</h3>
+      <p>Walk past your daily goal → the meter charges → a big satisfying button unleashes 4 hours of triple damage. Backend done; needs its button.</p>
+      <div class="meta"><span class="pill app">App</span><span class="ref">STR-14</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The "send a friend fuel" button</h3>
+      <p>When a friend's hero is out of energy, you tap their portrait and send them 6 hours of fight time. The social heart of the game — working behind the scenes, needs its UI.</p>
+      <div class="meta"><span class="pill app">App</span><span class="pill social">Friends</span><span class="ref">STR-15</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The crowned-boss week on screen</h3>
+      <p>Beat the boss early and the app should show it: the crowned monster rises, a gold meter counts your bonus damage up, and next week's power-up gets announced. (Also un-greys the attack button after a kill.)</p>
+      <div class="meta"><span class="pill app">App</span><span class="pill game">Game</span><span class="ref">STR-57</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Build the real onboarding</h3>
+      <p>Turn the comp you're reviewing into actual app screens: pick your hero, name them, start or join a guild with a code, connect Apple Health.</p>
+      <div class="meta"><span class="pill app">App</span><span class="ref">STR-45–50</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Put the battle scene in the app</h3>
+      <p>The full fight you've been previewing in the browser — 8 heroes, projectiles, ultimates, the crowned boss — moved into the real app, driven by real game events.</p>
+      <div class="meta"><span class="pill app">App</span><span class="pill art">Art</span><span class="ref">STR-17–23</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Count real steps from Apple Health</h3>
+      <p>Swap the test button for your actual steps. The plumbing is built and waiting — but real step data only exists on a physical iPhone.</p>
+      <div class="blocked">Waits on: Apple developer account</div>
+      <div class="meta"><span class="pill app">App</span><span class="pill apple">Apple</span><span class="ref">STR-26</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Set up the "real" server + final test-drive</h3>
+      <p>A production copy of the backend for friends to play on (separate from our testing one), plus one full scripted play-through of the crowned-boss week to certify everything.</p>
+      <div class="meta"><span class="pill game">Game</span><span class="ref">STR-27 · STR-59</span></div>
+    </div>
+  </div>
+
+  <!-- ============ LATER ============ -->
+  <div class="col">
+    <div class="colhead"><span class="dot later"></span><span class="name">Later — after friends are playing</span><span class="count">6</span></div>
+    <div class="colnote">Deliberately parked. None of this blocks the beta, and most of it gets better with real playtest data.</div>
+
+    <div class="card">
+      <h3>The shop: skins, season pass, streak repair</h3>
+      <p>The whole money plan is designed and researched (never sell power — steps stay the only strength). Built only after the game proves people come back.</p>
+      <div class="meta"><span class="pill money">Money</span><span class="ref">STR-30–37, 41</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Notifications</h3>
+      <p>"Maya sent you 6 hours of fight time!" — friendly nudges only, never guilt. For an 8-person beta, your group chat does this job; decide after.</p>
+      <div class="meta"><span class="pill app">App</span><span class="pill social">Friends</span><span class="ref">STR-60</span></div>
+    </div>
+
+    <div class="card">
+      <h3>More bosses</h3>
+      <p>Right now every week is the horse. A small roster (3–4 monsters, each with a crowned form) so week four feels different from week one.</p>
+      <div class="meta"><span class="pill art">Art</span><span class="ref">STR-40</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Don't-lose-your-hero login</h3>
+      <p>Friends play with no account at all right now (nice!), but deleting the app loses their hero. A gentle "secure your hero" Apple/email link fixes that.</p>
+      <div class="meta"><span class="pill app">App</span><span class="ref">STR-51</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Guild housekeeping</h3>
+      <p>Remove an inactive member, tidy up the roster — the boring-but-needed admin tools.</p>
+      <div class="meta"><span class="pill social">Friends</span><span class="ref">STR-52</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The App Store, for real</h3>
+      <p>Public launch: store listing, screenshots, review process. A different mountain, for after the friend beta says the game deserves it.</p>
+      <div class="meta"><span class="pill apple">Apple</span></div>
+    </div>
+  </div>
+
+  <!-- ============ DONE ============ -->
+  <div class="col">
+    <div class="colhead"><span class="dot done"></span><span class="name">Done</span><span class="count">9</span></div>
+    <div class="colnote">The hard, novel part. All of this is built, math-checked, and running in the cloud.</div>
+
+    <div class="card">
+      <h3>The complete game rulebook</h3>
+      <p>Steps become fuel; your hero fights around the clock; runs dry → kneels (never punished). Daily deploy, streaks with safety shields, Overdrive, sending friends fuel — every number verified to the digit.</p>
+      <div class="meta"><span class="pill game">Game</span><span class="ref">M1</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The weekly boss &amp; your guild</h3>
+      <p>One shared health bar the whole crew chips at. Dies around day 5–6 for an engaged group, comes back 40% tougher each week you win.</p>
+      <div class="meta"><span class="pill game">Game</span><span class="pill social">Friends</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The crowned bonus week (the brains)</h3>
+      <p>Your idea: kill the boss early → its crowned form rises → damage it all week → the whole guild earns next week's power-up (×1.1 to ×1.35). Working end to end.</p>
+      <div class="meta"><span class="pill game">Game</span><span class="ref">M1.5</span></div>
+    </div>
+
+    <div class="card">
+      <h3>All 8 hero classes</h3>
+      <p>Warrior, Mage, Medic, Archer, Assassin, Paladin, Bard, Warlock — each a real choice with its own look, no longer warrior-only.</p>
+      <div class="meta"><span class="pill game">Game</span><span class="ref">STR-42</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Friend invites (the plumbing)</h3>
+      <p>Create a guild → get a code like WQ-EHB8 → friends type it in and join, hero and progress intact. Built and tested behind the scenes.</p>
+      <div class="meta"><span class="pill social">Friends</span><span class="ref">STR-44</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Every pixel drawn</h3>
+      <p>40 hero jobs with idle, attack, ultimate, evolution and rest animations; per-class battle effects; the boss and his crowned form; the full pixel UI kit.</p>
+      <div class="meta"><span class="pill art">Art</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The battle scene, proven</h3>
+      <p>The full 8-hero fight with projectiles, ultimates, kneeling rests (with pixel Z's) and the crowned-boss toggle — all working in the browser preview, sized for iPhone.</p>
+      <div class="meta"><span class="pill art">Art</span><span class="pill app">App</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Real multiplayer cloud</h3>
+      <p>The game runs on a live cloud backend — two people's damage already lands on one shared boss in real time. Not a mockup.</p>
+      <div class="meta"><span class="pill game">Game</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The workshop itself</h3>
+      <p>GitHub + Linear wired together — tickets track themselves, every change is versioned, and you can work from any computer.</p>
+      <div class="meta"><span class="pill app">App</span></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Snapshot written 2026-07-14 — this board is a plain-language mirror, not live-synced.
+  When it drifts from reality, ask Claude to refresh it.
+</footer>
+
+</body>
+</html>
