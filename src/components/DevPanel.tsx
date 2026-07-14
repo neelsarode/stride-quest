@@ -8,6 +8,14 @@ import { useCallback, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { FX_ANCHORS } from "../battle/anchors";
+import {
+  Fighter,
+  type FighterHandle,
+  type FighterMode,
+  type ReleaseEvent,
+} from "../battle/Fighter";
+import { CLASS_NAMES, FX } from "../battle/fxConfig";
 import { Sprite } from "../battle/Sprite";
 import { PALETTE, SIZES } from "../config/assets";
 import { INJECTOR_AMOUNTS, TEAMMATE_STEP_AMOUNTS } from "../devConfig";
@@ -144,6 +152,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
       {open && (
         <>
           <SpriteDemo />
+          <FighterDemo />
 
           <Section title="TIME">
             <Btn label="Advance day +1" onPress={run(() => advanceDay({ days: 1 }))} busy={busy} />
@@ -275,6 +284,110 @@ function SpriteDemo() {
           <View style={styles.row}>
             <Btn label="⚔ Attack (one-shot)" onPress={attack} />
           </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+// Job folder keys per class, derived from the generated anchors (keys sort
+// correctly because job folders are prefixed 1_…5_). Demo-only lookup.
+const JOBS_BY_CLASS: Record<string, string[]> = {};
+for (const key of Object.keys(FX_ANCHORS)) {
+  const [c, j] = key.split("/");
+  (JOBS_BY_CLASS[c] ??= []).push(j);
+}
+for (const c of Object.keys(JOBS_BY_CLASS)) JOBS_BY_CLASS[c].sort();
+
+// STR-19 verification vehicle for src/battle/Fighter.tsx (plan step 3): drive
+// one fighter through basic/special/rest and log ACTUAL onRelease latency
+// (measured from the button press) against EXPECTED release/fps ms — the
+// ticket's Done-when is actual ≈ expected across 3 classes (D2 allows ±1
+// frame ≈ 83ms drift). Throwaway once the battle scene lands (plan step 5+).
+function FighterDemo() {
+  const fighter = useRef<FighterHandle>(null);
+  const [open, setOpen] = useState(false);
+  const [clsIdx, setClsIdx] = useState(0);
+  const [jobIdx, setJobIdx] = useState(4); // start at job 5 (ticket verifies job 5)
+  const [resting, setResting] = useState(false);
+  const [mode, setMode] = useState<FighterMode>("idle");
+  const [log, setLog] = useState<string[]>([]);
+  // Set at the accepted button press; onRelease measures latency against it.
+  const pressT0 = useRef(0);
+
+  const cls = CLASS_NAMES[clsIdx];
+  const jobs = JOBS_BY_CLASS[cls] ?? [];
+  const job = jobs[Math.min(jobIdx, jobs.length - 1)];
+
+  const pushLog = (line: string) =>
+    setLog((l) => [line, ...l].slice(0, 4));
+
+  const attack = (kind: "basic" | "special") => {
+    const t0 = Date.now();
+    const ok =
+      kind === "basic" ? fighter.current?.basic() : fighter.current?.special();
+    if (ok) pressT0.current = t0;
+    else pushLog(`${kind} IGNORED (mode=${fighter.current?.getMode()})`);
+  };
+
+  const onRelease = useCallback((e: ReleaseEvent) => {
+    const actual = Date.now() - pressT0.current;
+    const expected = Math.round(e.expectedDelayMs);
+    setLog((l) =>
+      [
+        `${e.cls}/${e.job} ${e.kind}: rel ${actual}ms · exp ${expected}ms · Δ${
+          actual - expected >= 0 ? "+" : ""
+        }${actual - expected}ms (tip ${e.anchor.tipX},${e.anchor.tipY})`,
+        ...l,
+      ].slice(0, 4),
+    );
+  }, []);
+
+  const toggleRest = () => {
+    const next = !resting;
+    setResting(next);
+    fighter.current?.setResting(next);
+  };
+
+  return (
+    <View style={styles.section}>
+      <Pressable onPress={() => setOpen((o) => !o)}>
+        <Text style={styles.sectionTitle}>FIGHTER DEMO {open ? "▲" : "▼"}</Text>
+      </Pressable>
+      {open && (
+        <>
+          <Text style={styles.readout}>
+            {cls}/{job} · MODE {mode.toUpperCase()}
+            {resting ? " · REST REQUESTED" : ""} · atk@{FX.attackFps}fps spc@
+            {FX.specialFps}fps
+          </Text>
+          <View style={styles.spriteStage}>
+            <Fighter
+              ref={fighter}
+              cls={cls}
+              job={job}
+              onRelease={onRelease}
+              onModeChange={setMode}
+            />
+          </View>
+          <View style={styles.row}>
+            <Btn
+              label={`CLASS ${cls} ▸`}
+              onPress={() => setClsIdx((i) => (i + 1) % CLASS_NAMES.length)}
+            />
+            <Btn
+              label={`JOB ${jobIdx + 1} ▸`}
+              onPress={() => setJobIdx((i) => (i + 1) % jobs.length)}
+            />
+            <Btn label="⚔ BASIC" onPress={() => attack("basic")} />
+            <Btn label="✦ SPECIAL" onPress={() => attack("special")} />
+            <Btn label={resting ? "REST ✓ (wake)" : "REST"} onPress={toggleRest} />
+          </View>
+          {log.map((line, i) => (
+            <Text key={`${i}-${line}`} style={styles.readout}>
+              {line}
+            </Text>
+          ))}
         </>
       )}
     </View>
