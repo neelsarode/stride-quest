@@ -21,6 +21,7 @@
   "devDependencies": {
     "@types/node": "^22.20.0",
     "@types/react": "~19.2.2",
+    "sharp": "^0.35.3",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -29,6 +30,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "convex": "convex dev",
+    "pack-sprites": "node scripts/pack-sprites.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },

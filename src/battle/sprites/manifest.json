@@ -1,0 +1,1340 @@
+{
+  "archer/1_greenhorn/attack": {
+    "frames": 9,
+    "w": 120,
+    "h": 120,
+    "file": "archer_1_greenhorn_attack.png"
+  },
+  "archer/1_greenhorn/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "archer_1_greenhorn_evolution.png"
+  },
+  "archer/1_greenhorn/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "archer_1_greenhorn_idle.png"
+  },
+  "archer/1_greenhorn/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "archer_1_greenhorn_rest.png"
+  },
+  "archer/1_greenhorn/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "archer_1_greenhorn_special.png"
+  },
+  "archer/2_scout/attack": {
+    "frames": 7,
+    "w": 124,
+    "h": 124,
+    "file": "archer_2_scout_attack.png"
+  },
+  "archer/2_scout/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "archer_2_scout_evolution.png"
+  },
+  "archer/2_scout/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "archer_2_scout_idle.png"
+  },
+  "archer/2_scout/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "archer_2_scout_rest.png"
+  },
+  "archer/2_scout/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "archer_2_scout_special.png"
+  },
+  "archer/3_hunter/attack": {
+    "frames": 9,
+    "w": 128,
+    "h": 128,
+    "file": "archer_3_hunter_attack.png"
+  },
+  "archer/3_hunter/evolution": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "archer_3_hunter_evolution.png"
+  },
+  "archer/3_hunter/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "archer_3_hunter_idle.png"
+  },
+  "archer/3_hunter/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "archer_3_hunter_rest.png"
+  },
+  "archer/3_hunter/special": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "archer_3_hunter_special.png"
+  },
+  "archer/4_ranger/attack": {
+    "frames": 15,
+    "w": 124,
+    "h": 124,
+    "file": "archer_4_ranger_attack.png"
+  },
+  "archer/4_ranger/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "archer_4_ranger_evolution.png"
+  },
+  "archer/4_ranger/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "archer_4_ranger_idle.png"
+  },
+  "archer/4_ranger/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "archer_4_ranger_rest.png"
+  },
+  "archer/4_ranger/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "archer_4_ranger_special.png"
+  },
+  "archer/5_sentinel/attack": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "archer_5_sentinel_attack.png"
+  },
+  "archer/5_sentinel/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "archer_5_sentinel_idle.png"
+  },
+  "archer/5_sentinel/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "archer_5_sentinel_rest.png"
+  },
+  "archer/5_sentinel/special": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "archer_5_sentinel_special.png"
+  },
+  "assassin/1_footpad/attack": {
+    "frames": 7,
+    "w": 116,
+    "h": 116,
+    "file": "assassin_1_footpad_attack.png"
+  },
+  "assassin/1_footpad/evolution": {
+    "frames": 13,
+    "w": 116,
+    "h": 116,
+    "file": "assassin_1_footpad_evolution.png"
+  },
+  "assassin/1_footpad/idle": {
+    "frames": 4,
+    "w": 116,
+    "h": 116,
+    "file": "assassin_1_footpad_idle.png"
+  },
+  "assassin/1_footpad/rest": {
+    "frames": 6,
+    "w": 116,
+    "h": 116,
+    "file": "assassin_1_footpad_rest.png"
+  },
+  "assassin/1_footpad/special": {
+    "frames": 13,
+    "w": 116,
+    "h": 116,
+    "file": "assassin_1_footpad_special.png"
+  },
+  "assassin/2_prowler/attack": {
+    "frames": 9,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_2_prowler_attack.png"
+  },
+  "assassin/2_prowler/evolution": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_2_prowler_evolution.png"
+  },
+  "assassin/2_prowler/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_2_prowler_idle.png"
+  },
+  "assassin/2_prowler/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_2_prowler_rest.png"
+  },
+  "assassin/2_prowler/special": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_2_prowler_special.png"
+  },
+  "assassin/3_nightblade/attack": {
+    "frames": 11,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_3_nightblade_attack.png"
+  },
+  "assassin/3_nightblade/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_3_nightblade_evolution.png"
+  },
+  "assassin/3_nightblade/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_3_nightblade_idle.png"
+  },
+  "assassin/3_nightblade/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_3_nightblade_rest.png"
+  },
+  "assassin/3_nightblade/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_3_nightblade_special.png"
+  },
+  "assassin/4_assassin/attack": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_4_assassin_attack.png"
+  },
+  "assassin/4_assassin/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_4_assassin_evolution.png"
+  },
+  "assassin/4_assassin/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_4_assassin_idle.png"
+  },
+  "assassin/4_assassin/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_4_assassin_rest.png"
+  },
+  "assassin/4_assassin/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "assassin_4_assassin_special.png"
+  },
+  "assassin/5_shadowlord/attack": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_5_shadowlord_attack.png"
+  },
+  "assassin/5_shadowlord/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_5_shadowlord_idle.png"
+  },
+  "assassin/5_shadowlord/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_5_shadowlord_rest.png"
+  },
+  "assassin/5_shadowlord/special": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "assassin_5_shadowlord_special.png"
+  },
+  "bard/1_busker/attack": {
+    "frames": 7,
+    "w": 124,
+    "h": 124,
+    "file": "bard_1_busker_attack.png"
+  },
+  "bard/1_busker/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "bard_1_busker_evolution.png"
+  },
+  "bard/1_busker/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "bard_1_busker_idle.png"
+  },
+  "bard/1_busker/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "bard_1_busker_rest.png"
+  },
+  "bard/1_busker/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "bard_1_busker_special.png"
+  },
+  "bard/2_minstrel/attack": {
+    "frames": 7,
+    "w": 120,
+    "h": 120,
+    "file": "bard_2_minstrel_attack.png"
+  },
+  "bard/2_minstrel/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "bard_2_minstrel_evolution.png"
+  },
+  "bard/2_minstrel/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "bard_2_minstrel_idle.png"
+  },
+  "bard/2_minstrel/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "bard_2_minstrel_rest.png"
+  },
+  "bard/2_minstrel/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "bard_2_minstrel_special.png"
+  },
+  "bard/3_troubadour/attack": {
+    "frames": 9,
+    "w": 120,
+    "h": 120,
+    "file": "bard_3_troubadour_attack.png"
+  },
+  "bard/3_troubadour/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "bard_3_troubadour_evolution.png"
+  },
+  "bard/3_troubadour/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "bard_3_troubadour_idle.png"
+  },
+  "bard/3_troubadour/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "bard_3_troubadour_rest.png"
+  },
+  "bard/3_troubadour/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "bard_3_troubadour_special.png"
+  },
+  "bard/4_bard/attack": {
+    "frames": 11,
+    "w": 124,
+    "h": 124,
+    "file": "bard_4_bard_attack.png"
+  },
+  "bard/4_bard/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "bard_4_bard_evolution.png"
+  },
+  "bard/4_bard/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "bard_4_bard_idle.png"
+  },
+  "bard/4_bard/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "bard_4_bard_rest.png"
+  },
+  "bard/4_bard/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "bard_4_bard_special.png"
+  },
+  "bard/5_maestro/attack": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "bard_5_maestro_attack.png"
+  },
+  "bard/5_maestro/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "bard_5_maestro_idle.png"
+  },
+  "bard/5_maestro/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "bard_5_maestro_rest.png"
+  },
+  "bard/5_maestro/special": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "bard_5_maestro_special.png"
+  },
+  "bosses/horse_256/attack": {
+    "frames": 9,
+    "w": 256,
+    "h": 256,
+    "file": "bosses_horse_256_attack.png"
+  },
+  "bosses/horse_256/hurt": {
+    "frames": 9,
+    "w": 256,
+    "h": 256,
+    "file": "bosses_horse_256_hurt.png"
+  },
+  "bosses/horse_256/idle": {
+    "frames": 9,
+    "w": 256,
+    "h": 256,
+    "file": "bosses_horse_256_idle.png"
+  },
+  "bosses/horse_256/idle_alt": {
+    "frames": 9,
+    "w": 256,
+    "h": 256,
+    "file": "bosses_horse_256_idle_alt.png"
+  },
+  "bosses/horse_crowned_256/hurt": {
+    "frames": 9,
+    "w": 256,
+    "h": 256,
+    "file": "bosses_horse_crowned_256_hurt.png"
+  },
+  "bosses/horse_crowned_256/idle": {
+    "frames": 9,
+    "w": 256,
+    "h": 256,
+    "file": "bosses_horse_crowned_256_idle.png"
+  },
+  "bosses/horse_crowned_256/static": {
+    "frames": 1,
+    "w": 256,
+    "h": 256,
+    "file": "bosses_horse_crowned_256_static.png"
+  },
+  "effects/archer/basic": {
+    "frames": 5,
+    "w": 64,
+    "h": 64,
+    "file": "effects_archer_basic.png"
+  },
+  "effects/archer/impact": {
+    "frames": 7,
+    "w": 64,
+    "h": 64,
+    "file": "effects_archer_impact.png"
+  },
+  "effects/archer/special": {
+    "frames": 5,
+    "w": 96,
+    "h": 96,
+    "file": "effects_archer_special.png"
+  },
+  "effects/assassin/basic": {
+    "frames": 5,
+    "w": 64,
+    "h": 64,
+    "file": "effects_assassin_basic.png"
+  },
+  "effects/assassin/impact": {
+    "frames": 7,
+    "w": 64,
+    "h": 64,
+    "file": "effects_assassin_impact.png"
+  },
+  "effects/assassin/special": {
+    "frames": 5,
+    "w": 96,
+    "h": 96,
+    "file": "effects_assassin_special.png"
+  },
+  "effects/bard/basic": {
+    "frames": 5,
+    "w": 64,
+    "h": 64,
+    "file": "effects_bard_basic.png"
+  },
+  "effects/bard/impact": {
+    "frames": 7,
+    "w": 64,
+    "h": 64,
+    "file": "effects_bard_impact.png"
+  },
+  "effects/bard/special": {
+    "frames": 5,
+    "w": 96,
+    "h": 96,
+    "file": "effects_bard_special.png"
+  },
+  "effects/mage/basic": {
+    "frames": 5,
+    "w": 64,
+    "h": 64,
+    "file": "effects_mage_basic.png"
+  },
+  "effects/mage/impact": {
+    "frames": 7,
+    "w": 64,
+    "h": 64,
+    "file": "effects_mage_impact.png"
+  },
+  "effects/mage/special": {
+    "frames": 5,
+    "w": 96,
+    "h": 96,
+    "file": "effects_mage_special.png"
+  },
+  "effects/medic/basic": {
+    "frames": 5,
+    "w": 64,
+    "h": 64,
+    "file": "effects_medic_basic.png"
+  },
+  "effects/medic/impact": {
+    "frames": 7,
+    "w": 64,
+    "h": 64,
+    "file": "effects_medic_impact.png"
+  },
+  "effects/medic/special": {
+    "frames": 5,
+    "w": 96,
+    "h": 96,
+    "file": "effects_medic_special.png"
+  },
+  "effects/paladin/basic": {
+    "frames": 5,
+    "w": 64,
+    "h": 64,
+    "file": "effects_paladin_basic.png"
+  },
+  "effects/paladin/impact": {
+    "frames": 7,
+    "w": 64,
+    "h": 64,
+    "file": "effects_paladin_impact.png"
+  },
+  "effects/paladin/special": {
+    "frames": 5,
+    "w": 96,
+    "h": 96,
+    "file": "effects_paladin_special.png"
+  },
+  "effects/warlock/basic": {
+    "frames": 5,
+    "w": 64,
+    "h": 64,
+    "file": "effects_warlock_basic.png"
+  },
+  "effects/warlock/impact": {
+    "frames": 7,
+    "w": 64,
+    "h": 64,
+    "file": "effects_warlock_impact.png"
+  },
+  "effects/warlock/special": {
+    "frames": 5,
+    "w": 96,
+    "h": 96,
+    "file": "effects_warlock_special.png"
+  },
+  "effects/warrior/basic": {
+    "frames": 5,
+    "w": 64,
+    "h": 64,
+    "file": "effects_warrior_basic.png"
+  },
+  "effects/warrior/impact": {
+    "frames": 7,
+    "w": 64,
+    "h": 64,
+    "file": "effects_warrior_impact.png"
+  },
+  "effects/warrior/special": {
+    "frames": 5,
+    "w": 96,
+    "h": 96,
+    "file": "effects_warrior_special.png"
+  },
+  "mage/1_apprentice/attack": {
+    "frames": 7,
+    "w": 124,
+    "h": 124,
+    "file": "mage_1_apprentice_attack.png"
+  },
+  "mage/1_apprentice/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "mage_1_apprentice_evolution.png"
+  },
+  "mage/1_apprentice/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "mage_1_apprentice_idle.png"
+  },
+  "mage/1_apprentice/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "mage_1_apprentice_rest.png"
+  },
+  "mage/1_apprentice/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "mage_1_apprentice_special.png"
+  },
+  "mage/2_adept/attack": {
+    "frames": 7,
+    "w": 124,
+    "h": 124,
+    "file": "mage_2_adept_attack.png"
+  },
+  "mage/2_adept/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "mage_2_adept_evolution.png"
+  },
+  "mage/2_adept/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "mage_2_adept_idle.png"
+  },
+  "mage/2_adept/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "mage_2_adept_rest.png"
+  },
+  "mage/2_adept/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "mage_2_adept_special.png"
+  },
+  "mage/3_conjurer/attack": {
+    "frames": 9,
+    "w": 124,
+    "h": 124,
+    "file": "mage_3_conjurer_attack.png"
+  },
+  "mage/3_conjurer/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "mage_3_conjurer_evolution.png"
+  },
+  "mage/3_conjurer/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "mage_3_conjurer_idle.png"
+  },
+  "mage/3_conjurer/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "mage_3_conjurer_rest.png"
+  },
+  "mage/3_conjurer/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "mage_3_conjurer_special.png"
+  },
+  "mage/4_sorcerer/attack": {
+    "frames": 11,
+    "w": 128,
+    "h": 128,
+    "file": "mage_4_sorcerer_attack.png"
+  },
+  "mage/4_sorcerer/evolution": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "mage_4_sorcerer_evolution.png"
+  },
+  "mage/4_sorcerer/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "mage_4_sorcerer_idle.png"
+  },
+  "mage/4_sorcerer/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "mage_4_sorcerer_rest.png"
+  },
+  "mage/4_sorcerer/special": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "mage_4_sorcerer_special.png"
+  },
+  "mage/5_archmage/attack": {
+    "frames": 17,
+    "w": 120,
+    "h": 120,
+    "file": "mage_5_archmage_attack.png"
+  },
+  "mage/5_archmage/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "mage_5_archmage_idle.png"
+  },
+  "mage/5_archmage/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "mage_5_archmage_rest.png"
+  },
+  "mage/5_archmage/special": {
+    "frames": 17,
+    "w": 120,
+    "h": 120,
+    "file": "mage_5_archmage_special.png"
+  },
+  "medic/1_acolyte/attack": {
+    "frames": 7,
+    "w": 124,
+    "h": 124,
+    "file": "medic_1_acolyte_attack.png"
+  },
+  "medic/1_acolyte/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "medic_1_acolyte_evolution.png"
+  },
+  "medic/1_acolyte/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "medic_1_acolyte_idle.png"
+  },
+  "medic/1_acolyte/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "medic_1_acolyte_rest.png"
+  },
+  "medic/1_acolyte/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "medic_1_acolyte_special.png"
+  },
+  "medic/2_healer/attack": {
+    "frames": 7,
+    "w": 128,
+    "h": 128,
+    "file": "medic_2_healer_attack.png"
+  },
+  "medic/2_healer/evolution": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "medic_2_healer_evolution.png"
+  },
+  "medic/2_healer/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "medic_2_healer_idle.png"
+  },
+  "medic/2_healer/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "medic_2_healer_rest.png"
+  },
+  "medic/2_healer/special": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "medic_2_healer_special.png"
+  },
+  "medic/3_cleric/attack": {
+    "frames": 9,
+    "w": 120,
+    "h": 120,
+    "file": "medic_3_cleric_attack.png"
+  },
+  "medic/3_cleric/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "medic_3_cleric_evolution.png"
+  },
+  "medic/3_cleric/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "medic_3_cleric_idle.png"
+  },
+  "medic/3_cleric/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "medic_3_cleric_rest.png"
+  },
+  "medic/3_cleric/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "medic_3_cleric_special.png"
+  },
+  "medic/4_priest/attack": {
+    "frames": 11,
+    "w": 124,
+    "h": 124,
+    "file": "medic_4_priest_attack.png"
+  },
+  "medic/4_priest/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "medic_4_priest_evolution.png"
+  },
+  "medic/4_priest/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "medic_4_priest_idle.png"
+  },
+  "medic/4_priest/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "medic_4_priest_rest.png"
+  },
+  "medic/4_priest/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "medic_4_priest_special.png"
+  },
+  "medic/5_hierophant/attack": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "medic_5_hierophant_attack.png"
+  },
+  "medic/5_hierophant/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "medic_5_hierophant_idle.png"
+  },
+  "medic/5_hierophant/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "medic_5_hierophant_rest.png"
+  },
+  "medic/5_hierophant/special": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "medic_5_hierophant_special.png"
+  },
+  "paladin/1_squire/attack": {
+    "frames": 7,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_1_squire_attack.png"
+  },
+  "paladin/1_squire/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_1_squire_evolution.png"
+  },
+  "paladin/1_squire/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_1_squire_idle.png"
+  },
+  "paladin/1_squire/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_1_squire_rest.png"
+  },
+  "paladin/1_squire/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_1_squire_special.png"
+  },
+  "paladin/2_knight/attack": {
+    "frames": 9,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_2_knight_attack.png"
+  },
+  "paladin/2_knight/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_2_knight_evolution.png"
+  },
+  "paladin/2_knight/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_2_knight_idle.png"
+  },
+  "paladin/2_knight/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_2_knight_rest.png"
+  },
+  "paladin/2_knight/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_2_knight_special.png"
+  },
+  "paladin/3_crusader/attack": {
+    "frames": 11,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_3_crusader_attack.png"
+  },
+  "paladin/3_crusader/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_3_crusader_evolution.png"
+  },
+  "paladin/3_crusader/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_3_crusader_idle.png"
+  },
+  "paladin/3_crusader/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_3_crusader_rest.png"
+  },
+  "paladin/3_crusader/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "paladin_3_crusader_special.png"
+  },
+  "paladin/4_paladin/attack": {
+    "frames": 11,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_4_paladin_attack.png"
+  },
+  "paladin/4_paladin/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_4_paladin_evolution.png"
+  },
+  "paladin/4_paladin/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_4_paladin_idle.png"
+  },
+  "paladin/4_paladin/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_4_paladin_rest.png"
+  },
+  "paladin/4_paladin/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "paladin_4_paladin_special.png"
+  },
+  "paladin/5_lightbringer/attack": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "paladin_5_lightbringer_attack.png"
+  },
+  "paladin/5_lightbringer/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "paladin_5_lightbringer_idle.png"
+  },
+  "paladin/5_lightbringer/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "paladin_5_lightbringer_rest.png"
+  },
+  "paladin/5_lightbringer/special": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "paladin_5_lightbringer_special.png"
+  },
+  "warlock/1_initiate/attack": {
+    "frames": 7,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_1_initiate_attack.png"
+  },
+  "warlock/1_initiate/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_1_initiate_evolution.png"
+  },
+  "warlock/1_initiate/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_1_initiate_idle.png"
+  },
+  "warlock/1_initiate/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_1_initiate_rest.png"
+  },
+  "warlock/1_initiate/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_1_initiate_special.png"
+  },
+  "warlock/2_cultist/attack": {
+    "frames": 7,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_2_cultist_attack.png"
+  },
+  "warlock/2_cultist/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_2_cultist_evolution.png"
+  },
+  "warlock/2_cultist/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_2_cultist_idle.png"
+  },
+  "warlock/2_cultist/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_2_cultist_rest.png"
+  },
+  "warlock/2_cultist/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_2_cultist_special.png"
+  },
+  "warlock/3_hexer/attack": {
+    "frames": 9,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_3_hexer_attack.png"
+  },
+  "warlock/3_hexer/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_3_hexer_evolution.png"
+  },
+  "warlock/3_hexer/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_3_hexer_idle.png"
+  },
+  "warlock/3_hexer/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_3_hexer_rest.png"
+  },
+  "warlock/3_hexer/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_3_hexer_special.png"
+  },
+  "warlock/4_warlock/attack": {
+    "frames": 11,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_4_warlock_attack.png"
+  },
+  "warlock/4_warlock/evolution": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_4_warlock_evolution.png"
+  },
+  "warlock/4_warlock/idle": {
+    "frames": 4,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_4_warlock_idle.png"
+  },
+  "warlock/4_warlock/rest": {
+    "frames": 6,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_4_warlock_rest.png"
+  },
+  "warlock/4_warlock/special": {
+    "frames": 13,
+    "w": 120,
+    "h": 120,
+    "file": "warlock_4_warlock_special.png"
+  },
+  "warlock/5_dreadlord/attack": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "warlock_5_dreadlord_attack.png"
+  },
+  "warlock/5_dreadlord/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "warlock_5_dreadlord_idle.png"
+  },
+  "warlock/5_dreadlord/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "warlock_5_dreadlord_rest.png"
+  },
+  "warlock/5_dreadlord/special": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "warlock_5_dreadlord_special.png"
+  },
+  "warrior/1_rookie/attack": {
+    "frames": 9,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_1_rookie_attack.png"
+  },
+  "warrior/1_rookie/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_1_rookie_evolution.png"
+  },
+  "warrior/1_rookie/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_1_rookie_idle.png"
+  },
+  "warrior/1_rookie/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_1_rookie_rest.png"
+  },
+  "warrior/1_rookie/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_1_rookie_special.png"
+  },
+  "warrior/2_strider/attack": {
+    "frames": 9,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_2_strider_attack.png"
+  },
+  "warrior/2_strider/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_2_strider_evolution.png"
+  },
+  "warrior/2_strider/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_2_strider_idle.png"
+  },
+  "warrior/2_strider/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_2_strider_rest.png"
+  },
+  "warrior/2_strider/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_2_strider_special.png"
+  },
+  "warrior/3_vanguard/attack": {
+    "frames": 11,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_3_vanguard_attack.png"
+  },
+  "warrior/3_vanguard/evolution": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_3_vanguard_evolution.png"
+  },
+  "warrior/3_vanguard/idle": {
+    "frames": 4,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_3_vanguard_idle.png"
+  },
+  "warrior/3_vanguard/rest": {
+    "frames": 6,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_3_vanguard_rest.png"
+  },
+  "warrior/3_vanguard/special": {
+    "frames": 13,
+    "w": 124,
+    "h": 124,
+    "file": "warrior_3_vanguard_special.png"
+  },
+  "warrior/4_champion/attack": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_4_champion_attack.png"
+  },
+  "warrior/4_champion/evolution": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_4_champion_evolution.png"
+  },
+  "warrior/4_champion/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_4_champion_idle.png"
+  },
+  "warrior/4_champion/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_4_champion_rest.png"
+  },
+  "warrior/4_champion/special": {
+    "frames": 13,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_4_champion_special.png"
+  },
+  "warrior/5_warlord/attack": {
+    "frames": 15,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_5_warlord_attack.png"
+  },
+  "warrior/5_warlord/idle": {
+    "frames": 4,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_5_warlord_idle.png"
+  },
+  "warrior/5_warlord/rest": {
+    "frames": 6,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_5_warlord_rest.png"
+  },
+  "warrior/5_warlord/special": {
+    "frames": 17,
+    "w": 128,
+    "h": 128,
+    "file": "warrior_5_warlord_special.png"
+  }
+}
