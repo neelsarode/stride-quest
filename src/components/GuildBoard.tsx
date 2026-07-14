@@ -1,8 +1,12 @@
 // The co-op roster: who's in the guild and what each member has contributed to
 // the shared boss, plus the fairness recognition badges. All members' damage
-// sums to the boss HP shown in the boss card.
-import { StyleSheet, Text, View } from "react-native";
+// sums to the boss HP shown in the boss card. Also the standing invite surface
+// (STR-47, spec Beat 2a: "your code lives on the guild board too") — the code
+// + native Share replace the old dev-panel copy leak.
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { PALETTE, SIZES } from "../config/assets";
+import { shareInviteCode } from "../screens/onboarding/GuildStepScreens";
 
 type Member = {
   userId: string;
@@ -25,10 +29,15 @@ type Overview = {
     longestStreakUserId: string | null;
   };
   memberCount: number;
+  // STR-47 invite surface (null only for legacy guilds until their next
+  // ensureSession backfills a code).
+  inviteCode: string | null;
+  maxMembers: number;
 };
 
 export function GuildBoard({ overview }: { overview: Overview }) {
-  const { members, recognition } = overview;
+  const { members, recognition, inviteCode, maxMembers } = overview;
+  const [shareNote, setShareNote] = useState<string | null>(null);
   return (
     <View style={styles.card}>
       <Text style={styles.cardLabel}>
@@ -58,10 +67,28 @@ export function GuildBoard({ overview }: { overview: Overview }) {
           </View>
         );
       })}
-      {members.length === 1 ? (
-        <Text style={styles.hint}>
-          Add a teammate in the dev panel to test the shared boss + recognition.
-        </Text>
+      {/* Invite surface (STR-47): the code every member can read aloud or
+          share, with the open-seat count. Warm CTA, never a gate. */}
+      {inviteCode ? (
+        <View style={styles.inviteBlock}>
+          <View style={styles.inviteRow}>
+            <View>
+              <Text style={styles.inviteLabel}>INVITE CODE</Text>
+              <Text style={styles.inviteCode}>{inviteCode}</Text>
+            </View>
+            <Pressable
+              onPress={async () => setShareNote(await shareInviteCode(inviteCode))}
+              style={({ pressed }) => [styles.shareBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.shareBtnText}>SHARE</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.hint}>
+            {members.length} of {maxMembers} spots filled — friends join with
+            this code any time.
+          </Text>
+          {shareNote ? <Text style={styles.hint}>{shareNote}</Text> : null}
+        </View>
       ) : null}
     </View>
   );
@@ -85,4 +112,30 @@ const styles = StyleSheet.create({
   sub: { color: PALETTE.textDim, fontSize: 12 },
   badges: { color: PALETTE.accent, fontSize: 12, fontWeight: "700", marginTop: 2 },
   hint: { color: PALETTE.textDim, fontSize: 12, fontStyle: "italic" },
+  inviteBlock: { gap: 6, marginTop: 4 },
+  inviteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  inviteLabel: {
+    color: PALETTE.textDim,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+  },
+  inviteCode: {
+    color: PALETTE.accent,
+    fontSize: 24,
+    fontWeight: "900",
+    letterSpacing: 4,
+  },
+  shareBtn: {
+    backgroundColor: PALETTE.accent,
+    borderRadius: 9,
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+  },
+  pressed: { opacity: 0.55 },
+  shareBtnText: { color: "#11131a", fontSize: 13, fontWeight: "900", letterSpacing: 1 },
 });
