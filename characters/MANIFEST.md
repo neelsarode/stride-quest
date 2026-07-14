@@ -114,5 +114,7 @@ Upscale 2x nearest-neighbor → 512px for display (keeps animation crisp).
 400px `create_map_object` is bigger but STATIC (no animation).
 
 - `armored_cat_256/`         — 256px werecat boss, facing left: `static.png` + `idle/` (9f). Animatable. ← canonical boss format
+- `horse_256/`               — 256px "THE NIGHTMARE" humanoid horse boss, facing left: `static.png` + `idle/ idle_alt/ hurt/ attack/` (9f each). PixelLab object `be4ea610-3e8a-4538-bfa8-3448e069812f`.
+- `horse_crowned_256/`       — BONUS FORM (M1.5 victory week): crowned/corrupted horse_256 — same pose, near-black hide, ember eyes, jagged crown. `static.png` + `idle/ hurt/` (9f each). Generated as a PixelLab STATE of the horse object (`create_object_state` keeps identity) → object `b3f020dc-baa9-42fb-a6e1-c8eae95a4509`. Convention: every future boss gets a `<boss>_crowned_256` bonus form.
 - `armored_cat_colossal_400_left.png` — 400px static, facing left (max size, no animation)
 - `armored_cat_colossal_400.png`      — 400px static, front-facing
