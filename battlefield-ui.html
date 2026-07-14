@@ -181,12 +181,17 @@
     { cls:'warlock',  left:COL_L, z:2 },
   ].map((h,i)=>({ ...h, bottom: PARTY_BASE + i*PARTY_STEP }));
   const BOSS = { dir:'characters/bosses/horse_256/idle', frames:9, fps:9 };
+  // Bonus Boss (M1.5): crowned form shown during the victory-week phase (spec
+  // docs/superpowers/specs/2026-07-14-bonus-boss-design.md). Same monster, escalated.
+  const BOSS_CROWNED = { dir:'characters/bosses/horse_crowned_256/idle', frames:9, fps:9 };
   const CYCLE_MS = 3600, STAGGER_MS = 420, SPECIAL_EVERY = 4;  // basics every cycle; each hero's 4th attack = special
 
   const bossEl=document.createElement('div'); bossEl.id='boss'; bossEl.style.height=BOSS_PX+'px';
   bossEl.style.transform='translateX(30%)';
   const bossImg=document.createElement('img'); bossImg.className='sprite';
-  const bf=FXEngine.framesOf(BOSS.dir,BOSS.frames); bossImg.src=bf[0]; FXEngine.preload(bf);
+  const bfNormal=FXEngine.framesOf(BOSS.dir,BOSS.frames);
+  let bf=bfNormal, bfCrowned=null;
+  bossImg.src=bf[0]; FXEngine.preload(bfNormal);
   bossEl.appendChild(bossImg); stage.appendChild(bossEl);
   let bi=0; setInterval(()=>{bi=(bi+1)%bf.length;bossImg.src=bf[bi];},1000/BOSS.fps);
   FXEngine.setBoss(bossImg,bossEl);
@@ -208,16 +213,34 @@
   // Boss auto-scale: never shorter than the party stack — his visible top must
   // reach the top party member's head. (Fractions: horse art starts 6px into
   // its 256px canvas; hero heads sit ~20% into their canvas.)
-  const BOSS_TOP_PAD=6/256, HERO_TOP_PAD=0.20, BOSS_BOTTOM_PCT=0.22;
+  const NORMAL_TOP_PAD=6/256, CROWNED_TOP_PAD=1/256, HERO_TOP_PAD=0.20, BOSS_BOTTOM_PCT=0.22;  // measured first visible pixel rows
+  let bossTopPad=NORMAL_TOP_PAD;
   const heroEls=[...document.querySelectorAll('.hero')];
   function sizeBoss(){
     const hr=heroEls[heroEls.length-1].getBoundingClientRect();
     const partyTopY=hr.top+hr.height*HERO_TOP_PAD;
     const bossBottomY=innerHeight*(1-BOSS_BOTTOM_PCT);
-    const needed=(bossBottomY-partyTopY)/(1-BOSS_TOP_PAD);
+    const needed=(bossBottomY-partyTopY)/(1-bossTopPad);
     bossEl.style.height=Math.max(BOSS_PX,needed)+'px';
   }
   sizeBoss(); addEventListener('resize',sizeBoss);
+
+  // Bonus-phase art swap: crowned idle frames (lazy-loaded on first toggle) +
+  // an ember rim glow. The auto-scale rule holds — the crown's height lives
+  // inside the 256 canvas, so only the measured top pad changes.
+  window.__setBonusBossArt = on => {
+    if (on && !bfCrowned){
+      bfCrowned = FXEngine.framesOf(BOSS_CROWNED.dir, BOSS_CROWNED.frames);
+      FXEngine.preload(bfCrowned);
+    }
+    bf = on ? bfCrowned : bfNormal;
+    bi = 0; bossImg.src = bf[0];
+    bossImg.style.filter = on
+      ? 'drop-shadow(0 14px 10px rgba(0,0,0,.5)) drop-shadow(0 0 18px rgba(255,140,40,.35))'
+      : '';
+    bossTopPad = on ? CROWNED_TOP_PAD : NORMAL_TOP_PAD;
+    sizeBoss();
+  };
 
   let cycle=0;
   setInterval(()=>{
@@ -253,6 +276,25 @@
     fighters.forEach(f => f.setResting(window.__restingAll));
   };
   stage.appendChild(restBtn);
+
+  // BONUS toggle (dev): previews the victory-week bonus phase (M1.5 spec) —
+  // the crowned boss rises, the HP bar becomes the accumulating damage meter
+  // (HUD swap lives in the HUD script via window.__setBonusHud). Attacks stay
+  // fully live: that's the point of the phase (the STR-53 fix).
+  window.__bonusMode = false;
+  const bonusBtn = document.createElement('button');
+  bonusBtn.id = 'bonustoggle';
+  bonusBtn.textContent = 'BONUS: OFF';
+  bonusBtn.style.cssText = 'position:absolute;left:12px;z-index:120;background:#1c1723;color:#d8c9a0;border:1px solid #6b5a3e;border-radius:6px;font-size:11px;font-weight:700;padding:3px 6px;cursor:pointer;'
+    + (PHONE ? 'top:calc(max(14px, env(safe-area-inset-top)) + 218px);' : 'top:276px;');
+  bonusBtn.onclick = () => {
+    window.__bonusMode = !window.__bonusMode;
+    bonusBtn.textContent = window.__bonusMode ? 'BONUS: ON' : 'BONUS: OFF';
+    bonusBtn.style.color = window.__bonusMode ? '#ffd76b' : '#d8c9a0';
+    window.__setBonusBossArt(window.__bonusMode);
+    if (window.__setBonusHud) window.__setBonusHud(window.__bonusMode);
+  };
+  stage.appendChild(bonusBtn);
 </script>
 <script>
 // ============ PROCEDURAL HUD v2 — S8 "CELESTIAL SILVER" (hi-fi kit) ============
@@ -326,13 +368,38 @@
   }
 
   /* ---- boss banner: LIVE silver-framed bar, radiant gold fill ---- */
-  textEl('bossname', 'THE NIGHTMARE', 'gold1', UI_S, 'center');
+  function setBossName(txt){
+    const d = document.getElementById('bossname');
+    d.textContent = '';
+    textEl('bossname', txt, 'gold1', UI_S, 'center');
+  }
+  setBossName('THE NIGHTMARE');
   const boss = { max: 100000, hp: 100000, disp: 100000, ghost: 100000, ghostDelay: 0, flash: 0, downTimer: 0 };
+  // Bonus phase (M1.5): accumulating damage meter — counts UP, never drains.
+  // Tier thresholds are FRACTIONS of the killed boss's max HP (spec §4);
+  // full meter width = T3 (a whole second boss's worth of damage).
+  const BONUS_TIERS = [
+    { frac: .25, mult: 'X1.1' },
+    { frac: .5,  mult: 'X1.2' },
+    { frac: 1,   mult: 'X1.35' },
+  ];
+  const bonus = { total: 0, disp: 0, flash: 0, tier: 0 };
+  const bonusTierFor = total => BONUS_TIERS.reduce((t, tier, i) => total >= tier.frac * boss.max ? i + 1 : t, 0);
   const BOSS_BAR_W = Math.floor((innerWidth - 18) / UI_S);   // full width inside the 9px outer padding
   const bossBarC = uiCanvas(BOSS_BAR_W, 20);
   document.getElementById('bosshpwrap').appendChild(bossBarC);
   const bossBarCtx = bossBarC.getContext('2d');
   FXEngine.onDamage = (amount) => {
+    if (window.__bonusMode){
+      bonus.total += amount;
+      bonus.flash = 10;
+      const t = bonusTierFor(bonus.total);
+      if (t > bonus.tier){        // tier crossing = the phase's "kill moment"
+        bonus.tier = t;
+        showToast(BONUS_TIERS[t - 1].mult + ' POWER SECURED FOR NEXT WEEK!');
+      }
+      return;
+    }
     if (boss.hp <= 0) return;
     boss.hp = Math.max(0, boss.hp - amount);
     boss.flash = 10;
@@ -340,7 +407,32 @@
     if (boss.hp === 0) boss.downTimer = 160;   // ~2.7s of DEFEATED!, then respawn
   };
   const fmt = n => Math.round(n).toLocaleString('en-US');
+  // Meter label mirrors the streak "×N.NN power" preview — always bonus-framed:
+  // what's earned + what's next, never what was missed (spec guardrail #1).
+  function bonusLabel(){
+    const next = BONUS_TIERS[bonus.tier];
+    if (!next) return fmt(bonus.disp) + ' - MAX X1.35 NEXT WEEK!';
+    const toGo = Math.max(0, next.frac * boss.max - bonus.disp);
+    return fmt(bonus.disp) + ' - ' + fmt(toGo) + ' TO ' + next.mult;
+  }
   (function bossLoop(){
+    if (window.__bonusMode){
+      const d = bonus.total - bonus.disp;
+      bonus.disp = Math.abs(d) < boss.max * .002 ? bonus.total : bonus.disp + d * .12;
+      if (bonus.flash > 0) bonus.flash--;
+      bossBarCtx.clearRect(0, 0, BOSS_BAR_W, 20);
+      const well = hifiBar(bossBarCtx, 0, 0, BOSS_BAR_W, 20, T_S8,
+        { value: Math.min(1, bonus.disp / boss.max), flash: bonus.flash,
+          label: bonusLabel(), labelKey: 'gold1' });
+      // tier ticks ON the meter (100% = the right end frame, no tick needed)
+      BONUS_TIERS.filter(t => t.frac < 1).forEach(t => {
+        const tx = well.wx + Math.round(well.ww * t.frac);
+        const reached = bonus.disp >= t.frac * boss.max;
+        px(bossBarCtx, tx, well.wy, 1, well.wh, reached ? 'white' : 'sky_dark');
+      });
+      requestAnimationFrame(bossLoop);
+      return;
+    }
     const b = boss, d = b.hp - b.disp;
     b.disp = Math.abs(d) < b.max * .002 ? b.hp : b.disp + d * .12;
     if (b.ghost < b.disp) b.ghost = b.disp;
@@ -358,6 +450,17 @@
       { value: b.disp / b.max, ghost: b.ghost / b.max, flash: b.flash, label, labelKey: dead ? 'gold1' : 'white' });
     requestAnimationFrame(bossLoop);
   })();
+  // HUD half of the BONUS toggle (scene half swaps the boss art). Fresh meter
+  // each time ON so the preview always starts at the swap moment.
+  window.__setBonusHud = on => {
+    if (on){
+      bonus.total = 0; bonus.disp = 0; bonus.flash = 0; bonus.tier = 0;
+      setBossName('THE CROWNED NIGHTMARE');
+      showToast('THE CROWNED NIGHTMARE RISES!');
+    } else {
+      setBossName('THE NIGHTMARE');
+    }
+  };
 
   /* ---- right nav: silver hi-fi buttons, emblems baked in ---- */
   const chartDraw = (ctx, x, y, w, h) => {           // stats = bar chart
