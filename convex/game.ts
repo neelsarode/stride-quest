@@ -14,6 +14,7 @@ import { getUserGroup } from "./players";
 import { energyBalance } from "./economy";
 import { getClockOffsetMs, dayString, weekRange } from "./time";
 import {
+  BONUS_BOSS,
   CLASSES,
   MVP_CLASS,
   JOB_THRESHOLDS,
@@ -23,8 +24,12 @@ import {
   OVERDRIVE,
   RALLY,
   STREAK_SHIELD,
+  bonusTierFor,
+  bonusTiersFor,
+  effectiveBoostMult,
   jobLevelForWeeklySteps,
   multiplierForJobLevel,
+  nextBonusTierTarget,
   nextJobThreshold,
 } from "./gameConfig";
 import { computeStreakMultiplier } from "./streak";
@@ -98,6 +103,48 @@ export const dashboard = query({
       myProgress = rows.find((r) => r.userId === userId) ?? null;
     }
 
+    // Bonus Boss payload (M1.5 spec §5, STR-56) — null unless the shown
+    // challenge is "won" (the bonus phase is DERIVED from status, never
+    // stored). Everything here runs the SAME pure helpers spawnBoss stamps
+    // with (bonusTiersFor / bonusTierFor / nextBonusTierTarget), so the tier
+    // markers, the "×N now" readout, and the "damage to go" preview are BY
+    // CONSTRUCTION what Monday's rollover will actually stamp.
+    let bonus = null;
+    if (challenge && challenge.status === "won") {
+      const { tier, mult } = bonusTierFor(bonusDamageTotal, challenge.bossMaxHP);
+      const next = nextBonusTierTarget(bonusDamageTotal, challenge.bossMaxHP);
+      bonus = {
+        // resolveBoss stamps bonusBossName in the kill write; the fallback
+        // only covers legacy challenges won before that stamp existed.
+        bossName:
+          challenge.bonusBossName ??
+          `${BONUS_BOSS.namePrefix} ${challenge.bossName}`,
+        totalDamage: bonusDamageTotal, // the party's accumulating meter
+        myDamage: myProgress?.bonusDamageContributed ?? 0,
+        // Absolute tier markers (thresholdFrac × bossMaxHP) + their mults.
+        tiers: bonusTiersFor(challenge.bossMaxHP),
+        // What the rollover would stamp RIGHT NOW.
+        currentTier: tier,
+        currentMult: mult,
+        // The chase readout ("38,400 damage to ×1.35"); null at max tier.
+        nextTier: next
+          ? { damageToGo: next.damageToGo, boostMult: next.mult }
+          : null,
+      };
+    }
+
+    // The ACTIVE reward (STR-56): the boost stamped on the CURRENT challenge
+    // by spawnBoss at rollover — in force all week. null when nothing was
+    // stamped (tier 0 / expired prior — absent IS the ×1.0 floor; we never
+    // surface a "×1.0 badge", per the never-punish guardrail).
+    const boost =
+      challenge && challenge.boostMult !== undefined
+        ? {
+            mult: challenge.boostMult,
+            sourceDamage: challenge.boostSourceDamage ?? 0,
+          }
+        : null;
+
     const stepsToday = await stepsForDate(ctx, userId, date);
     const stepsThisWeek = await stepsForWeek(ctx, userId, weekStart, weekEnd);
     const jobLevel = jobLevelForWeeklySteps(stepsThisWeek);
@@ -147,6 +194,11 @@ export const dashboard = query({
     // preview equals what lands).
     const idleMult =
       myProgress?.idleMultiplierSnapshot ?? multiplierForJobLevel(jobLevel);
+    // Guild-wide boost on the idle channel (STR-56): the settle multiplies its
+    // banked damage by this same factor (idle.settleFuelAndIdle, multiply site
+    // 2 of 2), so BOTH the pending preview and the live dph ticker carry it —
+    // the preview still equals exactly what the next settle lands.
+    const idleBoost = effectiveBoostMult("idle", challenge?.boostMult);
     const pendingIdle = myProgress
       ? settleFuelAndIdleWindow({
           fuel: user.fuel ?? 0,
@@ -156,13 +208,14 @@ export const dashboard = query({
           jobMult: idleMult,
           // Overdrive-aware (STR-8) so the preview equals what the settle lands.
           overdriveUntil: user.overdriveActiveUntil,
-        }).damage
+        }).damage * idleBoost
       : 0;
     const idle = {
       lastIdleCollectedAt: myProgress?.lastIdleCollectedAt ?? now,
       dph:
         idleDphFor(tank.state, idleMult) *
-        (od.active ? OVERDRIVE.idleDamageMult : 1),
+        (od.active ? OVERDRIVE.idleDamageMult : 1) *
+        idleBoost,
       pending: pendingIdle,
       capMs: OFFLINE_CAP_MS,
     };
@@ -297,15 +350,18 @@ export const dashboard = query({
             defeated: challenge.status === "won",
             startDate: challenge.startDate,
             endDate: challenge.endDate,
-            // --- Bonus Boss, MINIMAL exposure (STR-55): just enough for the
-            // DevPanel readout to verify the phase. The full bonus/boost UI
-            // payload (tiers, currentMult, nextTier preview) is STR-56.
-            // bonusBossName is only ever stamped by the kill write, so it's
-            // null exactly until status === "won".
-            bonusBossName: challenge.bonusBossName ?? null,
-            bonusDamageTotal,
+            // Bonus-phase data moved to the top-level `bonus` payload (STR-56
+            // replaced STR-55's minimal boss.bonusBossName/bonusDamageTotal
+            // exposure — the boss object stays purely the HP-bar fight).
           }
         : null,
+      // Bonus Boss meter + tier preview — non-null exactly while the bonus
+      // phase runs (status "won"). See the block above for the shown==applied
+      // invariant.
+      bonus,
+      // The ACTIVE guild-wide reward stamped on this week's challenge
+      // (spawnBoss, STR-56); null = ×1.0 floor, never shown as a penalty.
+      boost,
       steps: { today: stepsToday, thisWeek: stepsThisWeek },
       fuel,
       meters: {

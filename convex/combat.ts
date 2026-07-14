@@ -25,7 +25,9 @@ import {
   CRIT,
   DAMAGE_PER_ENERGY,
   STREAK,
+  bonusTierFor,
   bossMaxHP,
+  effectiveBoostMult,
   jobLevelForWeeklySteps,
   multiplierForJobLevel,
 } from "./gameConfig";
@@ -79,6 +81,34 @@ async function spawnBoss(
   prevId: Id<"challenges"> | undefined,
 ): Promise<Doc<"challenges">> {
   const members = await memberCount(ctx, group._id);
+
+  // Bonus reward stamping (M1.5 spec §5 write-site 4, STR-56). spawnBoss is
+  // called ONLY from ensureCurrentChallenge — the single writer of weekly
+  // rollover — so the reward is computed and stamped exactly once (guardrail
+  // §7.5, no double-stamp). If the boss being replaced was KILLED, its bonus
+  // meter (Σ bonusDamageContributed across the won week's progress rows)
+  // converts into next week's guild-wide boost via bonusTierFor — the SAME
+  // pure helper the dashboard tier preview runs, so the mult shown during the
+  // bonus phase is BY CONSTRUCTION the mult stamped here. Tier 0 or an
+  // expired/missing prior → omit BOTH fields entirely: absent = the ×1.0
+  // floor, never a penalty (never-punish guardrail §7.1).
+  let reward: { boostMult: number; boostSourceDamage: number } | null = null;
+  const prior = prevId ? await ctx.db.get(prevId) : null;
+  if (prior && prior.status === "won") {
+    const priorRows = await ctx.db
+      .query("challengeProgress")
+      .withIndex("by_challenge", (q) => q.eq("challengeId", prior._id))
+      .collect();
+    const totalBonus = priorRows.reduce(
+      (s, r) => s + (r.bonusDamageContributed ?? 0),
+      0,
+    );
+    const { tier: bonusTier, mult } = bonusTierFor(totalBonus, prior.bossMaxHP);
+    if (bonusTier > 0) {
+      reward = { boostMult: mult, boostSourceDamage: totalBonus };
+    }
+  }
+
   const id = await ctx.db.insert("challenges", {
     groupId: group._id,
     startDate: weekStart,
@@ -87,6 +117,7 @@ async function spawnBoss(
     bossMaxHP: bossMaxHP(tier, members),
     status: "active",
     tier,
+    ...(reward ?? {}),
     previousChallengeId: prevId,
     createdAt: Date.now(),
   });
@@ -195,7 +226,15 @@ export const collectIdle = mutation({
     // the damage into bonusDamageContributed instead of boss HP — the old
     // victory-lap branch settled fuel but DISCARDED the damage (a subtle
     // punishment; fixed). OFFLINE_CAP semantics are unchanged inside the walk.
-    const { collected } = await settleFuelAndIdle(ctx, userId, progress, now);
+    // Callers pass the CURRENT challenge's stamped boost (absent = ×1.0);
+    // the "does the boost cover idle?" scope gate lives inside the settle.
+    const { collected } = await settleFuelAndIdle(
+      ctx,
+      userId,
+      progress,
+      now,
+      challenge.boostMult ?? 1,
+    );
     if (challenge.status === "active") {
       await resolveBoss(ctx, challenge._id);
     }
@@ -263,7 +302,17 @@ export async function applyDeploy(
     jobLevel,
     today,
   );
-  const damage = Math.round(available * DAMAGE_PER_ENERGY * critMult * sMult);
+  // Guild-wide boost (M1.5 spec §4/§5 write-site 5, STR-56): last week's
+  // bonus-meter reward, stamped on this challenge by spawnBoss. This is
+  // multiply site 1 of EXACTLY 2 (site 2 = idle.settleFuelAndIdle's banked
+  // damage); the boostAppliesTo scope gate lives in effectiveBoostMult, so a
+  // re-scope ("all" → "deploys"/"idle") is a config flip. Scope "all" means
+  // this also boosts bonus-phase deploys — next week's own bonus damage —
+  // one cap-guarded step of soft compounding (spec §9.3, decided).
+  const boostMult = effectiveBoostMult("deploys", challenge.boostMult);
+  const damage = Math.round(
+    available * DAMAGE_PER_ENERGY * critMult * sMult * boostMult,
+  );
 
   // Spend the whole bank (energySpent := lifetime earned → balance 0) and
   // settle the streak + any shields consumed to bridge the gap.

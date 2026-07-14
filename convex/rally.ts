@@ -105,7 +105,13 @@ export async function applyRally(
   let settledFuel: number;
   if (challenge.status === "active") {
     const progress = await ensureProgress(ctx, challenge, receiverId);
-    const settled = await settleFuelAndIdle(ctx, receiverId, progress, now);
+    const settled = await settleFuelAndIdle(
+      ctx,
+      receiverId,
+      progress,
+      now,
+      challenge.boostMult ?? 1, // guild-wide boost stamped on this week (STR-56)
+    );
     settledFuel = settled.fuel;
     await resolveBoss(ctx, challenge._id);
   } else {

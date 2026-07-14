@@ -83,7 +83,14 @@ export const recordSteps = mutation({
           )
           .first();
         if (progress) {
-          await settleFuelAndIdle(ctx, userId, progress, now, newMult);
+          await settleFuelAndIdle(
+            ctx,
+            userId,
+            progress,
+            now,
+            challenge.boostMult ?? 1, // guild-wide boost stamped on this week (STR-56)
+            newMult,
+          );
         }
       }
     }

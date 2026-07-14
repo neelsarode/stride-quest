@@ -17,6 +17,8 @@ import {
   STREAK,
   bossMaxHP,
   bonusTierFor,
+  bonusTiersFor,
+  effectiveBoostMult,
   nextBonusTierTarget,
 } from "../convex/gameConfig.ts";
 
@@ -142,6 +144,71 @@ test("tiers ascend in BOTH fields — nextBonusTierTarget walks them in order", 
     assert.ok(BONUS_BOSS.tiers[i].thresholdFrac > BONUS_BOSS.tiers[i - 1].thresholdFrac);
     assert.ok(BONUS_BOSS.tiers[i].boostMult > BONUS_BOSS.tiers[i - 1].boostMult);
   }
+});
+
+// --- bonusTiersFor (STR-56): the absolute tier markers the dashboard exposes --
+
+test("bonusTiersFor: absolute thresholds = thresholdFrac × killed bossMaxHP", () => {
+  assert.deepEqual(bonusTiersFor(CREW_HP), [
+    { threshold: 150_000, boostMult: 1.1 },
+    { threshold: 300_000, boostMult: 1.2 },
+    { threshold: 600_000, boostMult: 1.35 },
+  ]);
+  assert.deepEqual(bonusTiersFor(SOLO_HP), [
+    { threshold: 37_500, boostMult: 1.1 },
+    { threshold: 75_000, boostMult: 1.2 },
+    { threshold: 150_000, boostMult: 1.35 },
+  ]);
+});
+
+test("bonusTiersFor clamps every tier's mult at maxBoostMult, like the stamping", () => {
+  for (const t of bonusTiersFor(CREW_HP)) {
+    assert.ok(t.boostMult <= BONUS_BOSS.maxBoostMult);
+  }
+});
+
+test("shown markers == stamped reward: landing EXACTLY on a marker earns its mult", () => {
+  // The dashboard draws bonusTiersFor's markers on the meter; the rollover
+  // stamps bonusTierFor's mult. Both walk the SAME list, so touching marker i
+  // must stamp marker i's mult — and one damage point below must not.
+  for (const hp of [CREW_HP, SOLO_HP, 1_234_567]) {
+    const tiers = bonusTiersFor(hp);
+    for (let i = 0; i < tiers.length; i++) {
+      assert.deepEqual(bonusTierFor(tiers[i].threshold, hp), {
+        tier: i + 1,
+        mult: tiers[i].boostMult,
+      });
+      const below = bonusTierFor(tiers[i].threshold - 1, hp);
+      assert.equal(below.tier, i, `marker ${i} leaked downward at hp=${hp}`);
+    }
+  }
+});
+
+// --- effectiveBoostMult (STR-56): the boostAppliesTo scope gate ----------------
+
+test("shipped scope is 'all': both channels apply the stamped mult", () => {
+  assert.equal(BONUS_BOSS.boostAppliesTo, "all");
+  assert.equal(effectiveBoostMult("deploys", 1.2), 1.2);
+  assert.equal(effectiveBoostMult("idle", 1.2), 1.2);
+});
+
+test("no stamp (undefined) is the ×1.0 floor on every channel and scope", () => {
+  for (const scope of ["all", "deploys", "idle"]) {
+    assert.equal(effectiveBoostMult("deploys", undefined, scope), 1);
+    assert.equal(effectiveBoostMult("idle", undefined, scope), 1);
+  }
+});
+
+test("re-scoping is a config flip: each scope gates exactly its own channel", () => {
+  // scope "deploys": deploys boosted, idle untouched.
+  assert.equal(effectiveBoostMult("deploys", 1.35, "deploys"), 1.35);
+  assert.equal(effectiveBoostMult("idle", 1.35, "deploys"), 1);
+  // scope "idle": idle boosted, deploys untouched.
+  assert.equal(effectiveBoostMult("idle", 1.35, "idle"), 1.35);
+  assert.equal(effectiveBoostMult("deploys", 1.35, "idle"), 1);
+  // scope "all": everything boosted.
+  assert.equal(effectiveBoostMult("deploys", 1.35, "all"), 1.35);
+  assert.equal(effectiveBoostMult("idle", 1.35, "all"), 1.35);
 });
 
 test("the boost softens the weekly ramp but can never cancel it", () => {

@@ -115,6 +115,25 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
             <Text style={styles.readout}>
               BOSS {dash.boss ? `${dash.boss.currentHP.toLocaleString()}/${dash.boss.maxHP.toLocaleString()} T${dash.boss.tier}` : "—"}
             </Text>
+            {/* Bonus phase (STR-56): the accumulating meter + the tier preview
+                the rollover will stamp — numerically verifiable pre-UI. */}
+            {dash.bonus && (
+              <Text style={styles.readout}>
+                BONUS {dash.bonus.totalDamage.toLocaleString()} · T
+                {dash.bonus.currentTier} ×{dash.bonus.currentMult.toFixed(2)}
+                {dash.bonus.nextTier
+                  ? ` · next ${Math.ceil(dash.bonus.nextTier.damageToGo).toLocaleString()}`
+                  : " · MAX"}
+              </Text>
+            )}
+            {/* Active guild-wide reward stamped on THIS week (STR-56). Absent
+                = ×1.0 floor — no line, never a "×1.00" badge (never-punish). */}
+            {dash.boost && (
+              <Text style={styles.readout}>
+                BOOST ×{dash.boost.mult.toFixed(2)} (from{" "}
+                {dash.boost.sourceDamage.toLocaleString()})
+              </Text>
+            )}
           </>
         )}
         {lastError && <Text style={styles.err}>⛔ {lastError}</Text>}

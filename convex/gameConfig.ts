@@ -331,49 +331,79 @@ export function streakMultiplierFrom(
   return Math.min(1 + dayBonus + intensityBonus + jobBonus, STREAK.maxStreakMult);
 }
 
+/** The bonus tiers as ABSOLUTE damage thresholds (thresholdFrac × the killed
+ *  boss's bossMaxHP), each with its (maxBoostMult-clamped) reward. This is the
+ *  ONE place fractions become absolute numbers: bonusTierFor and
+ *  nextBonusTierTarget both walk THIS list, and the dashboard exposes it
+ *  verbatim as the meter's tier markers (STR-56, spec §5) — so the markers a
+ *  player sees, the "damage to go" preview, and the mult the rollover stamps
+ *  can never disagree, by construction. Thresholds are left un-rounded (they
+ *  must equal exactly what the ≥ comparison uses); display rounding is the
+ *  UI's job. */
+export function bonusTiersFor(
+  killedBossMaxHP: number,
+): { threshold: number; boostMult: number }[] {
+  return BONUS_BOSS.tiers.map((t) => ({
+    threshold: t.thresholdFrac * killedBossMaxHP,
+    boostMult: Math.min(t.boostMult, BONUS_BOSS.maxBoostMult),
+  }));
+}
+
 /** Bonus Boss reward tier from the party's accumulating bonus damage.
  *  `killedBossMaxHP` is the bossMaxHP of the boss the crew KILLED (member-count
  *  × tier scaling already inside), so the tiers inherit every scale for free.
  *  Tier 0 / ×1.0 below the first threshold; reaching a threshold is INCLUSIVE
- *  (damage ≥ threshold); the mult is clamped by BONUS_BOSS.maxBoostMult. Pure
- *  function so the rollover stamping (spawnBoss) and the UI tier preview
- *  compute it identically — the number shown is ALWAYS the number applied. */
+ *  (damage ≥ threshold); the mult is clamped by BONUS_BOSS.maxBoostMult (via
+ *  bonusTiersFor). Pure function so the rollover stamping (spawnBoss) and the
+ *  UI tier preview compute it identically — the number shown is ALWAYS the
+ *  number applied. */
 export function bonusTierFor(
   totalBonusDamage: number,
   killedBossMaxHP: number,
 ): { tier: number; mult: number } {
   if (killedBossMaxHP <= 0) return { tier: 0, mult: 1 }; // defensive: no boss, no boost
+  const tiers = bonusTiersFor(killedBossMaxHP);
   let tier = 0;
   let mult = 1;
-  for (let i = 0; i < BONUS_BOSS.tiers.length; i++) {
-    if (
-      totalBonusDamage >=
-      BONUS_BOSS.tiers[i].thresholdFrac * killedBossMaxHP
-    ) {
+  for (let i = 0; i < tiers.length; i++) {
+    if (totalBonusDamage >= tiers[i].threshold) {
       tier = i + 1;
-      mult = BONUS_BOSS.tiers[i].boostMult;
+      mult = tiers[i].boostMult;
     }
   }
-  return { tier, mult: Math.min(mult, BONUS_BOSS.maxBoostMult) };
+  return { tier, mult };
 }
 
 /** The NEXT bonus tier to chase ("38,400 damage to ×1.35"), or null once the
  *  max tier is reached. Same inputs as bonusTierFor — and it goes THROUGH
- *  bonusTierFor, so the preview readout can never disagree with what the
- *  rollover will stamp. */
+ *  bonusTierFor + bonusTiersFor, so the preview readout can never disagree
+ *  with what the rollover will stamp. */
 export function nextBonusTierTarget(
   totalBonusDamage: number,
   killedBossMaxHP: number,
 ): { damageToGo: number; mult: number } | null {
   if (killedBossMaxHP <= 0) return null; // defensive: no boss, nothing to chase
   const { tier } = bonusTierFor(totalBonusDamage, killedBossMaxHP);
-  if (tier >= BONUS_BOSS.tiers.length) return null;
-  const next = BONUS_BOSS.tiers[tier]; // tiers[tier] IS the next one (tier is 1-based)
+  const tiers = bonusTiersFor(killedBossMaxHP);
+  if (tier >= tiers.length) return null;
+  const next = tiers[tier]; // tiers[tier] IS the next one (tier is 1-based)
   return {
-    damageToGo: Math.max(
-      0,
-      next.thresholdFrac * killedBossMaxHP - totalBonusDamage,
-    ),
-    mult: Math.min(next.boostMult, BONUS_BOSS.maxBoostMult),
+    damageToGo: Math.max(0, next.threshold - totalBonusDamage),
+    mult: next.boostMult,
   };
+}
+
+/** The boost multiplier a damage CHANNEL actually applies, honoring the
+ *  BONUS_BOSS.boostAppliesTo scope gate (spec §4 — decided "all", but the two
+ *  multiply sites route through here so a "deploys"/"idle" re-scope is a
+ *  config flip, never a logic change). `stampedBoostMult` is the current
+ *  challenge's `boostMult` — absent (no reward stamped) means the ×1.0 floor.
+ *  `scope` is injectable for tests only; production callers use the default. */
+export function effectiveBoostMult(
+  channel: "deploys" | "idle",
+  stampedBoostMult: number | undefined,
+  scope: "all" | "deploys" | "idle" = BONUS_BOSS.boostAppliesTo,
+): number {
+  if (scope !== "all" && scope !== channel) return 1;
+  return stampedBoostMult ?? 1;
 }

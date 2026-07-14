@@ -124,7 +124,13 @@ export const activateOverdrive = mutation({
       const challenge = await ensureCurrentChallenge(ctx, ug.group);
       if (challenge.status === "active") {
         const progress = await ensureProgress(ctx, challenge, userId);
-        const settled = await settleFuelAndIdle(ctx, userId, progress, now);
+        const settled = await settleFuelAndIdle(
+          ctx,
+          userId,
+          progress,
+          now,
+          challenge.boostMult ?? 1, // guild-wide boost stamped on this week (STR-56)
+        );
         settledFuel = settled.fuel;
         await resolveBoss(ctx, challenge._id);
       } else {

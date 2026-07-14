@@ -23,9 +23,10 @@
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { settleFuelAndIdleWindow } from "./fuelMath";
+import { effectiveBoostMult } from "./gameConfig";
 
 export type SettleResult = {
-  /** Idle damage banked onto the boss by this settle. */
+  /** Idle damage banked by this settle (guild-wide boost already applied). */
   collected: number;
   /** Fuel burned across the settled window. */
   burned: number;
@@ -34,12 +35,17 @@ export type SettleResult = {
 };
 
 /** Settle fuel burn + idle damage in one shared walk; bank the damage, drain
- *  the tank, re-stamp both clocks (and the job multiplier if it changed). */
+ *  the tank, re-stamp both clocks (and the job multiplier if it changed).
+ *  `boostMult` is the CURRENT challenge's stamped guild-wide boost
+ *  (`challenge.boostMult ?? 1` — STR-56); every caller passes it explicitly so
+ *  no settle path can silently skip the reward. Whether it actually applies to
+ *  idle is gated inside (effectiveBoostMult honors BONUS_BOSS.boostAppliesTo). */
 export async function settleFuelAndIdle(
   ctx: MutationCtx,
   userId: Id<"users">,
   progress: Doc<"challengeProgress">,
   effNow: number,
+  boostMult: number,
   newMult?: number,
 ): Promise<SettleResult> {
   const user = await ctx.db.get(userId);
@@ -57,6 +63,14 @@ export async function settleFuelAndIdle(
     overdriveUntil: user.overdriveActiveUntil,
   });
 
+  // Guild-wide boost (M1.5 spec §4/§5 write-site 5, STR-56): multiply site 2
+  // of EXACTLY 2 (site 1 = combat.applyDeploy's damage line). Applied to the
+  // whole settled window — including bonus-phase damage below (scope "all"
+  // covers next week's own bonus meter, spec §9.3). The dashboard's pending-
+  // idle preview multiplies by the same effectiveBoostMult, so the preview
+  // still equals exactly what lands.
+  const banked = settled.damage * effectiveBoostMult("idle", boostMult);
+
   // Damage routing (M1.5 spec §3): a "won" challenge is in its bonus phase —
   // bank onto the accumulating meter; otherwise onto boss HP as always.
   const challenge = await ctx.db.get(progress.challengeId);
@@ -67,13 +81,13 @@ export async function settleFuelAndIdle(
     ...(bonusPhase
       ? {
           bonusDamageContributed:
-            (progress.bonusDamageContributed ?? 0) + settled.damage,
+            (progress.bonusDamageContributed ?? 0) + banked,
         }
-      : { damageContributed: progress.damageContributed + settled.damage }),
+      : { damageContributed: progress.damageContributed + banked }),
     lastIdleCollectedAt: effNow,
     idleMultiplierSnapshot: newMult ?? progress.idleMultiplierSnapshot ?? 1,
     updatedAt: Date.now(),
   });
 
-  return { collected: settled.damage, burned: settled.burned, fuel: settled.fuel };
+  return { collected: banked, burned: settled.burned, fuel: settled.fuel };
 }

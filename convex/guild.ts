@@ -101,13 +101,20 @@ export const overview = query({
         .first();
     }
     const dmgByUser = new Map<string, number>();
+    // Per-member Bonus Boss contribution (M1.5 spec §6, STR-56): shown on the
+    // guild board ALONGSIDE weekly damage — recognition badges stay
+    // improvement-based, so bonus damage never becomes a raw-output leaderboard.
+    const bonusByUser = new Map<string, number>();
     if (challenge) {
       const ch = challenge;
       const rows = await ctx.db
         .query("challengeProgress")
         .withIndex("by_challenge", (q) => q.eq("challengeId", ch._id))
         .collect();
-      for (const r of rows) dmgByUser.set(r.userId, r.damageContributed);
+      for (const r of rows) {
+        dmgByUser.set(r.userId, r.damageContributed);
+        bonusByUser.set(r.userId, r.bonusDamageContributed ?? 0);
+      }
     }
 
     const memberships = await ctx.db
@@ -122,6 +129,7 @@ export const overview = query({
       isMe: boolean;
       isSimulated: boolean;
       damage: number;
+      bonusDamage: number; // this member's Bonus Boss meter contribution (STR-56)
       todaySteps: number;
       weeklySteps: number;
       jobLevel: number;
@@ -159,6 +167,7 @@ export const overview = query({
         isMe: m.userId === userId,
         isSimulated: u.isSimulated ?? false,
         damage: Math.round(dmgByUser.get(m.userId) ?? 0),
+        bonusDamage: Math.round(bonusByUser.get(m.userId) ?? 0),
         todaySteps,
         weeklySteps: weekly,
         jobLevel,

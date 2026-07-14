@@ -154,6 +154,13 @@ export default defineSchema({
     // status "won" AND the week isn't over — no new status literal.
     bonusStartedAt: v.optional(v.number()), // effective ms of the kill
     bonusBossName: v.optional(v.string()), // "Crowned <bossName>"
+    // --- Stamped by spawnBoss on the NEXT week's challenge (STR-56, spec §5
+    // write-site 4). spawnBoss is called only from ensureCurrentChallenge —
+    // the single writer of weekly rollover — so the reward is stamped exactly
+    // once. BOTH fields absent = ×1.0 floor (tier 0 or prior expired — the
+    // never-punish guardrail: no reward is never a penalty).
+    boostMult: v.optional(v.number()), // guild-wide damage mult in force this week
+    boostSourceDamage: v.optional(v.number()), // last week's total bonus damage (reward banner/history)
     previousChallengeId: v.optional(v.id("challenges")), // chain, for analytics
     createdAt: v.number(),
   })

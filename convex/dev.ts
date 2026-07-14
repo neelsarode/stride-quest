@@ -461,7 +461,13 @@ export const setFuelHours = mutation({
       const challenge = await ensureCurrentChallenge(ctx, ug.group);
       if (challenge.status === "active") {
         const progress = await ensureProgress(ctx, challenge, caller);
-        await settleFuelAndIdle(ctx, caller, progress, now);
+        await settleFuelAndIdle(
+          ctx,
+          caller,
+          progress,
+          now,
+          challenge.boostMult ?? 1, // guild-wide boost stamped on this week (STR-56)
+        );
         await resolveBoss(ctx, challenge._id);
       } else {
         await settleFuel(ctx, caller, now);
