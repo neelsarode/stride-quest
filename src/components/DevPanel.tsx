@@ -35,6 +35,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const simDeploy = useMutation(api.dev.simulateTeammateDeploy);
   const removeTeammates = useMutation(api.dev.removeSimulatedTeammates);
   const resetAccount = useMutation(api.dev.resetAccount);
+  const resetOnboarding = useMutation(api.dev.resetOnboarding);
   const setFuelHours = useMutation(api.dev.setFuelHours);
   const fillOverdrive = useMutation(api.dev.fillOverdrive);
   const simRally = useMutation(api.dev.simulateTeammateRally);
@@ -211,6 +212,9 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
 
           <Section title="ACCOUNT">
             <Btn label="Reset my account" onPress={run(() => resetAccount({}))} busy={busy} />
+            {/* STR-45 re-test loop: clears class/onboardedAt + the solo guild,
+                so the flow runs again from Beat 1 on the next render. */}
+            <Btn label="Reset onboarding" onPress={run(() => resetOnboarding({}))} busy={busy} />
           </Section>
         </>
       )}

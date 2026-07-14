@@ -1,23 +1,26 @@
 // =============================================================================
 // STRIDE QUEST — app root.
 // =============================================================================
-// Wires the Convex auth provider, auto-signs each player in anonymously (no login
-// screen), then shows the dashboard. If the backend URL isn't configured yet we
-// show a setup screen instead of crashing.
+// Wires the Convex auth provider, auto-signs each player in anonymously (no
+// login screen), then routes on SERVER state (STR-45, onboarding spec §Flow):
+// the DB's routing keys (class → hasGuild → onboardedAt) say which beat comes
+// next, so the flow is resume-safe by construction. If the backend URL isn't
+// configured yet we show a setup screen instead of crashing.
 // =============================================================================
 import { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 
+import { api } from "./convex/_generated/api";
 import { convex } from "./src/convex";
 import { secureStorage } from "./src/secureStorage";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { BackendSetupScreen } from "./src/screens/BackendSetupScreen";
 import { FeedbackProvider } from "./src/feedback/FeedbackProvider";
-import { PALETTE } from "./src/config/assets";
+import { TitleCard } from "./src/screens/onboarding/TitleCard";
+import { OnboardingFlow } from "./src/screens/onboarding/OnboardingFlow";
 
 export default function App() {
   // No backend URL yet -> guide the user instead of crashing.
@@ -40,7 +43,17 @@ export default function App() {
   );
 }
 
-/** Ensures every player has an anonymous identity, then renders the app. */
+/**
+ * Ensures every player has an anonymous identity, then routes purely from
+ * server state — the onboarding state machine (spec §Flow: "no router"):
+ *   signing in / loading      → Beat 0 title card (sign-in runs behind it)
+ *   no `onboardedAt` stamp    → OnboardingFlow (hero → guild → stamp)
+ *   stamped                   → the game (dashboard)
+ * Kill the app at any beat and it reopens exactly there: every routing key
+ * lives in the DB, never in local state. This also kills the old dead-end
+ * where a fresh account sat on "Setting up your guild…" forever — a guild-less
+ * account now routes INTO the flow instead of past it.
+ */
 function AuthGate() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { signIn } = useAuthActions();
@@ -51,25 +64,18 @@ function AuthGate() {
     }
   }, [isLoading, isAuthenticated, signIn]);
 
-  if (isLoading || !isAuthenticated) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={PALETTE.accent} />
-        <Text style={styles.dim}>Summoning your hero…</Text>
-      </View>
-    );
+  // The routing keys, straight from the server (skip until the token exists).
+  const viewer = useQuery(api.users.viewer, isAuthenticated ? {} : "skip");
+
+  // Beat 0 — covers anonymous sign-in AND the first viewer load, so there is
+  // exactly one pre-game surface (<2s, nothing to tap).
+  if (isLoading || !isAuthenticated || viewer === undefined || viewer === null) {
+    return <TitleCard />;
+  }
+
+  if (viewer.onboardedAt === null) {
+    return <OnboardingFlow viewer={viewer} />;
   }
 
   return <DashboardScreen />;
 }
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    backgroundColor: PALETTE.bg,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  dim: { color: PALETTE.textDim, fontSize: 14 },
-});
