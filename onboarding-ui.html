@@ -1,0 +1,617 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — Onboarding flow (S8 comp)</title>
+<!--
+  ONBOARDING FLOW COMP — interactive click-through of the M2.5 onboarding
+  (docs/superpowers/specs/2026-07-13-onboarding-design.md) in a phone frame,
+  drawn 100% with the procedural hi-fi kit (assets/ui-kit.js) in S8 CELESTIAL
+  SILVER — the app's live system style (battlefield-ui.html).
+  Static data, nothing wired to Convex. Text inputs are visual wells.
+  14 beats: title → choose hero (8 classes, real sprites) → guild fork →
+  create/code-reveal → join/confirm + 3 error states → HealthKit priming +
+  native sheet + sync payoff → first-battle landing.
+  Navigate: BACK/CONTINUE, the beat strip, arrow keys, or in-canvas buttons
+  (they follow the real flow routing). Feeds STR-43.
+-->
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { background: #0a0a0c; color: #b9c0cf;
+    font-family: ui-monospace, Menlo, monospace; }
+  body { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    gap: 34px; padding: 24px; flex-wrap: wrap; }
+  img.sprite, canvas.px { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+  /* ============ phone frame (dashboard-ui concept) ============ */
+  #phone { position: relative; width: 390px; height: 846px; flex: none;
+    border-radius: 42px; overflow: hidden; background: #000;
+    box-shadow: 0 0 0 10px #1c1c22, 0 0 0 12px #33333c, 0 30px 80px rgba(0,0,0,.8); }
+  #stage { position: absolute; inset: 0; overflow: hidden; }
+  #bg { position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; object-position: 50% 35%; }
+  .actor { position: absolute; display: none; z-index: 10; pointer-events: none; }
+  .actor img { display: block; height: 100%; }
+  .actor.above { z-index: 150; }   /* spotlight beats: hero rides above the scrim */
+  #ui { position: absolute; inset: 0; z-index: 100; width: 390px; height: 846px;
+    cursor: pointer; }
+
+  /* ============ legend / controls column ============ */
+  #legend { width: 330px; font-size: 12px; line-height: 1.55; }
+  #legend h1 { font-size: 15px; color: #e8ecf4; letter-spacing: 1px; }
+  #legend .sub { font-size: 10.5px; color: #77808f; margin: 3px 0 14px; }
+  .navrow { display: flex; gap: 8px; margin-bottom: 12px; }
+  button.ctl { background: #24272f; color: #cdd3de; border: 1px solid #3a4049;
+    border-radius: 4px; font: inherit; font-size: 11px; padding: 6px 12px;
+    cursor: pointer; letter-spacing: .5px; }
+  button.ctl:hover { border-color: #667080; }
+  button.ctl.gold { background: #ffce6b; color: #201607; border-color: #ffce6b; font-weight: 700; }
+  #chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+  #chips .chip { background: #191c22; color: #98a2b0; border: 1px solid #2c3038;
+    border-radius: 4px; font: inherit; font-size: 10px; padding: 3px 7px;
+    cursor: pointer; letter-spacing: .5px; }
+  #chips .chip.on { background: #ffce6b; color: #201607; border-color: #ffce6b; font-weight: 700; }
+  #cap { background: #15181d; border: 1px solid #24272f; border-radius: 6px;
+    padding: 10px 12px; font-size: 11px; color: #b9c0cf; min-height: 64px; }
+  #cap b { color: #ffce6b; }
+  .note { font-size: 10px; color: #667080; margin-top: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div id="phone">
+  <div id="stage">
+    <img id="bg" src="assets/backgrounds/battlefield_beach.png" alt="" />
+    <div class="actor above" id="stagehero"><img class="sprite" alt=""></div>
+    <div class="actor" id="bmate1"><img class="sprite" alt=""></div>
+    <div class="actor" id="bmate2"><img class="sprite" alt=""></div>
+    <div class="actor" id="bhero"><img class="sprite" alt=""></div>
+    <div class="actor" id="bboss"><img class="sprite" alt=""></div>
+    <canvas id="ui" class="px" width="130" height="282"></canvas>
+  </div>
+</div>
+
+<div id="legend">
+  <h1>ONBOARDING FLOW — UI COMP</h1>
+  <div class="sub">S8 Celestial Silver · procedural kit (assets/ui-kit.js) · spec:
+    docs/superpowers/specs/2026-07-13-onboarding-design.md · feeds STR-43</div>
+  <div class="navrow">
+    <button class="ctl" id="back">&larr; BACK</button>
+    <button class="ctl gold" id="next">CONTINUE &rarr;</button>
+  </div>
+  <div id="chips"></div>
+  <div id="cap"></div>
+  <div class="note">In-canvas buttons are clickable and follow the real flow routing
+    (fork &rarr; founder or joiner path, ALLOW &rarr; sync, MAYBE LATER &rarr; battle).
+    Arrow keys work too. Inputs are visual wells — this is a comp, not a build.
+    All copy is a draft for Neel's pass.</div>
+</div>
+
+<script src="assets/ui-kit.js"></script>
+<script>
+'use strict';
+/* ============ page-local kit extensions (do NOT live in ui-kit.js) ========= */
+// apostrophe glyph — onboarding copy needs it ("DON'T", "WEEK'S")
+FONT["'"] = ['#','#','.','.','.'];
+
+const ART_W = 130, ART_H = 282, S = 3;
+const AG = M('silver'), AU = M('gold'), ASL = M('slate');
+const GOLD_FAM = { light:'gold1', mid:'gold2', dark:'gold4' };
+const T8 = { mat:AG, sec:AU, well:'night_w', wellD:'night_wd', hp:GOLD_FAM,
+             text:'silver1', textDim:'sky_mid' };
+const T_SHEET = { mat:ASL, sec:ASL, well:'slate_w', wellD:'slate_wd',
+                  text:'slate1', textDim:'slate3' };
+const RAMP_GOLD = makeRamp('acc_gold', [PALETTE.gold1, PALETTE.gold2, PALETTE.gold4], 6, false);
+const RAMP_SKY  = makeRamp('acc_sky',  [PALETTE.sky_light, PALETTE.sky_mid, PALETTE.sky_dark], 6, false);
+
+// Outlined text over open scenes (kit precedent: hifiBar labels). heavy adds
+// diagonals for the big wordmark sizes.
+function textO(ctx, str, x, y, key, scale, heavy){
+  scale = scale || 1;
+  const offs = heavy
+    ? [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
+    : [[1,0],[-1,0],[0,1],[0,-1]];
+  for (const [dx,dy] of offs) drawText(ctx, str, x+dx, y+dy, 'outline', scale);
+  drawText(ctx, str, x, y, key, scale);
+}
+function textCO(ctx, str, cx, y, key, scale, heavy){
+  textO(ctx, str, cx - Math.round(textWidth(str, scale)/2), y, key, scale, heavy);
+}
+// word-wrap → centered outlined paragraph; returns next y
+function wrapLines(str, maxW, scale){
+  const out = []; let line = '';
+  for (const w of str.split(' ')){
+    const t = line ? line + ' ' + w : w;
+    if (textWidth(t, scale) <= maxW) line = t;
+    else { if (line) out.push(line); line = w; }
+  }
+  if (line) out.push(line);
+  return out;
+}
+function paraC(ctx, str, cx, y, key, maxW, lh, scale){
+  lh = lh || 8; scale = scale || 1;
+  for (const ln of wrapLines(str, maxW, scale)){ textCO(ctx, ln, cx, y, key, scale); y += lh; }
+  return y;
+}
+// input well: slim frame + recessed midnight well + text + blinking caret
+function inputWell(ctx, x, y, w, h, text, caretOn){
+  const well = hifiFrameSlim(ctx, x, y, w, h, 5, AG, 'night_wd');
+  const ty = well.wy + Math.round((well.wh - 5)/2);
+  const tx = well.wx + 4;
+  drawText(ctx, text, tx, ty, 'white');
+  if (caretOn) px(ctx, tx + textWidth(text) + 2, ty - 1, 1, 7, 'gold1');
+  return well;
+}
+// six-box invite-code row. gold=true → minted reveal (gold faces, engraved);
+// else entry wells (silver frames). caretAt = blinking caret in that box.
+function codeBoxes(ctx, y, chars, gold, caretAt, caretOn){
+  const BW = 17, BH = 20, G = 2, x0 = Math.round((ART_W - (6*BW + 5*G)) / 2);
+  for (let i = 0; i < 6; i++){
+    const bx = x0 + i * (BW + G);
+    const ch = chars[i] || '';
+    if (gold){
+      hifiFace(ctx, bx, y, BW, BH, 5, AU);
+      if (ch) engrave(ctx, ch, bx + Math.round((BW - textWidth(ch, 2))/2), y + 5, AU, 2);
+    } else {
+      const well = hifiFrameSlim(ctx, bx, y, BW, BH, 5, AG, 'night_wd');
+      if (ch) drawText(ctx, ch, bx + Math.round((BW - textWidth(ch, 2))/2), y + 5, 'white', 2);
+      else if (caretAt === i && caretOn) px(ctx, bx + 8, y + 5, 1, 10, 'gold1');
+    }
+  }
+}
+// pulsing selection ring (battlefield rally-beacon recipe), drawn around a box
+function selRing(ctx, x, y, s, key){
+  px(ctx, x+2, y, s-4, 1, key); px(ctx, x+2, y+s-1, s-4, 1, key);
+  px(ctx, x, y+2, 1, s-4, key); px(ctx, x+s-1, y+2, 1, s-4, key);
+  px(ctx, x+1, y+1, 1, 1, key); px(ctx, x+s-2, y+1, 1, 1, key);
+  px(ctx, x+1, y+s-2, 1, 1, key); px(ctx, x+s-2, y+s-2, 1, 1, key);
+}
+// hint bubble with a DOWN pointer (hifiPopover only points up/left; the
+// first-strike hint hangs ABOVE the attack button)
+function popDown(ctx, x, y, w, h, arrowAt){
+  const well = hifiFrameSlim(ctx, x, y, w, h, 5, AG, 'night_w');
+  const ax = x + arrowAt;
+  px(ctx, ax-2, y+h, 5, 1, AG.out); px(ctx, ax-1, y+h+1, 3, 1, AG.out); px(ctx, ax, y+h+2, 1, 1, AG.out);
+  px(ctx, ax-1, y+h, 3, 1, AG.rim); px(ctx, ax, y+h+1, 1, 1, AG.rim);
+  return well;
+}
+
+/* ------------------------------ static data ------------------------------- */
+const CLASSES = [
+  { key:'warrior',  name:'WARRIOR',  accent:'sky_light',    blurb:'FRONT OF THE LINE, EVERY TIME.' },
+  { key:'mage',     name:'MAGE',     accent:'amethyst1',    blurb:'TURNS A LONG WALK INTO A LONGER SPELL.' },
+  { key:'medic',    name:'MEDIC',    accent:'green_light',  blurb:'KEEPS THE WHOLE CREW STANDING.' },
+  { key:'archer',   name:'ARCHER',   accent:'elder1',       blurb:'NEVER MISSES A STEP.' },
+  { key:'assassin', name:'ASSASSIN', accent:'ember1',       blurb:'QUIET FEET. LOUD NUMBERS.' },
+  { key:'paladin',  name:'PALADIN',  accent:'gold1',        blurb:'WALKS IN THE LIGHT. HITS LIKE A SUNRISE.' },
+  { key:'warlock',  name:'WARLOCK',  accent:'ghoul_light',  blurb:'MADE A DEAL. IT INVOLVES CARDIO.' },
+  { key:'bard',     name:'BARD',     accent:'yellow_light', blurb:'EVERY JOURNEY NEEDS A SOUNDTRACK.' },
+];
+const CLASS_JOB5 = {   // portrait sources (PORTRAIT_CROPS are measured on these)
+  warrior:'5_warlord', mage:'5_archmage', medic:'5_hierophant', archer:'5_sentinel',
+  assassin:'5_shadowlord', paladin:'5_lightbringer', bard:'5_maestro', warlock:'5_dreadlord',
+};
+const JOB1 = {
+  warrior:'1_rookie', mage:'1_apprentice', medic:'1_acolyte', archer:'1_greenhorn',
+  assassin:'1_footpad', paladin:'1_squire', warlock:'1_initiate', bard:'1_busker',
+};
+const HERO_NAME = 'HERO-EHB8';
+const GUILD_NAME = "HERO-EHB8'S GUILD";
+const CODE = '7KDQ4V';           // from GUILD.inviteCodeAlphabet (no 0/O/1/I)
+const STEPS_TODAY = '4,832';
+
+const IMGS = {};
+CLASSES.forEach(c => {
+  const im = new Image();
+  im.src = `characters/${c.key}/${CLASS_JOB5[c.key]}/south.png`;
+  IMGS[c.key] = im;
+});
+// preload boss + a couple of job-1 idles so beat jumps don't flicker
+for (let f = 0; f < 9; f++) new Image().src = `characters/bosses/armored_cat_256/idle/frame_00${f}.png`;
+for (let f = 0; f < 4; f++) new Image().src = `characters/warrior/1_rookie/animations/idle/frame_00${f}.png`;
+
+/* ------------------------------ state machine ----------------------------- */
+const BEATS = [
+  { id:'TITLE',     cap:'<b>Beat 0 — Summoning.</b> Anonymous sign-in runs behind a title card over the battle scene. Under 2 seconds, nothing to tap.' },
+  { id:'HERO',      cap:'<b>Beat 1 — Choose your hero.</b> All 8 classes, live Job-1 idle on stage, one flavor line each. Name is pre-filled (editing optional, per spec — naming lives on this screen, not its own). Tap portraits to switch.' },
+  { id:'GUILD',     cap:'<b>Beat 2 — The guild fork.</b> Found a guild, or join with a friend’s code. Gold = founder (default path).' },
+  { id:'CREATE',    cap:'<b>Beat 2a — Start a guild.</b> Name pre-filled "{Hero}’s Guild"; one tap mints guild + invite code + boss + 24h starter tank.' },
+  { id:'CODE',      cap:'<b>Beat 2a — Code reveal.</b> The minted invite code, huge, with native Share. Skippable — inviting is never a gate. Code also lives on the guild board.' },
+  { id:'JOIN',      cap:'<b>Beat 2b — Join by code.</b> Six-box entry, auto-uppercase; the alphabet skips 0/O/1/I. CHECK CODE stays asleep until all 6 boxes are filled.' },
+  { id:'CONFIRM',   cap:'<b>Beat 2b — Preview-confirm.</b> previewInviteCode shows who you’re joining BEFORE you join. No surprise guilds.' },
+  { id:'NOT FOUND', cap:'<b>Error — not_found.</b> Warm inline retry under the boxes. No modal, no red, no blame.' },
+  { id:'FULL',      cap:'<b>Error — full (8/8).</b> Frames the full guild as their win, then offers the founder path. Entry state is preserved.' },
+  { id:'MEMBER',    cap:'<b>Error — already_member.</b> You typed your own guild’s code — framed as a homecoming, routes straight to battle.' },
+  { id:'HEALTH',    cap:'<b>Beat 3 — Power source.</b> Explain-then-ask HealthKit priming: why we ask, what we read (steps, nothing else), before any native prompt. iOS only — auto-skipped on web.' },
+  { id:'PERMISSION',cap:'<b>Beat 3 — Native prompt.</b> The iOS sheet (mocked here in slate so it reads as system chrome). ALLOW &rarr; first sync. DON’T ALLOW &rarr; starter tank + calm chip, never punished.' },
+  { id:'SYNC',      cap:'<b>Beat 3 — Grant payoff.</b> Steps already walked today load the tank before the first fight: "+4,832 steps already today. Your hero felt that."' },
+  { id:'BATTLE',    cap:'<b>Beat 4 — First battle.</b> No "done" screen — land in the real scene with your chosen class at Job 1. One teaching banner, first-strike hint (guaranteed crit — tap ATTACK!). The calm CONNECT HEALTH chip only appears if Health was skipped.' },
+];
+const state = {
+  beat: 0, cls: 'warrior', tick: 0, enter: 0,
+  toast: null, bossMax: 840000, bossHp: 840000, bossDisp: 840000, flash: 0, floats: [],
+};
+let hits = [], pressedId = null;
+
+const cv = document.getElementById('ui');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+/* ------------------------------ scene actors ------------------------------ */
+const actor = id => document.getElementById(id);
+const setActor = (id, css, src) => {
+  const el = actor(id);
+  Object.assign(el.style, { display:'block' }, css);
+  el.dataset.src = src;
+};
+function applyScene(){
+  ['stagehero','bhero','bmate1','bmate2','bboss'].forEach(id => actor(id).style.display = 'none');
+  const b = BEATS[state.beat].id;
+  const heroIdle = `characters/${state.cls}/${JOB1[state.cls]}/animations/idle`;
+  if (b === 'HERO')
+    setActor('stagehero', { left:'50%', transform:'translateX(-50%)', top:'36px', height:'230px' }, heroIdle);
+  if (b === 'SYNC')
+    setActor('stagehero', { left:'50%', transform:'translateX(-50%)', top:'100px', height:'150px' }, heroIdle);
+  if (b === 'BATTLE'){
+    const mates = CLASSES.map(c => c.key).filter(k => k !== state.cls);
+    setActor('bhero',  { left:'14%',  bottom:'23%',   top:'', height:'170px', zIndex: 12 }, heroIdle);
+    setActor('bmate1', { left:'-2%',  bottom:'26.5%', top:'', height:'160px', zIndex: 11 },
+      `characters/${mates[0]}/${JOB1[mates[0]]}/animations/idle`);
+    setActor('bmate2', { left:'30%',  bottom:'28.5%', top:'', height:'150px', zIndex: 11 },
+      `characters/${mates[1]}/${JOB1[mates[1]]}/animations/idle`);
+    setActor('bboss',  { right:'-60px', left:'', bottom:'22%', top:'', height:'360px' },
+      'characters/bosses/armored_cat_256/idle');
+  }
+}
+function animateActors(){
+  const hf = (state.tick >> 1) % 4;                 // heroes 5fps
+  ['stagehero','bhero','bmate1','bmate2'].forEach(id => {
+    const el = actor(id);
+    if (el.style.display !== 'none' && el.dataset.src)
+      el.querySelector('img').src = `${el.dataset.src}/frame_00${hf}.png`;
+  });
+  const bb = actor('bboss');
+  if (bb.style.display !== 'none')
+    bb.querySelector('img').src = `${bb.dataset.src}/frame_00${state.tick % 9}.png`;
+}
+
+/* --------------------------- shared chrome pieces ------------------------- */
+function scrim(alpha, h){ ctx.fillStyle = `rgba(10,13,20,${alpha})`; ctx.fillRect(0, 0, ART_W*0 + 130, h || ART_H); }
+function wordmark(){ textCO(ctx, 'STRIDE QUEST', 65, 3, 'sky_dark'); }
+function addHit(id, x, y, w, h, cb){ hits.push({ id, x, y, w, h, cb }); }
+function btn(id, x, y, w, h, m, content, cb){
+  hifiButton(ctx, x, y, w, h, m, content, pressedId === id);
+  addHit(id, x, y, w, h + 1, cb);
+}
+function btnDisabled(x, y, w, h, label){
+  hifiFace(ctx, x, y, w, h, Math.min(6, h >> 1), ASL);
+  drawText(ctx, label, x + Math.round((w - textWidth(label))/2), y + Math.round((h - 5)/2), 'slate5');
+}
+function link(id, str, cx, y, cb){
+  const w = textWidth(str);
+  const x = cx - Math.round(w/2);
+  textO(ctx, str, x, y, 'gold1');
+  px(ctx, x, y + 6, w, 1, 'gold4');
+  addHit(id, x - 2, y - 2, w + 4, 10, cb);
+}
+function showToast(msg){ state.toast = { msg, until: state.tick + 20 }; }
+function drawToast(){
+  if (!state.toast || state.tick >= state.toast.until){ state.toast = null; return; }
+  const w = textWidth(state.toast.msg) + 12;
+  hifiToast(ctx, Math.round((130 - w)/2), 234, state.toast.msg, AG, 'night_wd');
+}
+
+/* -------------------------------- renderers ------------------------------- */
+function rTitle(){
+  scrim(.5);
+  drawSprite(ctx, scaleSprite(CROSSED_SWORDS, 3), 48, 66);
+  textCO(ctx, 'STRIDE', 65, 108, 'gold1', 3, true);
+  textCO(ctx, 'QUEST',  65, 128, 'gold1', 3, true);
+  textCO(ctx, 'WALK TOGETHER. FIGHT TOGETHER.', 65, 152, 'sky_light');
+  const dots = '.'.repeat(1 + ((state.tick >> 3) % 3));
+  const base = 'SUMMONING YOUR HERO';
+  const bx = 65 - Math.round(textWidth(base + '...') / 2);
+  textO(ctx, base + dots, bx, 200, 'white');
+  textCO(ctx, 'NO ACCOUNT NEEDED - JUST WALK.', 65, 252, 'sky_mid');
+  addHit('title', 0, 0, ART_W, ART_H, () => go(1));
+}
+
+function rHero(){
+  scrim(.55);
+  wordmark();
+  textCO(ctx, 'CHOOSE YOUR HERO', 65, 12, 'gold1');
+  const sel = CLASSES.find(c => c.key === state.cls);
+  // stage hero <img> rides above the scrim (z150); class plate under it
+  textCO(ctx, sel.name, 65, 90, sel.accent, 2, true);
+  paraC(ctx, sel.blurb, 65, 104, 'silver1', 124);
+  // 8 portraits, 2 rows of 4 — REAL sprites via PORTRAIT_CROPS
+  const PS = 26, G = 2, x0 = Math.round((ART_W - (4*PS + 3*G)) / 2);
+  CLASSES.forEach((c, i) => {
+    const px0 = x0 + (i % 4) * (PS + G), py0 = 122 + Math.floor(i / 4) * (PS + G);
+    const seld = c.key === state.cls;
+    hifiPortrait(ctx, px0, py0, PS, seld ? AU : AG, 'night_wd', IMGS[c.key], PORTRAIT_CROPS[c.key]);
+    if (seld){
+      const pulse = ['gold4','gold2','gold1','gold2'][(state.tick >> 1) % 4];
+      selRing(ctx, px0 - 2, py0 - 2, PS + 4, pulse);
+    }
+    addHit('cls_' + c.key, px0, py0, PS, PS, () => { state.cls = c.key; applyScene(); });
+  });
+  drawText(ctx, 'YOUR NAME', 10, 184, 'sky_mid');
+  inputWell(ctx, 10, 191, 110, 16, HERO_NAME, (state.tick % 10) < 5);
+  drawText(ctx, 'PRE-PICKED - EDIT ANY TIME', 10, 210, 'sky_mid');
+  btn('thisisme', 20, 222, 90, 20, AU, { text:'THIS IS ME', scale:2 }, () => go(2));
+  paraC(ctx, 'CLASS IS FLAVOR - YOUR STEPS ARE THE POWER.', 65, 248, 'sky_mid', 120);
+}
+
+function rGuild(){
+  scrim(.72);
+  wordmark();
+  // a little crew, huddled — real sprites sell "guild" better than an emblem
+  ['mage','warrior','medic'].forEach((k, i) =>
+    hifiPortrait(ctx, 65 - 36 + i * 25, 22, 22, i === 1 ? AU : AG, 'night_wd', IMGS[k], PORTRAIT_CROPS[k]));
+  textCO(ctx, "HEROES DON'T", 65, 56, 'white', 2, true);
+  textCO(ctx, 'FIGHT ALONE.', 65, 70, 'white', 2, true);
+  paraC(ctx, 'EVERY STEP YOUR CREW WALKS HITS THE SAME BOSS. WIN SUNDAYS TOGETHER.', 65, 92, 'sky_light', 112);
+  btn('startguild', 8, 132, 114, 22, AU, { text:'START A GUILD', scale:2 }, () => go(3));
+  textCO(ctx, 'MINT A CODE TO SHARE', 65, 159, 'sky_mid');
+  btn('havecode', 8, 174, 114, 22, AG, { text:'I HAVE A CODE', scale:2 }, () => go(5));
+  textCO(ctx, 'A FRIEND ALREADY SENT YOU ONE', 65, 201, 'sky_mid');
+  textCO(ctx, 'A GUILD HOLDS UP TO 8 HEROES.', 65, 236, 'sky_mid');
+}
+
+function rCreate(){
+  scrim(.72);
+  wordmark();
+  const well = hifiPanel(ctx, 8, 34, 114, 192, T8, 'START A GUILD');
+  drawText(ctx, 'GUILD NAME', well.wx + 4, 54, 'sky_mid');
+  inputWell(ctx, well.wx + 3, 62, well.ww - 6, 16, GUILD_NAME, (state.tick % 10) < 5);
+  drawText(ctx, 'RENAME IT ANY TIME', well.wx + 4, 83, 'sky_mid');
+  px(ctx, well.wx + 4, 95, well.ww - 8, 1, AG.out);
+  drawText(ctx, 'FOUNDING A GUILD MINTS:', well.wx + 4, 102, 'silver1');
+  const row = (spr, txt, y, ov) => {
+    drawSprite(ctx, spr, well.wx + 5, y - 1, ov || null);
+    drawText(ctx, txt, well.wx + 17, y, 'sky_light');
+  };
+  row(BANNER, 'YOUR INVITE CODE', 113);
+  row(SKULL,  "THIS WEEK'S BOSS", 126);
+  row(STAR,   'A 24H STARTER TANK', 139);
+  drawText(ctx, 'FRIENDS JOIN ANY TIME.', well.wx + 4, 155, 'sky_mid');
+  btn('createguild', well.wx + 1, 192, 100, 20, AU, { text:'CREATE GUILD', scale:2 }, () => go(4));
+}
+
+function rCode(){
+  scrim(.72);
+  wordmark();
+  // celebration sparks
+  [[16,22],[104,30],[56,16],[112,54],[12,58]].forEach(([sx,sy], i) => {
+    if (((state.tick >> 2) + i) % 3 === 0) return;
+    drawSprite(ctx, STAR, sx, sy);
+  });
+  textCO(ctx, 'GUILD CREATED!', 65, 34, 'gold1', 2, true);
+  textCO(ctx, GUILD_NAME, 65, 52, 'silver1');
+  textCO(ctx, 'YOUR INVITE CODE', 65, 66, 'sky_mid');
+  codeBoxes(ctx, 74, CODE, true);
+  paraC(ctx, 'SEND IT TO YOUR CREW. THEY ENTER IT AND FIGHT BESIDE YOU ALL WEEK.', 65, 102, 'sky_light', 112);
+  const shareFace = (c2, x, y, w, h) => {
+    const tw = 7 + 3 + textWidth('SHARE CODE', 2);
+    const lx = x + Math.round((w - tw)/2);
+    drawSprite(ctx, ARROW_UP, lx, y + Math.round((h - 8)/2), { A:'gold0', L:'gold1' });
+    engrave(c2, 'SHARE CODE', lx + 10, y + Math.round((h - 10)/2), AU, 2);
+  };
+  btn('sharecode', 15, 128, 100, 22, AU, { draw: shareFace }, () => showToast('SHARE SHEET OPENS HERE'));
+  btn('skipshare', 25, 158, 80, 16, AG, { text:'SKIP FOR NOW' }, () => go(10));
+  paraC(ctx, 'SHARING CAN WAIT - YOUR CODE LIVES ON THE GUILD BOARD TOO.', 65, 186, 'sky_mid', 108);
+}
+
+// one renderer for JOIN + CONFIRM + the three error states
+function rJoin(variant){
+  scrim(.72);
+  wordmark();
+  textCO(ctx, 'ENTER YOUR CODE', 65, 28, 'white', 2, true);
+  textCO(ctx, '6 LETTERS FROM YOUR FRIEND', 65, 46, 'sky_light');
+  const caretOn = (state.tick % 10) < 5;
+  if (variant === 'entry'){
+    codeBoxes(ctx, 60, '7KDQ', false, 4, caretOn);
+    textCO(ctx, 'TYPE ANY CASE - WE UPPERCASE IT.', 65, 92, 'sky_mid');
+    btnDisabled(20, 112, 90, 18, 'CHECK CODE');
+    textCO(ctx, 'ENTER ALL 6 CHARACTERS FIRST', 65, 138, 'sky_mid');
+    link('startown', "NO CODE? START A GUILD", 65, 166, () => go(3));
+    return;
+  }
+  if (variant === 'confirm'){
+    codeBoxes(ctx, 60, CODE, false);
+    const well = hifiPanel(ctx, 8, 100, 114, 138, T8, 'CODE FOUND!');
+    textCO(ctx, 'TEAM SOFIA', 65, 122, 'gold1', 2);
+    const PS = 20, G2 = 3, members = ['mage','archer','medic'];
+    const x0 = Math.round((ART_W - (4*PS + 3*G2)) / 2);
+    members.forEach((k, i) =>
+      hifiPortrait(ctx, x0 + i*(PS+G2), 138, PS, AG, 'night_wd', IMGS[k], PORTRAIT_CROPS[k]));
+    {  // the empty "+ you" slot
+      const sx = x0 + 3*(PS+G2);
+      const w2 = hifiFrameSlim(ctx, sx, 138, PS, PS, 5, AG, 'night_wd');
+      const cx0 = w2.wx + Math.floor((w2.ww - 6)/2), cy0 = w2.wy + Math.floor((w2.wh - 6)/2);
+      px(ctx, cx0, cy0 + 2, 6, 2, 'gold1'); px(ctx, cx0 + 2, cy0, 2, 6, 'gold1');
+    }
+    textCO(ctx, '3 HEROES FIGHT BESIDE YOU.', 65, 164, 'silver1');
+    textCO(ctx, '3 OF 8 SPOTS FILLED', 65, 174, 'sky_mid');
+    btn('joinguild', well.wx + 6, 188, 90, 18, AU, { text:'JOIN TEAM SOFIA' }, () => go(10));
+    btn('notthis', well.wx + 16, 212, 70, 14, AG, { text:'NOT THIS ONE' }, () => go(5));
+    return;
+  }
+  if (variant === 'notfound'){
+    codeBoxes(ctx, 60, '7KDQ4X', false);
+    let y = paraC(ctx, 'HMM - NO GUILD WEARS THAT CODE.', 65, 92, 'yellow_light', 112);
+    paraC(ctx, 'CHECK IT WITH YOUR FRIEND AND TRY AGAIN.', 65, y, 'sky_light', 112);
+    btn('recheck', 20, 124, 90, 18, AU, { text:'CHECK CODE' }, () => showToast('RE-CHECKING...'));
+    link('startown2', "OR START A GUILD INSTEAD", 65, 156, () => go(3));
+    return;
+  }
+  if (variant === 'full'){
+    codeBoxes(ctx, 60, CODE, false);
+    let y = paraC(ctx, 'TEAM SOFIA IS FULL - 8 HEROES STRONG.', 65, 92, 'yellow_light', 112);
+    paraC(ctx, 'YOUR CODE WAS RIGHT. THE BENCH IS JUST OUT OF SEATS.', 65, y, 'sky_light', 112);
+    btn('foundinstead', 12, 132, 106, 20, AU, { text:'START MY OWN GUILD' }, () => go(3));
+    btn('tryanother', 25, 158, 80, 15, AG, { text:'TRY ANOTHER CODE' }, () => go(5));
+    return;
+  }
+  // already_member
+  codeBoxes(ctx, 60, CODE, false);
+  let y = paraC(ctx, "YOU'RE ALREADY IN TEAM SOFIA!", 65, 92, 'gold1', 112);
+  paraC(ctx, 'NO CODE NEEDED - WELCOME HOME.', 65, y, 'sky_light', 112);
+  btn('gohome', 20, 126, 90, 20, AU, { text:'GO TO BATTLE', scale:1 }, () => go(13));
+}
+
+function rHealth(dim){
+  scrim(.72);
+  wordmark();
+  drawPixelRing(ctx, 65, 38, 16, 13, .78, 'gold2', 'night_w');
+  drawSprite(ctx, scaleSprite(HEART, 2), 58, 32);
+  textCO(ctx, 'FUEL YOUR HERO', 65, 62, 'white', 2, true);
+  let y = paraC(ctx, 'YOUR HERO FIGHTS WITH YOUR REAL STEPS.', 65, 82, 'silver1', 112);
+  y = paraC(ctx, "STRIDE QUEST ASKS APPLE HEALTH FOR YOUR STEP COUNT. THAT'S ALL IT EVER READS.", 65, y + 4, 'sky_light', 112);
+  paraC(ctx, 'STEPS BECOME ENERGY. ENERGY WINS THE WEEK.', 65, y + 4, 'sky_light', 112);
+  btn('connect', 13, 162, 104, 20, AU, { text:'CONNECT APPLE HEALTH' }, () => go(11));
+  btn('later', 25, 188, 80, 16, AG, { text:'MAYBE LATER' }, () => go(13));
+  paraC(ctx, 'LATER IS FINE - YOUR HERO STARTS WITH A FULL 24-HOUR TANK.', 65, 212, 'sky_mid', 108);
+  if (dim){ ctx.fillStyle = 'rgba(8,10,16,.62)'; ctx.fillRect(0, 0, 130, ART_H); }
+}
+
+function rPermission(){
+  rHealth(true);
+  const well = hifiPanel(ctx, 10, 92, 110, 116, T_SHEET, 'HEALTH ACCESS');
+  textCO(ctx, 'STRIDE QUEST WANTS TO', 65, 112, 'slate1');
+  textCO(ctx, 'READ YOUR STEP COUNT.', 65, 121, 'slate1');
+  textCO(ctx, 'STEPS - READ ONLY', 65, 135, 'slate3');
+  btn('deny',  well.wx + 1, 150, 52, 18, ASL, { text:"DON'T ALLOW" }, () => go(13));
+  btn('allow', well.wx + 56, 150, 42, 18, AU, { text:'ALLOW' }, () => go(12));
+  px(ctx, well.wx + 4, 176, well.ww - 8, 1, ASL.out);
+  textCO(ctx, 'IOS SYSTEM SHEET - MOCK', 65, 184, 'slate3');
+}
+
+function rSync(){
+  scrim(.6);
+  wordmark();
+  // floating gold chip bobs above the hero <img> (which rides at z150)
+  const bob = [0,1,2,1][(state.tick >> 1) % 4];
+  hifiChip(ctx, 65 - Math.round((textWidth('+' + STEPS_TODAY) + 10)/2), 20 + bob, '+' + STEPS_TODAY, AU, RAMP_GOLD);
+  textCO(ctx, '+' + STEPS_TODAY + ' STEPS', 65, 92, 'gold1', 2, true);
+  textCO(ctx, 'ALREADY WALKED TODAY.', 65, 110, 'sky_light');
+  textCO(ctx, 'YOUR HERO FELT THAT.', 65, 122, 'white');
+  const fill = Math.min(.62, (state.tick - state.enter) * .02);
+  hifiBar(ctx, 15, 136, 100, 14, T8, { value: fill, slim: true, label: 'ENERGY ' + STEPS_TODAY });
+  btn('tobattle', 20, 166, 90, 20, AU, { text:'TO BATTLE!', scale:2 }, () => go(13));
+  paraC(ctx, 'STEPS KEEP SYNCING ON THEIR OWN FROM HERE.', 65, 202, 'sky_mid', 108);
+}
+
+function rBattle(){
+  // top legibility band, stepped falloff (no hard edge)
+  ctx.fillStyle = 'rgba(8,6,10,.5)'; ctx.fillRect(0, 0, 130, 40);
+  ctx.fillStyle = 'rgba(8,6,10,.3)'; ctx.fillRect(0, 40, 130, 4);
+  ctx.fillStyle = 'rgba(8,6,10,.15)'; ctx.fillRect(0, 44, 130, 4);
+  textCO(ctx, 'THE SLOTH TYRANT', 65, 4, 'gold1');
+  textCO(ctx, 'WEEKLY BOSS - TIER 1', 65, 13, 'sky_light');
+  // boss HP: gold hierarchy bar; ATTACK feeds it
+  const d = state.bossHp - state.bossDisp;
+  state.bossDisp = Math.abs(d) < 900 ? state.bossHp : state.bossDisp + d * .2;
+  if (state.flash > 0) state.flash--;
+  const fmt = n => Math.round(n).toLocaleString('en-US');
+  hifiBar(ctx, 6, 22, 118, 18, T8,
+    { value: state.bossDisp / state.bossMax, flash: state.flash,
+      label: fmt(state.bossDisp) + ' / ' + fmt(state.bossMax) });
+  hifiChip(ctx, 6, 46, 'CONNECT HEALTH', AG, RAMP_SKY);   // calm chip (only if Health skipped)
+  hifiBanner(ctx, 8, 106, 114, AU, 'THE SLOTH TYRANT AWAKENS!');
+  textCO(ctx, 'YOUR GUILD HAS UNTIL', 65, 134, 'white');
+  textCO(ctx, 'SUNDAY NIGHT.', 65, 143, 'white');
+  // first-deploy hint: pulsing bubble pointing at ATTACK (first strike crits)
+  const bob = [0,0,1,1][(state.tick >> 1) % 4];
+  const pw = popDown(ctx, 13, 190 + bob, 104, 26, 52);
+  textCO(ctx, 'YOUR STEPS ARE LOADED.', 65, pw.wy + 3 + bob, 'silver1');
+  textCO(ctx, 'FIRST STRIKE CRITS!', 65, pw.wy + 12 + bob, 'gold1');
+  // ATTACK — gold, highest hierarchy (battlefield-ui recipe)
+  const face = (c2, x, y, w, h) => {
+    const stackH = 11 + 2 + 7, top = y + Math.round((h - stackH)/2);
+    drawSprite(c2, CROSSED_SWORDS, x + Math.round((w - 11)/2), top);
+    const lw = 8 + 2 + textWidth(STEPS_TODAY);
+    const lx = x + Math.round((w - lw)/2);
+    drawSprite(c2, GEM, lx, top + 13);
+    drawText(c2, STEPS_TODAY, lx + 10, top + 14, 'white');
+  };
+  btn('attack', 37, 226, 56, 34, AU, { draw: face }, () => {
+    if (state.bossHp <= 0) return;
+    state.bossHp = Math.max(0, state.bossHp - 9664);
+    state.flash = 10;
+    state.floats.push({ txt: '-9,664 CRIT!', y: 60, life: 14 });
+  });
+  // floating damage numbers
+  state.floats = state.floats.filter(f => f.life-- > 0);
+  state.floats.forEach(f => { textCO(ctx, f.txt, 65, f.y, 'gold1', 2, true); f.y -= 2; });
+}
+
+const RENDER = [
+  rTitle, rHero, rGuild, rCreate, rCode,
+  () => rJoin('entry'), () => rJoin('confirm'),
+  () => rJoin('notfound'), () => rJoin('full'), () => rJoin('member'),
+  () => rHealth(false), rPermission, rSync, rBattle,
+];
+
+/* ------------------------------ loop + input ------------------------------ */
+function render(){
+  hits = [];
+  ctx.clearRect(0, 0, 130, ART_H);
+  RENDER[state.beat]();
+  drawToast();
+}
+setInterval(() => { state.tick++; animateActors(); render(); }, 100);
+
+function go(n){
+  state.beat = Math.max(0, Math.min(BEATS.length - 1, n));
+  state.enter = state.tick;
+  state.toast = null; state.floats = [];
+  applyScene();
+  document.querySelectorAll('#chips .chip').forEach((el, i) =>
+    el.classList.toggle('on', i === state.beat));
+  document.getElementById('cap').innerHTML = BEATS[state.beat].cap;
+  render();
+}
+window.go = go;   // playwright / console hook
+
+cv.addEventListener('pointerdown', e => {
+  const r = cv.getBoundingClientRect();
+  const ax = (e.clientX - r.left) / (r.width / ART_W);
+  const ay = (e.clientY - r.top) / (r.height / ART_H);
+  for (let i = hits.length - 1; i >= 0; i--){
+    const h = hits[i];
+    if (ax >= h.x && ax < h.x + h.w && ay >= h.y && ay < h.y + h.h){
+      pressedId = h.id; render();
+      const up = () => {
+        pressedId = null;
+        window.removeEventListener('pointerup', up);
+        h.cb();
+      };
+      window.addEventListener('pointerup', up);
+      return;
+    }
+  }
+});
+
+/* ------------------------------ page controls ----------------------------- */
+const chipsEl = document.getElementById('chips');
+BEATS.forEach((b, i) => {
+  const el = document.createElement('button');
+  el.className = 'chip';
+  el.textContent = i + ' ' + b.id;
+  el.onclick = () => go(i);
+  chipsEl.appendChild(el);
+});
+document.getElementById('back').onclick = () => go(state.beat - 1);
+document.getElementById('next').onclick = () => go(state.beat + 1);
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') go(state.beat + 1);
+  if (e.key === 'ArrowLeft')  go(state.beat - 1);
+});
+go(0);
+</script>
+</body>
+</html>
