@@ -143,22 +143,38 @@ window.FXEngine = (function () {
     step();
 
     // Drifting "z" particles while resting — the kneel pose alone reads subtle,
-    // so the z's carry the "asleep at the wheel" legibility. Pure DOM overlay
-    // (same recipe as damage numbers): no art regeneration, stops on wake.
+    // so the z's carry the "asleep" legibility. PIXEL z's: a 5x5-block glyph
+    // with a 1px pixel drop-shadow drawn on a tiny canvas and scaled up crisp —
+    // grid-pure like the sprites, no fonts, no art regeneration. Stops on wake.
     let zzzTimer = null;
+    function makeZCanvas(scale) {
+      const c = document.createElement('canvas');
+      c.width = 6; c.height = 6;                 // 5x5 glyph + 1px shadow offset
+      const ctx = c.getContext('2d');
+      const glyph = (ox, oy, color) => {         // classic Z: bar, diagonal, bar
+        ctx.fillStyle = color;
+        ctx.fillRect(ox, oy, 5, 1);
+        ctx.fillRect(ox + 3, oy + 1, 1, 1);
+        ctx.fillRect(ox + 2, oy + 2, 1, 1);
+        ctx.fillRect(ox + 1, oy + 3, 1, 1);
+        ctx.fillRect(ox, oy + 4, 5, 1);
+      };
+      glyph(1, 1, 'rgba(0,0,0,.55)');
+      glyph(0, 0, '#cfd6e4');
+      return c;
+    }
     function spawnZ() {
       const r = img.getBoundingClientRect();
-      const z = document.createElement('div');
-      z.textContent = 'z';
-      const size = 13 + Math.floor(Math.random() * 7);
+      const scale = 2 + Math.floor(Math.random() * 2);   // 12px or 18px on screen
+      const z = makeZCanvas(scale);
       const x = r.left + r.width * (0.50 + Math.random() * 0.14);
       const y = r.top + r.height * 0.30;
       z.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:60;pointer-events:none;
-        font-weight:800;font-size:${size}px;color:#cfd6e4;text-shadow:0 1px 2px #000;opacity:0;
+        width:${6 * scale}px;height:${6 * scale}px;image-rendering:pixelated;opacity:0;
         transition:transform 2.2s ease-out,opacity .6s ease-in;`;
       (api.layer || document.body).appendChild(z);
       requestAnimationFrame(() => {
-        z.style.opacity = '.85';
+        z.style.opacity = '.9';
         z.style.transform = `translate(${8 + Math.random() * 10}px,-34px)`;
       });
       setTimeout(() => { z.style.opacity = '0'; }, 1400);
