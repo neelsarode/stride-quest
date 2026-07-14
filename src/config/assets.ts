@@ -131,7 +131,25 @@ export function animationDirRelPath(
   return `characters/${classKey}/${folder}/animations/${type}`;
 }
 
-/** Class accent color (defaults to warrior for the MVP). */
-export function classAccent(_classKey: ClassKey): string {
-  return PALETTE.warrior;
+/** Per-class accent colors (STR-46; comp beat HERO — the stage plate shifts
+ *  with each pick). Hexes transcribed from the approved onboarding comp's
+ *  ui-kit ramps (amethyst1/green_light/elder1/ember1/gold1/ghoul_light/
+ *  yellow_light), EXCEPT warrior: the comp's sky_light (#e9f4ff) reads as
+ *  plain white on the app's dark bg, so warrior keeps the established steel
+ *  blue (PALETTE.warrior). Partial so a 9th registry class renders with the
+ *  gold fallback before its accent is chosen. */
+export const CLASS_ACCENTS: Partial<Record<ClassKey, string>> = {
+  warrior: PALETTE.warrior,
+  mage: "#dfb8ff", // amethyst
+  medic: "#9ae06b", // healing green
+  archer: "#c4e07e", // elder leaf
+  assassin: "#ffb15c", // ember
+  paladin: "#ffe9a0", // radiant gold
+  warlock: "#a9f4c9", // ghoul glow
+  bard: "#ffe08a", // limelight yellow
+};
+
+/** Class accent color (gold fallback for classes without one yet). */
+export function classAccent(classKey: ClassKey): string {
+  return CLASS_ACCENTS[classKey] ?? PALETTE.accent;
 }
