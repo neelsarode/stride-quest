@@ -30,7 +30,14 @@ export type FeedbackEvent =
   | { type: "overdriveEnded" }
   // A server-side rejection with a friendly ConvexError message (rally daily
   // limit, uncharged overdrive, …). Always a calm info toast, never red.
-  | { type: "actionRejected"; message: string };
+  | { type: "actionRejected"; message: string }
+  // --- M1 fuel hybrid (STR-15) ---
+  // A teammate's rally landed in YOUR tank — the welcome-back celebration,
+  // named after the sender (the nudge comes from a friend, not the app).
+  | { type: "rallyReceived"; senderName: string; hours: number }
+  // You sent one — make the giver feel generous (toast, quieter than the
+  // receiver's banner).
+  | { type: "rallySent"; receiverName: string; hours: number };
 
 /** Mirror of the server's FuelState (convex/fuelMath.ts) — duplicated here so
  *  the feedback contract stays free of backend imports. */

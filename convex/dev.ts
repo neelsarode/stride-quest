@@ -535,6 +535,46 @@ export const simulateTeammateRally = mutation({
   },
 });
 
+/** Drain a SIMULATED teammate's tank to N nominal battling-hours (default 0 →
+ *  Resting; ≤6 → Winded), so the STR-15 "Send Rally" affordance is exercisable
+ *  in the browser: a drained bot shows up in rally.eligibleTeammates exactly
+ *  like a tired friend would. Settle-before-change invariant held (same shape
+ *  as setFuelHours): the bot's elapsed window banks its idle damage honestly
+ *  before the tank is teleported. */
+export const drainTeammate = mutation({
+  args: { userId: v.id("users"), hours: v.optional(v.number()) },
+  handler: async (ctx, { userId, hours }) => {
+    assertDevEnabled();
+    const bot = await ctx.db.get(userId);
+    if (!bot?.isSimulated) {
+      throw new Error("Pick a simulated teammate to drain.");
+    }
+    const caller = await getAuthUserId(ctx);
+    if (caller === null) throw new Error("Not signed in.");
+    const now = await effectiveNow(ctx);
+    const ug = await getUserGroup(ctx, caller);
+    if (ug) {
+      const challenge = await ensureCurrentChallenge(ctx, ug.group);
+      if (challenge.status === "active") {
+        const progress = await ensureProgress(ctx, challenge, userId);
+        await settleFuelAndIdle(
+          ctx,
+          userId,
+          progress,
+          now,
+          challenge.boostMult ?? 1,
+        );
+        await resolveBoss(ctx, challenge._id);
+      } else {
+        await settleFuel(ctx, userId, now);
+      }
+    } else {
+      await settleFuel(ctx, userId, now);
+    }
+    await ctx.db.patch(userId, { fuel: fuelForBattlingHours(hours ?? 0) });
+  },
+});
+
 /** Put one Streak Shield in the caller's pocket, through the same cap rule real
  *  earning uses (max 2 — overflow is lost). Ledger earning settles first so the
  *  grant stacks on the true pocket. */

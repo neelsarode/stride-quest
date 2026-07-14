@@ -97,6 +97,9 @@ export const BANNER = {
   backInFight: { bg: "#12331f", fg: PALETTE.good, icon: "⚔" },
   // Overdrive pop (STR-14): the player-chosen fever moment — loud and purple.
   overdrive: { bg: "#2a1140", fg: PALETTE.overdrive, icon: "⚡" },
+  // A friend's rally arrived (STR-15): the welcome-back celebration — warm
+  // energy cyan, named after the SENDER (peer nudge > app nudge, spec §5).
+  rallyReceived: { bg: "#0a2c38", fg: PALETTE.energy, icon: "📣" },
 } as const;
 
 /** Teaching-layer tuning (STR-49). Contextual first-session moments — all

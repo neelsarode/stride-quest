@@ -48,6 +48,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const setFuelHours = useMutation(api.dev.setFuelHours);
   const fillOverdrive = useMutation(api.dev.fillOverdrive);
   const simRally = useMutation(api.dev.simulateTeammateRally);
+  const drainTeammate = useMutation(api.dev.drainTeammate);
   const grantShield = useMutation(api.dev.grantShield);
   const consumeShield = useMutation(api.dev.consumeShield);
   // The REAL activation mutation (what STR-14's button will call) — exposed
@@ -216,6 +217,14 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
                   <Btn
                     label="📣 Rally me"
                     onPress={run(() => simRally({ giverId: tm.userId }))}
+                    busy={busy}
+                  />
+                  {/* Drain THE BOT to Resting (STR-15): makes it eligible for
+                      MY rally, so the real Send Rally path on the guild board
+                      is exercisable end-to-end in the browser. */}
+                  <Btn
+                    label="💤 Drain"
+                    onPress={run(() => drainTeammate({ userId: tm.userId }))}
                     busy={busy}
                   />
                 </View>

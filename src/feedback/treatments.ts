@@ -137,5 +137,25 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
     case "actionRejected":
       // Friendly server rejections (ConvexError messages). Calm, never red.
       return { toast: { message: e.message, tone: "info" } };
+    // --- M1 fuel hybrid (STR-15) ---
+    case "rallyReceived":
+      // The welcome-back moment: a FRIEND woke you, by name — celebratory,
+      // never guilt-flavored (spec §5 design intent).
+      juice.haptic("success");
+      return {
+        banner: {
+          variant: "rallyReceived",
+          title: `${e.senderName.toUpperCase()} RALLIED YOU!`,
+          subtitle: `+${e.hours} hours of fight time — welcome back to the front.`,
+        },
+      };
+    case "rallySent":
+      // The giver's glow: generous, quieter than the receiver's banner.
+      return {
+        toast: {
+          message: `Rally sent — ${e.receiverName} fights on with ${e.hours} more hours. That was generous.`,
+          tone: "good",
+        },
+      };
   }
 }

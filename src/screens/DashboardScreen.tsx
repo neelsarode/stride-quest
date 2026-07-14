@@ -14,7 +14,6 @@ import {
   View,
 } from "react-native";
 import { useMutation, useQuery } from "convex/react";
-import { ConvexError } from "convex/values";
 import { api } from "../../convex/_generated/api";
 import {
   HERO_STATE_STYLE,
@@ -34,6 +33,7 @@ import { DevPanel } from "../components/DevPanel";
 import { useGameEvents } from "../feedback/useGameEvents";
 import { useTeammateDamage } from "../feedback/useTeammateDamage";
 import { useFeedback } from "../feedback/FeedbackProvider";
+import { friendlyError } from "../feedback/errors";
 import { usePendingIdle } from "../usePendingIdle";
 import { HealthPermissionScreen } from "./onboarding/HealthPermissionScreen";
 import {
@@ -48,6 +48,7 @@ export function DashboardScreen() {
   const deployMut = useMutation(api.combat.deploy);
   const collectIdleMut = useMutation(api.combat.collectIdle);
   const activateOverdriveMut = useMutation(api.overdrive.activateOverdrive);
+  const markRalliesSeenMut = useMutation(api.rally.markRalliesSeen);
   const { emit } = useFeedback();
 
   const [busy, setBusy] = useState(false);
@@ -82,6 +83,28 @@ export function DashboardScreen() {
       })
       .catch(() => {});
   }, [collectIdleMut, emit, data]);
+
+  // Received-rally celebration (STR-15): every unseen rally plays ONCE — a
+  // banner naming the SENDER (the nudge comes from a friend, not the app) —
+  // then the batch is acknowledged server-side. The played-set guards the
+  // reactive window between the emit and markRalliesSeen's write landing.
+  const playedRallies = useRef(new Set<string>());
+  const unseenRallies = data?.rally.unseen;
+  useEffect(() => {
+    if (!unseenRallies || unseenRallies.length === 0) return;
+    let sawNew = false;
+    for (const r of unseenRallies) {
+      if (playedRallies.current.has(r.rallyId)) continue;
+      playedRallies.current.add(r.rallyId);
+      sawNew = true;
+      emit({
+        type: "rallyReceived",
+        senderName: r.senderName,
+        hours: Math.round(r.hours),
+      });
+    }
+    if (sawNew) markRalliesSeenMut({}).catch(() => {});
+  }, [unseenRallies, emit, markRalliesSeenMut]);
 
   // Teaching layer (STR-49): the boss-arrival banner frames the week on the
   // FIRST post-onboarding render — keyed off the onboardedAt stamp's
@@ -390,8 +413,8 @@ export function DashboardScreen() {
         </View>
       </View>
 
-      {/* Guild (co-op roster + recognition) */}
-      {overview ? <GuildBoard overview={overview} /> : null}
+      {/* Guild (co-op roster + recognition + the STR-15 rally surface) */}
+      {overview ? <GuildBoard overview={overview} rally={data.rally} /> : null}
 
       {/* Steps */}
       <View style={styles.card}>
@@ -419,18 +442,6 @@ export function DashboardScreen() {
 }
 
 // --- small presentational helpers --------------------------------------------
-
-/** Friendly message from a server rejection: ConvexError carries a structured
- *  {code, message} written for players (the STR-44/53 pattern); anything else
- *  falls back to a generic line rather than leaking an internal error string. */
-function friendlyError(e: unknown): string {
-  if (e instanceof ConvexError) {
-    const data = e.data as { message?: string } | string;
-    const msg = typeof data === "string" ? data : data?.message;
-    if (msg) return msg;
-  }
-  return "That didn't go through — give it another try in a moment.";
-}
 
 // Fuel time formatting (STR-13): the tank speaks in REAL fight time
 // (hoursToEmpty already stretches the winded tail). Compact form for the gauge
