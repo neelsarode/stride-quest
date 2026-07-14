@@ -75,6 +75,24 @@ export const BANNER = {
   jobUp: { bg: "#2b2140", fg: PALETTE.accent, icon: "⬆" },
   goalHit: { bg: "#12331f", fg: PALETTE.good, icon: "✔" },
   bossDefeated: { bg: "#3a1d20", fg: PALETTE.hp, icon: "☠" },
+  // M2.5 teaching layer (STR-49): the week-framing arrival banner and the
+  // joiner's welcome. Cozy, never punitive — no red (binding guardrail).
+  bossAppears: { bg: "#241f33", fg: PALETTE.accent, icon: "⚔" },
+  guildJoined: { bg: "#13293a", fg: PALETTE.energy, icon: "🤝" },
+} as const;
+
+/** Teaching-layer tuning (STR-49). Contextual first-session moments — all
+ *  keyed by SERVER state (never localStorage), so they fire once per account
+ *  across devices. */
+export const TEACHING = {
+  /** bossAppears fires when the dashboard renders within this window after
+   *  the completeOnboarding stamp — "the first post-onboarding render",
+   *  generous enough for a slow first load, tight enough that tomorrow's
+   *  app-open stays quiet. */
+  bossAppearsFreshMs: 2 * 60_000,
+  /** First-deploy hint pulse (gentle: small scale swell, slow). */
+  deployHintPulseScale: 1.04,
+  deployHintPulseMs: 700,
 } as const;
 
 /** Swap-in switches for real juice. All OFF now (placeholder feedback only).

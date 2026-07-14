@@ -55,6 +55,11 @@ export default defineSchema({
     // HEALTH chip (never red, never a badge). Server state, so the chip stays
     // consistent across devices.
     healthKitConnectedAt: v.optional(v.number()),
+    // Stamped by the first idle collect that banked damage (>0) — keys the
+    // one-time "Your hero never stops." teaching suffix (STR-49, spec
+    // §Teaching Layer). First-time-only BY SERVER STATE, never localStorage,
+    // so the moment fires exactly once across devices/reinstalls.
+    firstIdleCollectedAt: v.optional(v.number()),
 
     // --- Phase 2 account-level meta (PERSISTS across weekly resets) ---
     // Energy is DERIVED: balance = energyEarned(ledger) − energySpent. We store

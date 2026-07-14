@@ -15,8 +15,8 @@ import {
 } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { PALETTE, SIZES, classAccent } from "../config/assets";
-import { DAILY_STEP_GOAL } from "../../convex/gameConfig";
+import { PALETTE, SIZES, TEACHING, classAccent } from "../config/assets";
+import { CLASSES, DAILY_STEP_GOAL } from "../../convex/gameConfig";
 import { DEV_FLAGS } from "../devConfig";
 import { AnimatedHPBar } from "../components/AnimatedHPBar";
 import { AnimatedMeter } from "../components/AnimatedMeter";
@@ -57,17 +57,37 @@ export function DashboardScreen() {
   const overview = useQuery(api.guild.overview, {});
   useTeammateDamage(overview?.members);
 
-  // Auto-collect idle once on open ("while you were away…").
+  // Auto-collect idle once on open ("while you were away…"). The snapshot in
+  // this closure is the PRE-collect one, so hasEverCollectedIdle still says
+  // whether this is the account's first payout — the one-time "Your hero
+  // never stops." teaching suffix (STR-49; server state, never localStorage).
   const didCollect = useRef(false);
   useEffect(() => {
     if (didCollect.current || !data) return;
     didCollect.current = true;
+    const firstTime = !data.hasEverCollectedIdle;
     collectIdleMut({})
       .then((r) => {
-        if (r && r.collected > 0) emit({ type: "idleCollected", amount: r.collected });
+        if (r && r.collected > 0)
+          emit({ type: "idleCollected", amount: r.collected, firstTime });
       })
       .catch(() => {});
   }, [collectIdleMut, emit, data]);
+
+  // Teaching layer (STR-49): the boss-arrival banner frames the week on the
+  // FIRST post-onboarding render — keyed off the onboardedAt stamp's
+  // freshness (the stamp lands seconds before this screen mounts), so
+  // tomorrow's app-open stays quiet. Once per mount, only while the boss is
+  // actually up.
+  const didBossAppears = useRef(false);
+  useEffect(() => {
+    if (didBossAppears.current || !data?.boss || data.boss.defeated) return;
+    const onboardedAt = data.player.onboardedAt;
+    if (onboardedAt == null) return;
+    if (Date.now() - onboardedAt > TEACHING.bossAppearsFreshMs) return;
+    didBossAppears.current = true;
+    emit({ type: "bossAppears", bossName: data.boss.name });
+  }, [data, emit]);
 
   async function onDeploy() {
     setBusy(true);
@@ -154,7 +174,10 @@ export function DashboardScreen() {
   const jobProgress = m.jobXp - m.jobThreshold;
   const jobSpan = m.nextJobThreshold != null ? m.nextJobThreshold - m.jobThreshold : 1;
   const jobMaxed = m.nextJobThreshold == null;
-  const accent = classAccent("warrior");
+  // Registry-driven, off the VIEWER'S class (STR-49 nit): a Mage sees MAGE in
+  // mage colors — never a hardcoded warrior. Server falls back to MVP_CLASS
+  // for class-less accounts, so classKey is always a valid registry key.
+  const accent = classAccent(player.classKey);
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -178,7 +201,9 @@ export function DashboardScreen() {
       <View style={styles.card}>
         <View style={styles.playerRow}>
           <View style={[styles.sprite, { borderColor: accent }]}>
-            <Text style={[styles.spriteLabel, { color: accent }]}>WARRIOR</Text>
+            <Text style={[styles.spriteLabel, { color: accent }]}>
+              {CLASSES[player.classKey].displayName.toUpperCase()}
+            </Text>
             <Text style={styles.spriteSub}>{player.jobName}</Text>
             <Text style={styles.spriteTag}>[sprite]</Text>
           </View>
@@ -253,6 +278,10 @@ export function DashboardScreen() {
           streakCount={streak.count}
           streakMult={streak.multiplier}
           disabled={busy || m.energy <= 0 || !bossActive}
+          // First-deploy hint (STR-49): pulses while there's something to
+          // deploy and this account has NEVER deployed. lastDeployDate is
+          // server truth, so one deploy silences it forever, on every device.
+          firstDeployHint={m.energy > 0 && !data.hasEverDeployed && bossActive}
           onDeploy={onDeploy}
         />
       </View>

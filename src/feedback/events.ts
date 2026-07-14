@@ -5,6 +5,15 @@
 export type FeedbackEvent =
   | { type: "damageDealt"; amount: number; source: "deploy" | "idle" | "teammate"; crit?: boolean }
   | { type: "jobUp"; from: number; to: number; jobName: string }
-  | { type: "idleCollected"; amount: number }
+  // firstTime (STR-49 teaching layer): the account's FIRST idle collect that
+  // banked damage — the toast gains the one-time "Your hero never stops."
+  // suffix. Keyed by server state (dashboard.hasEverCollectedIdle).
+  | { type: "idleCollected"; amount: number; firstTime?: boolean }
   | { type: "goalHit"; steps: number; goal: number }
-  | { type: "bossDefeated"; bossName: string };
+  | { type: "bossDefeated"; bossName: string }
+  // --- M2.5 teaching layer (STR-49, spec §Teaching Layer) ---
+  // First post-onboarding render: frame the week ("…until Sunday night").
+  | { type: "bossAppears"; bossName: string }
+  // A joiner landed in a friend's guild (the founder path stays quiet — the
+  // code reveal IS that moment). memberCount = the guild size including them.
+  | { type: "guildJoined"; guildName: string; memberCount: number };

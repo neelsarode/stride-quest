@@ -235,6 +235,15 @@ export const collectIdle = mutation({
       now,
       challenge.boostMult ?? 1,
     );
+    // First idle collect that actually banked damage → one-shot stamp (STR-49
+    // teaching layer: keys the "Your hero never stops." suffix, which
+    // self-defers to session 2 because day-1 pending idle is 0 by design).
+    if (collected > 0) {
+      const user = await ctx.db.get(userId);
+      if (user && user.firstIdleCollectedAt === undefined) {
+        await ctx.db.patch(userId, { firstIdleCollectedAt: Date.now() });
+      }
+    }
     if (challenge.status === "active") {
       await resolveBoss(ctx, challenge._id);
     }

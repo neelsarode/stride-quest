@@ -38,7 +38,15 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
     case "idleCollected":
       return {
         floating: { text: `+${n(e.amount)}`, color: FEEDBACK.idleColor, size: FEEDBACK.floatNumberSize },
-        toast: { message: `While you were away: +${n(e.amount)} damage`, tone: "good" },
+        toast: {
+          // First-time suffix (STR-49): teach the idle loop exactly once, at
+          // the moment it first pays out (self-defers to session 2 — day-1
+          // pending idle is 0 by design).
+          message: e.firstTime
+            ? `While you were away: +${n(e.amount)} damage. Your hero never stops.`
+            : `While you were away: +${n(e.amount)} damage`,
+          tone: "good",
+        },
       };
     case "jobUp":
       juice.haptic("success");
@@ -50,5 +58,26 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
       juice.haptic("success");
       juice.screenShake(16);
       return { banner: { variant: "bossDefeated", title: `${e.bossName} FALLS`, subtitle: "Victory!" } };
+    // --- M2.5 teaching layer (STR-49) ---
+    case "bossAppears":
+      // Frame the week on the first post-onboarding render (spec Beat 4:
+      // "THE SLOTH TYRANT — your guild has until Sunday night.").
+      return {
+        banner: {
+          variant: "bossAppears",
+          title: e.bossName.toUpperCase(),
+          subtitle: "Your guild has until Sunday night.",
+        },
+      };
+    case "guildJoined":
+      // The joiner's welcome ("You're in — Team Sofia grows to 4.").
+      juice.haptic("success");
+      return {
+        banner: {
+          variant: "guildJoined",
+          title: "YOU'RE IN!",
+          subtitle: `${e.guildName} grows to ${e.memberCount}.`,
+        },
+      };
   }
 }

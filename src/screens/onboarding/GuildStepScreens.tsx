@@ -32,6 +32,7 @@ import { ConvexError } from "convex/values";
 import { api } from "../../../convex/_generated/api";
 import { GUILD } from "../../../convex/gameConfig";
 import { PALETTE, SIZES } from "../../config/assets";
+import { useFeedback } from "../../feedback/FeedbackProvider";
 import type { Viewer } from "./OnboardingFlow";
 
 /** Mirrors guild.createGuild's validated bound. */
@@ -282,6 +283,7 @@ function JoinGuildStep({
   onDone: () => void;
 }) {
   const joinGuildByCode = useMutation(api.guild.joinGuildByCode);
+  const { emit } = useFeedback();
   const [code, setCode] = useState("");
   const [checkCode, setCheckCode] = useState<string | null>(null);
   const [err, setErr] = useState<JoinError | null>(null);
@@ -308,6 +310,18 @@ function JoinGuildStep({
     setBusy(true);
     try {
       await joinGuildByCode({ code });
+      // Teaching moment (STR-49): welcome the joiner AT the join — the banner
+      // rides the app-root feedback overlay across the remaining beats
+      // ("You're in — Team Sofia grows to 4."). Counts come from the same
+      // preview the confirm card showed (+1 = them). Founder path stays
+      // quiet: the code reveal IS its moment.
+      if (preview != null) {
+        emit({
+          type: "guildJoined",
+          guildName: preview.guildName,
+          memberCount: preview.memberCount + 1,
+        });
+      }
       onDone(); // membership landed; OnboardingFlow stamps + lands the game
     } catch (e) {
       if (e instanceof ConvexError && typeof e.data === "object" && e.data) {

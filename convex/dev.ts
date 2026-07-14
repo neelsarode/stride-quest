@@ -383,6 +383,10 @@ export const resetAccount = mutation({
       overdriveActiveUntil: undefined,
       shieldsHeld: 0,
       shieldLastEarnedWeek: undefined,
+      // One-shot teaching/health stamps (STR-48/49): a clean slate re-arms
+      // the first-collect suffix and the CONNECT HEALTH chip for re-testing.
+      healthKitConnectedAt: undefined,
+      firstIdleCollectedAt: undefined,
     });
   },
 });

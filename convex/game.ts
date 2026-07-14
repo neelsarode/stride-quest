@@ -333,10 +333,17 @@ export const dashboard = query({
       player: {
         id: user._id,
         displayName: user.displayName ?? "New Hero",
+        // The registry KEY (falls back like every class read) so the client
+        // can drive accents/sprites off CLASSES[classKey] — a Mage sees MAGE,
+        // never a hardcoded warrior (STR-49 nit).
+        classKey: user.class ?? MVP_CLASS,
         className: cls.displayName,
         jobLevel,
         jobName: cls.jobNames[jobLevel - 1],
         idleMultiplier: multiplierForJobLevel(jobLevel),
+        // Teaching layer (STR-49): the bossAppears banner fires on the first
+        // post-onboarding render, keyed off this stamp's freshness.
+        onboardedAt: user.onboardedAt ?? null,
       },
       guild: group ? { id: group._id, name: group.name } : null,
       boss: challenge
@@ -382,6 +389,9 @@ export const dashboard = query({
       // written by a deploy, so its absence means this account has never hit
       // the button — the DeployButton pulses until they do.
       hasEverDeployed: user.lastDeployDate !== undefined,
+      // First idle collect that banked damage (STR-49): keys the one-time
+      // "Your hero never stops." suffix on the idleCollected toast.
+      hasEverCollectedIdle: user.firstIdleCollectedAt !== undefined,
       shields,
       rally,
       dailyGoal,
