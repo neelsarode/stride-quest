@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — Procedural UI Forge</title>
+<!--
+  PROCEDURAL PIXEL-ART UI TEST — zero image files.
+  Every asset is drawn with fillRect on a low-res logical canvas, scaled up
+  with nearest-neighbor. Texel parity with the game sprites: heroes are 64px
+  art (~3x on screen in battlefield-ui.html), boss is 256px art (~2x).
+  Assets here are authored on that same 1px-art grid; use the 2x/3x/4x
+  switcher to compare densities.
+
+  The kit itself (palette / sprites / font / bars / panels / buttons) lives in
+  assets/ui-kit.js — shared with battlefield-ui.html. This page is the
+  gallery + acceptance test.
+-->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #14161b; color: #b9c0cf;
+    font-family: ui-monospace, Menlo, monospace; }
+  #page { max-width: 1040px; margin: 0 auto; padding: 22px 18px 60px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  section { border: 1px solid #262a33; border-radius: 6px; padding: 14px 16px 16px;
+    margin-top: 16px; background: #181b21; }
+  h2 { font-size: 11px; letter-spacing: 2px; color: #8b95a3; font-weight: 600;
+    margin: 0 0 10px; text-transform: uppercase; }
+  .cap { font-size: 10px; color: #6b7484; margin-top: 6px; letter-spacing: .5px; }
+  .row { display: flex; gap: 22px; flex-wrap: wrap; align-items: flex-end; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .controls label { font-size: 10px; color: #8b95a3; letter-spacing: 1px; }
+  button.ctl { background: #262a33; color: #cdd3de; border: 1px solid #3a4049;
+    border-radius: 4px; font: inherit; font-size: 11px; padding: 4px 10px; cursor: pointer; }
+  button.ctl:hover { background: #303540; }
+  button.ctl.on { background: #ffce6b; color: #201607; border-color: #ffce6b; font-weight: 700; }
+  input[type=range] { accent-color: #ffce6b; width: 170px; }
+  #titlewrap { display: flex; align-items: center; gap: 14px; }
+  .note { font-size: 10px; color: #6b7484; margin-top: 8px; line-height: 1.6; }
+  footer { font-size: 10px; color: #4d5563; margin-top: 26px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div id="page">
+  <div id="titlewrap"><canvas id="title"></canvas></div>
+  <div class="note">All UI below is drawn procedurally — fillRect only, no images, no gradients, no
+    anti-aliased text. Authored on the same pixel grid as the 64px heroes / 256px boss.
+    <b>3x ≈ hero density in battlefield-ui, 2x ≈ boss density.</b> Live in the game scene:
+    open <b>battlefield-ui.html</b>.</div>
+
+  <div class="controls" id="scalectl">
+    <label>SCALE</label>
+    <button class="ctl" data-s="2">2x</button>
+    <button class="ctl on" data-s="3">3x</button>
+    <button class="ctl" data-s="4">4x</button>
+  </div>
+
+  <section>
+    <h2>1 · Health bar — threshold palettes, drain + damage flash</h2>
+    <div class="row">
+      <div class="stack">
+        <canvas id="hp-live"></canvas>
+        <div class="cap">LIVE — drag / hit it. White flash on damage, pale “chip” ghost drains after.</div>
+      </div>
+      <div class="stack">
+        <canvas id="hp-static"></canvas>
+        <div class="cap">STATIC — green &gt;50%, yellow &gt;25%, red below (whole-family swap).</div>
+      </div>
+      <div class="stack">
+        <canvas id="hp-boss"></canvas>
+        <div class="cap">BOSS VARIANT — gold inner frame (gold = high-hierarchy).</div>
+      </div>
+    </div>
+    <div class="controls">
+      <label>HP</label><input type="range" id="hpSlider" min="0" max="100" value="72" />
+      <button class="ctl" id="btnDmg">-15 DMG</button>
+      <button class="ctl" id="btnHeal">+20 HEAL</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>2 · Segmented energy bar — discrete notched cells</h2>
+    <div class="row">
+      <div class="stack">
+        <canvas id="seg-main"></canvas>
+        <div class="cap">8 cells, partial-fill on the active cell.</div>
+      </div>
+      <div class="stack">
+        <canvas id="seg-small"></canvas>
+        <div class="cap">5-cell compact variant (same function, different params).</div>
+      </div>
+    </div>
+    <div class="controls">
+      <label>ENERGY</label><input type="range" id="segSlider" min="0" max="80" value="52" />
+    </div>
+  </section>
+
+  <section>
+    <h2>3 · 9-slice panel — one 12×12 patch, any size</h2>
+    <div class="row">
+      <div class="stack"><canvas id="panel-a"></canvas><div class="cap">PLAIN</div></div>
+      <div class="stack"><canvas id="panel-b"></canvas><div class="cap">TITLE-STRIP VARIANT</div></div>
+    </div>
+    <div class="controls">
+      <label>W</label><input type="range" id="panW" min="56" max="240" value="150" />
+      <label>H</label><input type="range" id="panH" min="36" max="130" value="76" />
+    </div>
+  </section>
+
+  <section>
+    <h2>4 · Buttons — idle / hover / pressed / disabled</h2>
+    <div class="row">
+      <div class="stack">
+        <canvas id="btn-states"></canvas>
+        <div class="cap">STONE = base chrome · GOLD = high-hierarchy. Pressed drops contents 1px and loses the base shadow.</div>
+      </div>
+      <div class="stack">
+        <canvas id="btn-live"></canvas>
+        <div class="cap">LIVE — mouse over / hold it.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>5 · Icon set — sprite-as-data + palette recolors</h2>
+    <div class="stack">
+      <canvas id="icons"></canvas>
+      <div class="cap">heart full/half/empty · coin · star · gem · skull · arrows (one data grid, rotated) · sword · crossed swords (sword + mirrored merge) · banner · shield</div>
+      <canvas id="icons-recolor"></canvas>
+      <div class="cap">RECOLORS — same sprite data, palette override only: frost heart, silver coin, gold gem, blinking star.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>6 · Composed HUD sample — everything together (playable)</h2>
+    <canvas id="hud"></canvas>
+    <div class="cap">COLLECT banks energy → sword button spends 1 energy per hit. Boss HP is the same
+      state as section 1. RESET revives.</div>
+  </section>
+
+  <footer>
+    Rules honored: logical-resolution canvases, nearest-neighbor integer scaling, integer coords,
+    flat 2–3 tone banding (no gradients/shadows/blur), notched corners (no arc/roundRect),
+    single named palette, 1px outlines, frame-count blink (no opacity fades).
+  </footer>
+</div>
+
+<script src="assets/ui-kit.js"></script>
+<script>
+'use strict';
+/* ========================== preview scaffolding ========================== */
+let SCALE = 3;
+const widgets = [];
+function makeWidget(id, w, h, draw){
+  const c = document.getElementById(id);
+  c.width = w; c.height = h;
+  c.style.width = (w * SCALE) + 'px';
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const wg = { c, ctx, draw };
+  widgets.push(wg);
+  return wg;
+}
+function resizeWidget(wg, w, h){
+  wg.c.width = w; wg.c.height = h;
+  wg.c.style.width = (w * SCALE) + 'px';
+  wg.ctx.imageSmoothingEnabled = false;   // canvas resize resets this
+}
+document.querySelectorAll('#scalectl .ctl').forEach(b => {
+  b.addEventListener('click', () => {
+    SCALE = +b.dataset.s;
+    document.querySelectorAll('#scalectl .ctl').forEach(x => x.classList.toggle('on', x === b));
+    widgets.forEach(wg => { wg.c.style.width = (wg.c.width * SCALE) + 'px'; });
+  });
+});
+// Map mouse events to logical pixel coords on a widget canvas.
+function logicalPos(c, e){
+  const r = c.getBoundingClientRect();
+  return { x: Math.floor((e.clientX - r.left) / (r.width / c.width)),
+           y: Math.floor((e.clientY - r.top)  / (r.height / c.height)) };
+}
+
+/* ------------------------------ title banner ----------------------------- */
+{
+  const t = 'STRIDE QUEST - UI FORGE';
+  makeWidget('title', textWidth(t) + 4, 9, ctx => {
+    drawText(ctx, t, 2, 2, 'gold_mid');
+  });
+}
+
+/* ------------------------------ 1 · HP bars ------------------------------ */
+const hpState = { target: 72, disp: 72, ghost: 72, ghostDelay: 0, flash: 0 };
+function hpDamage(n){
+  hpState.target = Math.max(0, hpState.target - n);
+  hpState.flash = 10;
+  hpState.ghostDelay = 18;
+}
+function hpHeal(n){ hpState.target = Math.min(100, hpState.target + n); }
+function hpTick(){
+  const s = hpState, d = s.target - s.disp;
+  if (Math.abs(d) < .4) s.disp = s.target;
+  else s.disp += d * .14;
+  if (s.ghost < s.disp) s.ghost = s.disp;
+  if (s.ghost > s.disp){
+    if (s.ghostDelay > 0) s.ghostDelay--;
+    else s.ghost = Math.max(s.disp, s.ghost - Math.max(.35, (s.ghost - s.disp) * .07));
+  }
+  if (s.flash > 0) s.flash--;
+  const sl = document.getElementById('hpSlider');
+  if (document.activeElement !== sl) sl.value = Math.round(s.target);
+}
+makeWidget('hp-live', 140, 20, ctx => {
+  drawHealthBar(ctx, 2, 4, 136, 12,
+    { value: hpState.disp/100, ghost: hpState.ghost/100, flash: hpState.flash });
+});
+makeWidget('hp-static', 140, 52, ctx => {
+  drawHealthBar(ctx, 2, 2,  136, 12, { value: .78 });
+  drawHealthBar(ctx, 2, 20, 136, 12, { value: .42 });
+  drawHealthBar(ctx, 2, 38, 136, 12, { value: .14 });
+});
+makeWidget('hp-boss', 140, 20, ctx => {
+  drawHealthBar(ctx, 2, 3, 136, 14,
+    { value: hpState.disp/100, ghost: hpState.ghost/100, flash: hpState.flash, gold: true });
+});
+document.getElementById('hpSlider').addEventListener('input', e => {
+  hpState.target = +e.target.value;
+});
+document.getElementById('btnDmg').addEventListener('click', () => hpDamage(15));
+document.getElementById('btnHeal').addEventListener('click', () => hpHeal(20));
+
+/* ---------------------------- 2 · segment bars --------------------------- */
+const segState = { value: 5.2 };
+makeWidget('seg-main', 140, 16, ctx => {
+  drawSegmentBar(ctx, 2, 2, { cells: 8, cellW: 15, cellH: 10, value: segState.value });
+});
+makeWidget('seg-small', 80, 12, ctx => {
+  drawSegmentBar(ctx, 2, 2, { cells: 5, cellW: 13, cellH: 6, value: segState.value * 5/8 });
+});
+document.getElementById('segSlider').addEventListener('input', e => {
+  segState.value = +e.target.value / 10;
+});
+
+/* ------------------------------- 3 · panels ------------------------------ */
+const panState = { w: 150, h: 76 };
+const panA = makeWidget('panel-a', panState.w + 4, panState.h + 4, ctx => {
+  drawPanel(ctx, 2, 2, panState.w, panState.h);
+});
+const panB = makeWidget('panel-b', panState.w + 4, panState.h + 4, ctx => {
+  drawPanel(ctx, 2, 2, panState.w, panState.h, { title: 'QUEST LOG' });
+  drawText(ctx, 'WALK 8,000 STEPS', 10, 22, 'stone_light');
+  drawText(ctx, 'FEED THE HERO', 10, 32, 'stone_light');
+  drawSprite(ctx, GEM, panState.w - 14, 21, null);
+});
+function syncPanels(){
+  resizeWidget(panA, panState.w + 4, panState.h + 4);
+  resizeWidget(panB, panState.w + 4, panState.h + 4);
+}
+document.getElementById('panW').addEventListener('input', e => { panState.w = +e.target.value; syncPanels(); });
+document.getElementById('panH').addEventListener('input', e => { panState.h = +e.target.value; syncPanels(); });
+
+/* ------------------------------ 4 · buttons ------------------------------ */
+const BTN_STATES = ['idle', 'hover', 'pressed', 'disabled'];
+makeWidget('btn-states', 250, 62, ctx => {
+  BTN_STATES.forEach((st, i) => {
+    const bx = 2 + i * 62;
+    drawText(ctx, st, bx + Math.round((56 - textWidth(st))/2), 0, 'stone_dark');
+    drawButton(ctx, bx, 8,  56, 18, st, 'stone', { text: 'DEPLOY' });
+    drawButton(ctx, bx, 32, 56, 22, st, 'gold',  { sprite: CROSSED_SWORDS });
+  });
+});
+const liveBtn = { state: 'idle' };
+{
+  const wg = makeWidget('btn-live', 80, 26, ctx => {
+    drawButton(ctx, 4, 3, 72, 20, liveBtn.state, 'gold', { text: 'ATTACK!' });
+  });
+  const c = wg.c;
+  const over = e => { const p = logicalPos(c, e); return p.x >= 4 && p.x < 76 && p.y >= 3 && p.y < 23; };
+  c.addEventListener('mousemove', e => {
+    if (liveBtn.state !== 'pressed') liveBtn.state = over(e) ? 'hover' : 'idle';
+    c.style.cursor = over(e) ? 'pointer' : 'default';
+  });
+  c.addEventListener('mousedown', e => { if (over(e)) liveBtn.state = 'pressed'; });
+  window.addEventListener('mouseup', () => { if (liveBtn.state === 'pressed') liveBtn.state = 'idle'; });
+  c.addEventListener('mouseleave', () => { if (liveBtn.state !== 'pressed') liveBtn.state = 'idle'; });
+}
+
+/* ------------------------------- 5 · icons ------------------------------- */
+makeWidget('icons', 230, 16, ctx => {
+  let x = 2;
+  const put = (s, ov) => { drawSprite(ctx, s, x, 15 - spriteH(s), ov); x += spriteW(s) + 4; };
+  put(HEART); put(HEART_HALF); put(HEART, HEART_EMPTY_OVERRIDE);
+  put(COIN); put(STAR); put(GEM); put(SKULL);
+  put(ARROW_UP); put(ARROW_RIGHT); put(ARROW_DOWN); put(ARROW_LEFT);
+  put(SWORD); put(CROSSED_SWORDS); put(BANNER); put(SHIELD);
+});
+let iconTick = 0;
+makeWidget('icons-recolor', 120, 14, ctx => {
+  let x = 2;
+  const put = (s, ov) => { drawSprite(ctx, s, x, 13 - spriteH(s), ov); x += spriteW(s) + 6; };
+  put(HEART, { R:'blue_mid', L:'blue_light' });                       // frost heart
+  put(COIN,  { L:'white', G:'stone_light', D:'stone_mid' });          // silver coin
+  put(GEM,   { L:'gold_light', B:'gold_mid', D:'gold_dark' });        // gold gem
+  const blink = (iconTick % 40) < 20;                                 // palette-swap blink
+  put(STAR, blink ? null : { G:'gold_dark', L:'gold_mid', W:'gold_light' });
+});
+
+/* ------------------------- 6 · composed HUD sample ----------------------- */
+const hud = { energy: 4, hover: null, pressed: null, hits: [] };
+const HUD_W = 252, HUD_H = 158;
+{
+  const wg = makeWidget('hud', HUD_W, HUD_H, ctx => {
+    hud.hits.length = 0;
+    px(ctx, 0, 0, HUD_W, HUD_H, 'bg_scene');
+    const defeated = hpState.target <= 0;
+
+    // boss panel
+    drawPanel(ctx, 4, 4, 244, 62, { title: 'WEEKLY BOSS' });
+    drawSprite(ctx, SKULL, 12, 22);
+    drawText(ctx, 'SHADOW WYRM', 26, 23, 'white');
+    drawText(ctx, 'TIER 3', 200, 23, 'gold_mid');
+    drawHealthBar(ctx, 12, 36, 228, 14,
+      { value: hpState.disp/100, ghost: hpState.ghost/100, flash: hpState.flash, gold: true });
+    if (defeated && (iconTick % 30) < 18) drawText(ctx, 'BOSS FALLS!', 96, 54, 'gold_light');
+    else drawText(ctx, Math.round(Math.max(0, hpState.disp)) + '/100', 106, 54, 'stone_light');
+
+    // party status row — hearts derive from boss-fight hp state (6 half-hearts)
+    const halves = Math.round(hpState.disp / 100 * 6);
+    for (let i = 0; i < 3; i++){
+      const hx = 12 + i * 10;
+      const full = halves >= (i+1) * 2, half = !full && halves === i * 2 + 1;
+      drawSprite(ctx, full ? HEART : half ? HEART_HALF : HEART, hx, 74,
+        (full || half) ? null : HEART_EMPTY_OVERRIDE);
+    }
+    drawSprite(ctx, COIN, 176, 73);
+    drawText(ctx, '1,250', 188, 74, 'gold_light');
+
+    // energy
+    drawSprite(ctx, GEM, 12, 90);
+    drawText(ctx, 'ENERGY', 24, 90, 'stone_light');
+    drawSegmentBar(ctx, 12, 98, { cells: 8, cellW: 15, cellH: 8, value: hud.energy });
+
+    // action buttons
+    const canAttack = hud.energy >= 1 && !defeated;
+    const atkState = !canAttack ? 'disabled'
+      : hud.pressed === 'atk' ? 'pressed' : hud.hover === 'atk' ? 'hover' : 'idle';
+    drawButton(ctx, 12, 118, 64, 26, atkState, 'gold', { sprite: CROSSED_SWORDS });
+    hud.hits.push({ x:12, y:118, w:64, h:26, id:'atk', enabled: canAttack });
+
+    const colState = hud.pressed === 'col' ? 'pressed' : hud.hover === 'col' ? 'hover' : 'idle';
+    drawButton(ctx, 84, 122, 60, 20, colState, 'stone', { text: 'COLLECT' });
+    hud.hits.push({ x:84, y:122, w:60, h:20, id:'col', enabled: true });
+
+    const rstState = hud.pressed === 'rst' ? 'pressed' : hud.hover === 'rst' ? 'hover' : 'idle';
+    drawButton(ctx, 200, 122, 40, 16, rstState, 'stone', { text: 'RESET' });
+    hud.hits.push({ x:200, y:122, w:40, h:16, id:'rst', enabled: true });
+
+    drawText(ctx, '1 GEM PER HIT', 12, 148, 'stone_dark');
+  });
+  const c = wg.c;
+  const hitAt = e => {
+    const p = logicalPos(c, e);
+    return hud.hits.find(h => h.enabled && p.x >= h.x && p.x < h.x + h.w && p.y >= h.y && p.y < h.y + h.h);
+  };
+  c.addEventListener('mousemove', e => {
+    const h = hitAt(e);
+    hud.hover = h ? h.id : null;
+    c.style.cursor = h ? 'pointer' : 'default';
+  });
+  c.addEventListener('mousedown', e => { const h = hitAt(e); hud.pressed = h ? h.id : null; });
+  c.addEventListener('mouseup', e => {
+    const h = hitAt(e);
+    if (h && h.id === hud.pressed){
+      if (h.id === 'atk'){ hud.energy = Math.max(0, hud.energy - 1); hpDamage(9); }
+      if (h.id === 'col'){ hud.energy = Math.min(8, hud.energy + 2); }
+      if (h.id === 'rst'){ hpState.target = 100; hpState.disp = 100; hpState.ghost = 100; hud.energy = 4; }
+    }
+    hud.pressed = null;
+  });
+  c.addEventListener('mouseleave', () => { hud.hover = null; hud.pressed = null; });
+}
+
+/* ------------------------------- main loop ------------------------------- */
+function frame(){
+  hpTick();
+  iconTick++;
+  for (const wg of widgets){
+    wg.ctx.clearRect(0, 0, wg.c.width, wg.c.height);
+    wg.draw(wg.ctx);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
