@@ -254,8 +254,9 @@ in the RN app — port plan is `docs/fx-rn-port-plan.md`, decisions already made
   user-approved); per-job feel comes from per-job anchors.
 - **Scenes**: `battlefield-ui.html` = all 8 heroes staggered basics + every-4th
   specials, tap-hero-to-ult, JOB 1–5 switcher + REST toggle (whole party plays
-  its per-job kneel loop — the fuel Resting-state preview; rest mode ignores
-  attack orders by construction), front hero foot-aligned to the boss, boss
+  its per-job kneel loop with drifting "z" particles — the fuel Resting-state
+  preview; rest mode ignores attack orders by construction, z-emitter stops on
+  wake), front hero foot-aligned to the boss, boss
   auto-scales to never be shorter than the party. `fx-test.html` = QA rig;
   **`?verify=1` must print `PASS — 80/80`** after any FX/anchor change.
 - Verified 2026-07-12: 80/80 attacks pass, zero console errors. Re-verified

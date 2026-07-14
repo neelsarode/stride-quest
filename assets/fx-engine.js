@@ -142,19 +142,48 @@ window.FXEngine = (function () {
     }
     step();
 
+    // Drifting "z" particles while resting — the kneel pose alone reads subtle,
+    // so the z's carry the "asleep at the wheel" legibility. Pure DOM overlay
+    // (same recipe as damage numbers): no art regeneration, stops on wake.
+    let zzzTimer = null;
+    function spawnZ() {
+      const r = img.getBoundingClientRect();
+      const z = document.createElement('div');
+      z.textContent = 'z';
+      const size = 13 + Math.floor(Math.random() * 7);
+      const x = r.left + r.width * (0.50 + Math.random() * 0.14);
+      const y = r.top + r.height * 0.30;
+      z.style.cssText = `position:fixed;left:${x}px;top:${y}px;z-index:60;pointer-events:none;
+        font-weight:800;font-size:${size}px;color:#cfd6e4;text-shadow:0 1px 2px #000;opacity:0;
+        transition:transform 2.2s ease-out,opacity .6s ease-in;`;
+      (api.layer || document.body).appendChild(z);
+      requestAnimationFrame(() => {
+        z.style.opacity = '.85';
+        z.style.transform = `translate(${8 + Math.random() * 10}px,-34px)`;
+      });
+      setTimeout(() => { z.style.opacity = '0'; }, 1400);
+      setTimeout(() => z.remove(), 2400);
+    }
+    function stopZzz() { if (zzzTimer) { clearInterval(zzzTimer); zzzTimer = null; } }
+
     // basic/special only fire from 'idle', so a resting hero ignores attack
     // orders by construction — no extra guards needed.
     f.basic = () => { if (f.mode === 'idle') { f.mode = 'attack'; f.frame = -1; } };
     f.special = () => { if (f.mode === 'idle') { f.mode = 'special'; f.frame = -1; } };
     f.setResting = (on) => {
-      if (on) { f.mode = 'rest'; f.frame = 0; img.src = restF[0]; }
-      else if (f.mode === 'rest') { f.mode = 'idle'; f.frame = 0; img.src = idleF[0]; }
+      if (on) {
+        f.mode = 'rest'; f.frame = 0; img.src = restF[0];
+        if (!zzzTimer) { spawnZ(); zzzTimer = setInterval(spawnZ, 1500 + Math.random() * 700); }
+      } else if (f.mode === 'rest') {
+        f.mode = 'idle'; f.frame = 0; img.src = idleF[0];
+        stopZzz();
+      }
     };
     f.setJob = (jobKey) => {
       const wasResting = f.mode === 'rest';
       f.job = jobKey; f.mode = wasResting ? 'rest' : 'idle'; f.frame = 0; loadJob();
     };
-    f.destroy = () => { f.alive = false; };
+    f.destroy = () => { f.alive = false; stopZzz(); };
     return f;
   }
 
