@@ -4,10 +4,11 @@
 // and manage simulated teammates so time-based + co-op mechanics are testable in
 // minutes. Deliberately loud (magenta, dashed) so it reads as NOT-real UI.
 // =============================================================================
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { Sprite } from "../battle/Sprite";
 import { PALETTE, SIZES } from "../config/assets";
 import { INJECTOR_AMOUNTS, TEAMMATE_STEP_AMOUNTS } from "../devConfig";
 
@@ -142,6 +143,8 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
 
       {open && (
         <>
+          <SpriteDemo />
+
           <Section title="TIME">
             <Btn label="Advance day +1" onPress={run(() => advanceDay({ days: 1 }))} busy={busy} />
             <Btn label="+10h idle" onPress={run(() => fastForwardIdle({ hours: 10 }))} busy={busy} />
@@ -222,6 +225,62 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   );
 }
 
+// STR-18 verification vehicle for src/battle/Sprite.tsx (plan D2): a looping
+// warlord idle plus a one-shot attack, with a RENDER COUNT readout proving the
+// D2 invariant — frame stepping happens on the UI thread, so React re-render
+// count stays FLAT while the loop runs (it only ticks on real state changes:
+// open/attack/onDone). Throwaway once the battle scene lands (plan step 5+).
+function SpriteDemo() {
+  // Incremented in the component body on EVERY React render — if frames were
+  // driven by setState this would count up ~6×/sec. It must not.
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"idle" | "attack">("idle");
+  const [playKey, setPlayKey] = useState(0);
+
+  const attack = () => {
+    setMode("attack");
+    // playKey bump = restart token: replays the one-shot from frame 0 even if
+    // an attack is already mid-flight (Sprite API, plan D2).
+    setPlayKey((k) => k + 1);
+  };
+  const backToIdle = useCallback(() => setMode("idle"), []);
+
+  return (
+    <View style={styles.section}>
+      <Pressable onPress={() => setOpen((o) => !o)}>
+        <Text style={styles.sectionTitle}>SPRITE DEMO {open ? "▲" : "▼"}</Text>
+      </Pressable>
+      {open && (
+        <>
+          <Text style={styles.readout}>
+            RENDER COUNT {renderCount.current} · {mode.toUpperCase()}
+          </Text>
+          <View style={styles.spriteStage}>
+            <Sprite
+              // Preview-parity fps (assets/fx-engine.js): idle 6, attack 12.
+              animKey={
+                mode === "idle"
+                  ? "warrior/5_warlord/idle"
+                  : "warrior/5_warlord/attack"
+              }
+              fps={mode === "idle" ? 6 : 12}
+              loop={mode === "idle"}
+              playKey={playKey}
+              onDone={backToIdle}
+            />
+          </View>
+          <View style={styles.row}>
+            <Btn label="⚔ Attack (one-shot)" onPress={attack} />
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
@@ -267,6 +326,12 @@ const styles = StyleSheet.create({
   section: { gap: 6 },
   sectionTitle: { color: PALETTE.dev, fontSize: 11, fontWeight: "700", letterSpacing: 1 },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  spriteStage: {
+    backgroundColor: "#0c0e14",
+    borderRadius: 8,
+    padding: 8,
+    alignItems: "center",
+  },
   teammate: { gap: 6, marginTop: 2 },
   teammateName: { color: PALETTE.text, fontSize: 13, fontWeight: "600" },
   btn: {
