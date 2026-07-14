@@ -22,6 +22,7 @@ type Snapshot =
       dailyGoal?: { hit: boolean; goal: number } | null;
       steps?: { today: number };
       fuel?: { state: HeroState };
+      overdrive?: { active: boolean; durationHours: number; idleDamageMult: number };
     }
   | null
   | undefined;
@@ -72,6 +73,22 @@ export function useGameEvents(data: Snapshot) {
         from: prev.fuel.state,
         to: data.fuel.state,
       });
+    }
+
+    // Overdrive window opened/closed (STR-14). Diffing the snapshot (instead
+    // of emitting from the button handler) means the banner also fires for a
+    // DevPanel activation, and the end toast fires whenever a refresh lands
+    // past the 4h mark.
+    if (data.overdrive && prev.overdrive) {
+      if (data.overdrive.active && !prev.overdrive.active) {
+        emit({
+          type: "overdriveStarted",
+          durationHours: data.overdrive.durationHours,
+          mult: data.overdrive.idleDamageMult,
+        });
+      } else if (!data.overdrive.active && prev.overdrive.active) {
+        emit({ type: "overdriveEnded" });
+      }
     }
   }, [data, prev, emit]);
 }

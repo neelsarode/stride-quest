@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { api } from "../../convex/_generated/api";
 import {
   HERO_STATE_STYLE,
@@ -27,6 +28,7 @@ import { DEV_FLAGS } from "../devConfig";
 import { AnimatedHPBar } from "../components/AnimatedHPBar";
 import { AnimatedMeter } from "../components/AnimatedMeter";
 import { DeployButton } from "../components/DeployButton";
+import { OverdriveMeter } from "../components/OverdriveMeter";
 import { GuildBoard } from "../components/GuildBoard";
 import { DevPanel } from "../components/DevPanel";
 import { useGameEvents } from "../feedback/useGameEvents";
@@ -45,6 +47,7 @@ export function DashboardScreen() {
   const ensureSession = useMutation(api.users.ensureSession);
   const deployMut = useMutation(api.combat.deploy);
   const collectIdleMut = useMutation(api.combat.collectIdle);
+  const activateOverdriveMut = useMutation(api.overdrive.activateOverdrive);
   const { emit } = useFeedback();
 
   const [busy, setBusy] = useState(false);
@@ -113,6 +116,21 @@ export function DashboardScreen() {
     try {
       const r = await collectIdleMut({});
       if (r && r.collected > 0) emit({ type: "damageDealt", amount: r.collected, source: "idle" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Pop the charged Overdrive (STR-14). The OVERDRIVE! banner fires from the
+  // reactive diff (useGameEvents), so a success needs no emit here; friendly
+  // server rejections (uncharged / resting / already running) surface as calm
+  // toasts via their ConvexError message.
+  async function onActivateOverdrive() {
+    setBusy(true);
+    try {
+      await activateOverdriveMut({});
+    } catch (e) {
+      emit({ type: "actionRejected", message: friendlyError(e) });
     } finally {
       setBusy(false);
     }
@@ -335,11 +353,30 @@ export function DashboardScreen() {
         />
       </View>
 
+      {/* Overdrive (STR-14) — the player-activated fever mode. Sits with the
+          action cluster: DEPLOY is the daily anchor, this is the earned spike. */}
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>OVERDRIVE</Text>
+        <OverdriveMeter
+          chargePct={data.overdrive.chargePct}
+          ready={data.overdrive.ready}
+          active={data.overdrive.active}
+          remainingSeconds={data.overdrive.remainingSeconds}
+          idleDamageMult={data.overdrive.idleDamageMult}
+          durationHours={data.overdrive.durationHours}
+          resting={resting}
+          busy={busy}
+          onActivate={onActivateOverdrive}
+        />
+      </View>
+
       {/* Idle combat */}
       <View style={styles.card}>
         <Text style={styles.cardLabel}>IDLE COMBAT</Text>
         <Text style={styles.dimSmall}>
-          Your hero auto-attacks at ×{player.idleMultiplier}. Accrues up to{" "}
+          Your hero auto-attacks at ×{player.idleMultiplier}
+          {data.overdrive.active ? ` · ⚡ OVERDRIVE ×${data.overdrive.idleDamageMult}` : ""} —{" "}
+          {Math.round(data.idle.dph).toLocaleString()} damage/hour right now. Accrues up to{" "}
           {Math.round(data.idle.capMs / 3_600_000)}h offline, then pauses.
         </Text>
         <View style={styles.idleRow}>
@@ -382,6 +419,18 @@ export function DashboardScreen() {
 }
 
 // --- small presentational helpers --------------------------------------------
+
+/** Friendly message from a server rejection: ConvexError carries a structured
+ *  {code, message} written for players (the STR-44/53 pattern); anything else
+ *  falls back to a generic line rather than leaking an internal error string. */
+function friendlyError(e: unknown): string {
+  if (e instanceof ConvexError) {
+    const data = e.data as { message?: string } | string;
+    const msg = typeof data === "string" ? data : data?.message;
+    if (msg) return msg;
+  }
+  return "That didn't go through — give it another try in a moment.";
+}
 
 // Fuel time formatting (STR-13): the tank speaks in REAL fight time
 // (hoursToEmpty already stretches the winded tail). Compact form for the gauge

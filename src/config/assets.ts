@@ -26,6 +26,7 @@ export const PALETTE = {
   dev: "#c026d3", // dev panel magenta — unmistakably not real UI
   crit: "#ff7b39", // crit orange
   fuel: "#7fe3d2", // fuel gauge teal (dashboard-ui.html mock)
+  overdrive: "#c77dff", // overdrive purple (dashboard-ui.html mock gradient)
 } as const;
 
 /** Hero fuel-state presentation (STR-13) — chip label + colors per state,
@@ -94,6 +95,8 @@ export const BANNER = {
   // neutrals, NEVER red (spec §3 tone guardrail); recovery = a small celebration.
   heroResting: { bg: "#1c1f28", fg: "#b9c0cf", icon: "🧎" },
   backInFight: { bg: "#12331f", fg: PALETTE.good, icon: "⚔" },
+  // Overdrive pop (STR-14): the player-chosen fever moment — loud and purple.
+  overdrive: { bg: "#2a1140", fg: PALETTE.overdrive, icon: "⚡" },
 } as const;
 
 /** Teaching-layer tuning (STR-49). Contextual first-session moments — all

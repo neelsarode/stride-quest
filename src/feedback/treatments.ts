@@ -115,5 +115,27 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
         },
       };
     }
+    // --- M1 fuel hybrid (STR-14) ---
+    case "overdriveStarted":
+      juice.haptic("heavy");
+      juice.screenShake();
+      return {
+        banner: {
+          variant: "overdrive",
+          title: "OVERDRIVE!",
+          subtitle: `×${e.mult} damage for the next ${e.durationHours} hours.`,
+        },
+      };
+    case "overdriveEnded":
+      // Quiet close: the reward ran its course — never loss-framed.
+      return {
+        toast: {
+          message: "Overdrive has run its course — back to the steady fight.",
+          tone: "info",
+        },
+      };
+    case "actionRejected":
+      // Friendly server rejections (ConvexError messages). Calm, never red.
+      return { toast: { message: e.message, tone: "info" } };
   }
 }

@@ -21,7 +21,16 @@ export type FeedbackEvent =
   // The hero's fuel state crossed a boundary (Battling⇄Winded⇄Resting).
   // Resting is DIGNIFIED (spec §3): its treatment is calm, never red/shaming;
   // recovering to Battling is a small celebration.
-  | { type: "heroStateChanged"; from: HeroState; to: HeroState };
+  | { type: "heroStateChanged"; from: HeroState; to: HeroState }
+  // --- M1 fuel hybrid (STR-14) ---
+  // Overdrive window opened/closed (diffed from the reactive snapshot, so the
+  // banner also fires when a DevPanel activation lands). Ending is quiet —
+  // the reward ran its course; nothing was lost (never loss-frame a bonus).
+  | { type: "overdriveStarted"; durationHours: number; mult: number }
+  | { type: "overdriveEnded" }
+  // A server-side rejection with a friendly ConvexError message (rally daily
+  // limit, uncharged overdrive, …). Always a calm info toast, never red.
+  | { type: "actionRejected"; message: string };
 
 /** Mirror of the server's FuelState (convex/fuelMath.ts) — duplicated here so
  *  the feedback contract stays free of backend imports. */
