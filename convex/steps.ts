@@ -57,6 +57,17 @@ export const recordSteps = mutation({
       createdAt: Date.now(),
     });
 
+    // First HealthKit sync with REAL data (>0) ⇒ Health is provably connected
+    // (STR-48). iOS never reveals read-permission status, so evidence-of-data
+    // is the only honest signal; a 0-step grant (Simulator, denied read) keeps
+    // the calm CONNECT HEALTH chip on the dashboard. One-shot stamp.
+    if (source === "healthkit" && clamped > 0) {
+      const user = await ctx.db.get(userId);
+      if (user && user.healthKitConnectedAt === undefined) {
+        await ctx.db.patch(userId, { healthKitConnectedAt: Date.now() });
+      }
+    }
+
     const now = await effectiveNow(ctx);
     await grantStarterFuelIfNew(ctx, userId, now);
 

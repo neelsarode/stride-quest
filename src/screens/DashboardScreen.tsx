@@ -27,10 +27,10 @@ import { useGameEvents } from "../feedback/useGameEvents";
 import { useTeammateDamage } from "../feedback/useTeammateDamage";
 import { useFeedback } from "../feedback/FeedbackProvider";
 import { usePendingIdle } from "../usePendingIdle";
+import { HealthPermissionScreen } from "./onboarding/HealthPermissionScreen";
 import {
   isAvailable as healthKitAvailable,
   readTodaySteps,
-  requestStepPermission,
 } from "../health/healthkit";
 
 export function DashboardScreen() {
@@ -43,6 +43,8 @@ export function DashboardScreen() {
 
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // The calm CONNECT HEALTH chip (STR-48) reopens the Beat-3 priming screen.
+  const [showHealthScreen, setShowHealthScreen] = useState(false);
 
   // Live "pending idle" ticker (display-only; server is authoritative on collect).
   const pendingIdle = usePendingIdle(data?.idle, data?.now);
@@ -102,24 +104,26 @@ export function DashboardScreen() {
     );
   }, [ensureSession]);
 
-  async function syncHealthKit() {
-    setBusy(true);
-    setNote(null);
-    try {
-      await requestStepPermission();
-      const steps = await readTodaySteps();
-      if (steps == null) {
-        setNote("No HealthKit data here (Simulator/browser have none).");
-      } else {
-        await recordSteps({ stepCount: steps, source: "healthkit" });
-        setNote(`Synced ${steps.toLocaleString()} steps from Health.`);
-      }
-    } catch (e) {
-      setNote(`HealthKit error: ${String(e)}`);
-    } finally {
-      setBusy(false);
-    }
-  }
+  // Silent HealthKit re-sync on open, once Health is CONNECTED (STR-48: the
+  // permission moment moved into onboarding; the buried manual sync button it
+  // replaced becomes automatic — "steps keep syncing on their own from here").
+  // Read-then-record through the existing seam; null/0 reads are simply
+  // skipped (the ledger is append-only, so re-syncs are always safe).
+  const didHealthSync = useRef(false);
+  const healthConnected = data?.health.connected === true;
+  useEffect(() => {
+    if (didHealthSync.current || !healthConnected || !healthKitAvailable()) return;
+    didHealthSync.current = true;
+    readTodaySteps()
+      .then((steps) => {
+        if (steps != null && steps > 0) {
+          return recordSteps({ stepCount: steps, source: "healthkit" }).then(
+            () => undefined,
+          );
+        }
+      })
+      .catch(() => {});
+  }, [healthConnected, recordSteps]);
 
   if (data === undefined) {
     return (
@@ -137,6 +141,13 @@ export function DashboardScreen() {
     );
   }
 
+  // Chip tap → the same Beat-3 priming screen, full-screen (STR-48: "reopens
+  // this screen"). Its own onDone just returns here; if the sync landed real
+  // steps the chip is gone reactively (health.connected flipped server-side).
+  if (showHealthScreen) {
+    return <HealthPermissionScreen onDone={() => setShowHealthScreen(false)} />;
+  }
+
   const { player, guild, boss, steps, streak, dailyGoal } = data;
   const m = data.meters;
   const bossActive = !!boss && !boss.defeated;
@@ -149,6 +160,19 @@ export function DashboardScreen() {
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
       <Text style={styles.title}>STRIDE QUEST</Text>
       <Text style={styles.guild}>{guild ? guild.name : "Setting up your guild…"}</Text>
+
+      {/* Calm CONNECT HEALTH chip (STR-48; comp BATTLE beat): only while Health
+          was skipped/denied on a HealthKit-capable device. Never red, never a
+          badge — a quiet door back to the Beat-3 priming screen. */}
+      {(healthKitAvailable() || DEV_FLAGS.forceHealthBeat) &&
+        !data.health.connected && (
+          <Pressable
+            onPress={() => setShowHealthScreen(true)}
+            style={({ pressed }) => [styles.healthChip, pressed && styles.btnPressed]}
+          >
+            <Text style={styles.healthChipText}>♥ CONNECT HEALTH</Text>
+          </Pressable>
+        )}
 
       {/* Player + placeholder sprite */}
       <View style={styles.card}>
@@ -269,22 +293,6 @@ export function DashboardScreen() {
         </View>
       </View>
 
-      {/* HealthKit sync */}
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>HEALTHKIT</Text>
-        <Text style={styles.dimSmall}>
-          {healthKitAvailable()
-            ? "Read today's real steps from Apple Health."
-            : "Not available here — use the dev panel injector."}
-        </Text>
-        <Btn
-          label="Sync real steps from Health"
-          onPress={syncHealthKit}
-          disabled={busy || !healthKitAvailable()}
-          kind="ghost"
-        />
-      </View>
-
       {/* Dev panel */}
       {DEV_FLAGS.showDevPanel && <DevPanel stepsToday={steps.today} />}
 
@@ -364,6 +372,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   guild: { color: PALETTE.textDim, fontSize: 14, textAlign: "center", marginBottom: 4 },
+  // The calm Health chip (STR-48): ghost border + dim text — deliberately the
+  // quietest interactive element on the screen (never red, never a badge).
+  healthChip: {
+    alignSelf: "center",
+    borderWidth: 1,
+    borderColor: PALETTE.panelBorder,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  healthChipText: {
+    color: PALETTE.textDim,
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
   card: {
     backgroundColor: PALETTE.panel,
     borderColor: PALETTE.panelBorder,

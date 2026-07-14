@@ -48,6 +48,13 @@ export default defineSchema({
     // Stamped when onboarding completes (Beat 4 — first battle). The App.tsx
     // state machine routes on server state, so unset ⇒ resume the flow.
     onboardedAt: v.optional(v.number()),
+    // Stamped by the first HealthKit sync that lands REAL steps (>0), in
+    // recordSteps (STR-48, spec §Beat 3). iOS never reveals read-permission
+    // status (privacy by design), so "connected" is derived from evidence:
+    // data actually arrived. Unset ⇒ the dashboard shows the calm CONNECT
+    // HEALTH chip (never red, never a badge). Server state, so the chip stays
+    // consistent across devices.
+    healthKitConnectedAt: v.optional(v.number()),
 
     // --- Phase 2 account-level meta (PERSISTS across weekly resets) ---
     // Energy is DERIVED: balance = energyEarned(ledger) − energySpent. We store

@@ -363,6 +363,11 @@ export const dashboard = query({
       // (spawnBoss, STR-56); null = ×1.0 floor, never shown as a penalty.
       boost,
       steps: { today: stepsToday, thisWeek: stepsThisWeek },
+      // Health connection state (STR-48): stamped by the first HealthKit sync
+      // that landed real steps. Drives the dashboard's calm CONNECT HEALTH
+      // chip (shown while unconnected on a HealthKit-capable device) and the
+      // silent re-sync on open once connected.
+      health: { connected: user.healthKitConnectedAt !== undefined },
       fuel,
       meters: {
         energy, // spendable Energy bank
