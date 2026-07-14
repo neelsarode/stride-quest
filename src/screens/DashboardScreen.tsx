@@ -15,7 +15,13 @@ import {
 } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { PALETTE, SIZES, TEACHING, classAccent } from "../config/assets";
+import {
+  HERO_STATE_STYLE,
+  PALETTE,
+  SIZES,
+  TEACHING,
+  classAccent,
+} from "../config/assets";
 import { CLASSES, DAILY_STEP_GOAL } from "../../convex/gameConfig";
 import { DEV_FLAGS } from "../devConfig";
 import { AnimatedHPBar } from "../components/AnimatedHPBar";
@@ -168,9 +174,13 @@ export function DashboardScreen() {
     return <HealthPermissionScreen onDone={() => setShowHealthScreen(false)} />;
   }
 
-  const { player, guild, boss, steps, streak, dailyGoal } = data;
+  const { player, guild, boss, steps, streak, dailyGoal, fuel } = data;
   const m = data.meters;
   const bossActive = !!boss && !boss.defeated;
+  // Hero fuel state (STR-13): chip styling + copy per state. Resting is
+  // DIGNIFIED (spec §3): calm neutrals, never red, never shame language.
+  const hs = HERO_STATE_STYLE[fuel.state];
+  const resting = fuel.state === "resting";
   const jobProgress = m.jobXp - m.jobThreshold;
   const jobSpan = m.nextJobThreshold != null ? m.nextJobThreshold - m.jobThreshold : 1;
   const jobMaxed = m.nextJobThreshold == null;
@@ -197,15 +207,25 @@ export function DashboardScreen() {
           </Pressable>
         )}
 
-      {/* Player + placeholder sprite */}
+      {/* Player + placeholder sprite. While Resting the box frames the
+          dignified kneel — the per-job `rest` animation lands with STR-38
+          through this same assets.ts seam (placeholder glyph until then). */}
       <View style={styles.card}>
         <View style={styles.playerRow}>
-          <View style={[styles.sprite, { borderColor: accent }]}>
-            <Text style={[styles.spriteLabel, { color: accent }]}>
-              {CLASSES[player.classKey].displayName.toUpperCase()}
+          <View
+            style={[
+              styles.sprite,
+              { borderColor: resting ? hs.color : accent },
+              resting && styles.spriteResting,
+            ]}
+          >
+            <Text style={[styles.spriteLabel, { color: resting ? hs.color : accent }]}>
+              {resting ? "🧎" : CLASSES[player.classKey].displayName.toUpperCase()}
             </Text>
             <Text style={styles.spriteSub}>{player.jobName}</Text>
-            <Text style={styles.spriteTag}>[sprite]</Text>
+            <Text style={styles.spriteTag}>
+              {resting ? "[rest sprite]" : "[sprite]"}
+            </Text>
           </View>
           <View style={styles.playerMeta}>
             <Text style={styles.playerName}>{player.displayName}</Text>
@@ -218,6 +238,35 @@ export function DashboardScreen() {
             </Text>
           </View>
         </View>
+      </View>
+
+      {/* Fuel tank (STR-13) — the reason to walk today: hours of fight time +
+          the hero state. Steps ARE fuel; the readout speaks in time, not fuel
+          units (spec §3: "Your hero can fight for 9 more hours"). */}
+      <View style={styles.card}>
+        <View style={styles.fuelHeader}>
+          <Text style={styles.cardLabel}>FUEL</Text>
+          <View style={[styles.stateChip, { backgroundColor: hs.bg, borderColor: hs.color }]}>
+            <Text style={[styles.stateChipText, { color: hs.color }]}>{hs.label}</Text>
+          </View>
+        </View>
+        <AnimatedMeter
+          label="TANK"
+          value={fuel.current}
+          max={fuel.tankCap}
+          color={hs.color}
+          valueText={
+            resting ? "empty — resting" : `fights ${fmtFightShort(fuel.hoursToEmpty)} more`
+          }
+        />
+        <Text style={styles.dimSmall}>
+          {fuel.state === "battling" &&
+            `Your hero can fight for ${fmtMoreTime(fuel.hoursToEmpty)}. Every step you walk is fuel.`}
+          {fuel.state === "winded" &&
+            `Winded — fighting at half strength, with ${fmtFightTime(fuel.hoursToEmpty)} of fight left. Any walk refills the tank.`}
+          {fuel.state === "resting" &&
+            "Catching breath — nothing is lost while resting. Any walk rejoins the fight."}
+        </Text>
       </View>
 
       {/* Dual meters */}
@@ -333,6 +382,35 @@ export function DashboardScreen() {
 }
 
 // --- small presentational helpers --------------------------------------------
+
+// Fuel time formatting (STR-13): the tank speaks in REAL fight time
+// (hoursToEmpty already stretches the winded tail). Compact form for the gauge
+// ("21h" / "9.5h" / "40m"), sentence forms for the readout copy.
+function fmtFightShort(hours: number): string {
+  if (hours >= 10) return `${Math.round(hours)}h`;
+  if (hours >= 1) return `${Math.round(hours * 10) / 10}h`;
+  return `${Math.max(1, Math.round(hours * 60))}m`;
+}
+
+function fmtFightTime(hours: number): string {
+  if (hours >= 10) return `${Math.round(hours)} hours`;
+  if (hours >= 1) {
+    const h = Math.round(hours * 10) / 10;
+    return `${h} ${h === 1 ? "hour" : "hours"}`;
+  }
+  const mins = Math.max(1, Math.round(hours * 60));
+  return `${mins} ${mins === 1 ? "minute" : "minutes"}`;
+}
+
+function fmtMoreTime(hours: number): string {
+  if (hours >= 10) return `${Math.round(hours)} more hours`;
+  if (hours >= 1) {
+    const h = Math.round(hours * 10) / 10;
+    return `${h} more ${h === 1 ? "hour" : "hours"}`;
+  }
+  const mins = Math.max(1, Math.round(hours * 60));
+  return `${mins} more ${mins === 1 ? "minute" : "minutes"}`;
+}
 
 function Stat({
   label,
@@ -459,6 +537,22 @@ const styles = StyleSheet.create({
   note: { color: PALETTE.good, fontSize: 13, textAlign: "center" },
   footer: { color: PALETTE.textDim, fontSize: 11, textAlign: "center", marginTop: 8 },
   streakChip: { color: PALETTE.crit, fontSize: 12, fontWeight: "700", marginTop: 2 },
+  // Fuel/hero-state chip (STR-13): state colors come from HERO_STATE_STYLE —
+  // teal battling, amber winded, calm neutral resting. Never red.
+  fuelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  stateChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+  },
+  stateChipText: { fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+  // The resting kneel framing: slightly dimmed, calm — dignified, not grayed-out.
+  spriteResting: { opacity: 0.85 },
   defeated: { color: PALETTE.good, fontSize: 14, fontWeight: "800" },
   idleRow: {
     flexDirection: "row",

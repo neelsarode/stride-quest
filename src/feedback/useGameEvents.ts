@@ -12,6 +12,7 @@
 import { useEffect } from "react";
 import { usePrevious } from "./usePrevious";
 import { useFeedback } from "./FeedbackProvider";
+import type { HeroState } from "./events";
 
 // Loosely typed on purpose — the dashboard shape grows chunk by chunk.
 type Snapshot =
@@ -20,6 +21,7 @@ type Snapshot =
       boss?: { id: string; currentHP: number; name: string } | null;
       dailyGoal?: { hit: boolean; goal: number } | null;
       steps?: { today: number };
+      fuel?: { state: HeroState };
     }
   | null
   | undefined;
@@ -60,6 +62,16 @@ export function useGameEvents(data: Snapshot) {
       prev.boss.currentHP > 0
     ) {
       emit({ type: "bossDefeated", bossName: data.boss.name });
+    }
+
+    // Hero fuel-state transitions (STR-13): Battling⇄Winded⇄Resting. The
+    // treatment keys off from→to (recovery celebrates, resting stays dignified).
+    if (data.fuel && prev.fuel && data.fuel.state !== prev.fuel.state) {
+      emit({
+        type: "heroStateChanged",
+        from: prev.fuel.state,
+        to: data.fuel.state,
+      });
     }
   }, [data, prev, emit]);
 }

@@ -16,4 +16,13 @@ export type FeedbackEvent =
   | { type: "bossAppears"; bossName: string }
   // A joiner landed in a friend's guild (the founder path stays quiet — the
   // code reveal IS that moment). memberCount = the guild size including them.
-  | { type: "guildJoined"; guildName: string; memberCount: number };
+  | { type: "guildJoined"; guildName: string; memberCount: number }
+  // --- M1 fuel hybrid (STR-13) ---
+  // The hero's fuel state crossed a boundary (Battling⇄Winded⇄Resting).
+  // Resting is DIGNIFIED (spec §3): its treatment is calm, never red/shaming;
+  // recovering to Battling is a small celebration.
+  | { type: "heroStateChanged"; from: HeroState; to: HeroState };
+
+/** Mirror of the server's FuelState (convex/fuelMath.ts) — duplicated here so
+ *  the feedback contract stays free of backend imports. */
+export type HeroState = "battling" | "winded" | "resting";

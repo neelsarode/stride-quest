@@ -79,5 +79,41 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
           subtitle: `${e.guildName} grows to ${e.memberCount}.`,
         },
       };
+    // --- M1 fuel hybrid (STR-13) ---
+    case "heroStateChanged": {
+      if (e.to === "battling") {
+        // Recovery is a small celebration — the comeback moment.
+        juice.haptic("success");
+        return {
+          banner: {
+            variant: "backInFight",
+            title: "BACK IN THE FIGHT!",
+            subtitle: "Tank refueled — your hero charges back in.",
+          },
+        };
+      }
+      if (e.to === "winded") {
+        return {
+          toast: {
+            // Rising out of rest is good news; slipping toward it is a gentle
+            // nudge. Either way: the fix is always "walk", never a scold.
+            message:
+              e.from === "resting"
+                ? "Your hero is up — winded but fighting. More steps bring full strength."
+                : "Your hero is winded — the tank runs low. Any walk refills it.",
+            tone: e.from === "resting" ? "good" : "info",
+          },
+        };
+      }
+      // → resting: the dignified kneel (spec §3). Calm, recoverable, NEVER red,
+      // no loss language — nothing earned is ever at stake while resting.
+      return {
+        banner: {
+          variant: "heroResting",
+          title: "CATCHING BREATH",
+          subtitle: "Your hero kneels to rest — any walk rejoins the fight.",
+        },
+      };
+    }
   }
 }

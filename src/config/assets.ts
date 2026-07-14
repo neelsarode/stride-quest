@@ -25,7 +25,18 @@ export const PALETTE = {
   xp: "#ffd166", // job XP meter gold
   dev: "#c026d3", // dev panel magenta — unmistakably not real UI
   crit: "#ff7b39", // crit orange
+  fuel: "#7fe3d2", // fuel gauge teal (dashboard-ui.html mock)
 } as const;
+
+/** Hero fuel-state presentation (STR-13) — chip label + colors per state,
+ *  transcribed from the dashboard-ui.html mock. Tone guardrail (spec §3):
+ *  Resting is DIGNIFIED — calm neutral, NEVER red, no shame styling, ever. */
+export const HERO_STATE_STYLE = {
+  battling: { label: "BATTLING", color: "#7fe3d2", bg: "#0a2c28" },
+  winded: { label: "WINDED", color: "#ffc46b", bg: "#342208" }, // warm amber — a nudge, not a warning
+  resting: { label: "RESTING", color: "#b9c0cf", bg: "#1c1c22" }, // calm neutral — recoverable, never shameful
+} as const;
+export type HeroStateKey = keyof typeof HERO_STATE_STYLE;
 
 /** Spacing / sizing scale. */
 export const SIZES = {
@@ -79,6 +90,10 @@ export const BANNER = {
   // joiner's welcome. Cozy, never punitive — no red (binding guardrail).
   bossAppears: { bg: "#241f33", fg: PALETTE.accent, icon: "⚔" },
   guildJoined: { bg: "#13293a", fg: PALETTE.energy, icon: "🤝" },
+  // Fuel-state transitions (STR-13). Resting = the dignified kneel — calm
+  // neutrals, NEVER red (spec §3 tone guardrail); recovery = a small celebration.
+  heroResting: { bg: "#1c1f28", fg: "#b9c0cf", icon: "🧎" },
+  backInFight: { bg: "#12331f", fg: PALETTE.good, icon: "⚔" },
 } as const;
 
 /** Teaching-layer tuning (STR-49). Contextual first-session moments — all
