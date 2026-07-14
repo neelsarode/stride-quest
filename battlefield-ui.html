@@ -221,6 +221,7 @@
 
   let cycle=0;
   setInterval(()=>{
+    if (window.__restingAll) return;   // party is kneeling — no attack orders
     cycle++;
     fighters.forEach((f,i)=>setTimeout(()=>{
       ((cycle+i)%SPECIAL_EVERY===0) ? f.special() : f.basic();
@@ -235,6 +236,23 @@
   for(let t=1;t<=5;t++){const o=document.createElement('option');o.value=t;o.textContent='JOB '+t;if(t===jobTier)o.selected=true;sel.appendChild(o);}
   sel.onchange=()=>{jobTier=+sel.value;fighters.forEach((f,i)=>f.setJob(JOBS[HEROES[i].cls][jobTier-1]));};
   stage.appendChild(sel);
+
+  // REST toggle (dev): the whole party kneels — previews the out-of-fuel
+  // Resting state with the per-job rest animations (STR-38). Attack cycle and
+  // tap-to-ult are blocked while resting (rest mode ignores attack orders).
+  window.__restingAll = false;
+  const restBtn = document.createElement('button');
+  restBtn.id = 'resttoggle';
+  restBtn.textContent = 'REST: OFF';
+  restBtn.style.cssText = 'position:absolute;left:12px;z-index:120;background:#1c1723;color:#d8c9a0;border:1px solid #6b5a3e;border-radius:6px;font-size:11px;font-weight:700;padding:3px 6px;cursor:pointer;'
+    + (PHONE ? 'top:calc(max(14px, env(safe-area-inset-top)) + 182px);' : 'top:240px;');
+  restBtn.onclick = () => {
+    window.__restingAll = !window.__restingAll;
+    restBtn.textContent = window.__restingAll ? 'REST: ON' : 'REST: OFF';
+    restBtn.style.color = window.__restingAll ? '#9fe8c8' : '#d8c9a0';
+    fighters.forEach(f => f.setResting(window.__restingAll));
+  };
+  stage.appendChild(restBtn);
 </script>
 <script>
 // ============ PROCEDURAL HUD v2 — S8 "CELESTIAL SILVER" (hi-fi kit) ============

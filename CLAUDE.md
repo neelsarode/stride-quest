@@ -253,10 +253,13 @@ in the RN app — port plan is `docs/fx-rn-port-plan.md`, decisions already made
   on narrow screens). VFX are per-CLASS shared across jobs (budget decision,
   user-approved); per-job feel comes from per-job anchors.
 - **Scenes**: `battlefield-ui.html` = all 8 heroes staggered basics + every-4th
-  specials, tap-hero-to-ult, JOB 1–5 switcher, front hero foot-aligned to the
-  boss, boss auto-scales to never be shorter than the party. `fx-test.html` =
-  QA rig; **`?verify=1` must print `PASS — 80/80`** after any FX/anchor change.
-- Verified 2026-07-12: 80/80 attacks pass, zero console errors.
+  specials, tap-hero-to-ult, JOB 1–5 switcher + REST toggle (whole party plays
+  its per-job kneel loop — the fuel Resting-state preview; rest mode ignores
+  attack orders by construction), front hero foot-aligned to the boss, boss
+  auto-scales to never be shorter than the party. `fx-test.html` = QA rig;
+  **`?verify=1` must print `PASS — 80/80`** after any FX/anchor change.
+- Verified 2026-07-12: 80/80 attacks pass, zero console errors. Re-verified
+  2026-07-13 after the engine gained `rest` mode (`setResting`): 80/80.
 
 ### Phase 3 — Core-loop evolution: FUEL HYBRID (backend ✅ VERIFIED 2026-07-13; UI pending)
 Spec: `docs/superpowers/specs/2026-07-12-core-loop-fuel-hybrid-design.md`;

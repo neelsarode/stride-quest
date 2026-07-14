@@ -6,6 +6,7 @@
 window.FXEngine = (function () {
   const FX = {
     idleFps: 6, attackFps: 12, specialFps: 12,
+    restFps: 5,                            // 6-frame kneel loop → ~1.2s breath
     projFps: 12, impactFps: 14,
     speedPxMs: 1.5, minTravelPx: 80,
     projFrames: 5, impactFrames: 7, specialProjFrames: 5,
@@ -96,26 +97,30 @@ window.FXEngine = (function () {
   function makeFighter(img, cls, jobKey) {
     const f = { img, cls, job: jobKey, mode: 'idle', frame: 0, alive: true };
     let fx = classFxFrames(cls);
-    let idleF, atkF, atkAnchor, spcF, spcAnchor;
+    let idleF, restF, atkF, atkAnchor, spcF, spcAnchor;
 
     function loadJob() {
       const key = `${f.cls}/${f.job}`;
       atkAnchor = window.FX_ANCHORS[key];
       const spc = (window.FX_SPECIAL_ANCHORS || {})[key];
       idleF = framesOf(`characters/${f.cls}/${f.job}/animations/idle`, 4);
+      restF = framesOf(`characters/${f.cls}/${f.job}/animations/rest`, 6);
       atkF = framesOf(`characters/${f.cls}/${f.job}/animations/attack`, atkAnchor.frames);
       spcF = spc ? framesOf(`characters/${f.cls}/${f.job}/animations/special`, spc.frames) : null;
       spcAnchor = spc || null;
-      preload([...idleF, ...atkF, ...(spcF || []), ...fx.basic, ...fx.special, ...fx.impact]);
-      img.src = idleF[0];
+      preload([...idleF, ...restF, ...atkF, ...(spcF || []), ...fx.basic, ...fx.special, ...fx.impact]);
+      img.src = (f.mode === 'rest' ? restF : idleF)[0];
     }
     loadJob();
 
     function step() {
       if (!f.alive) return;
-      if (f.mode === 'idle') {
-        f.frame = (f.frame + 1) % idleF.length; img.src = idleF[f.frame];
-        setTimeout(step, 1000 / FX.idleFps);
+      if (f.mode === 'idle' || f.mode === 'rest') {
+        // Both are loops; rest = the kneeling breather (out-of-fuel state).
+        const seq = f.mode === 'rest' ? restF : idleF;
+        const fps = f.mode === 'rest' ? FX.restFps : FX.idleFps;
+        f.frame = (f.frame + 1) % seq.length; img.src = seq[f.frame];
+        setTimeout(step, 1000 / fps);
         return;
       }
       const seq = f.mode === 'special' && spcF ? spcF : atkF;
@@ -137,9 +142,18 @@ window.FXEngine = (function () {
     }
     step();
 
+    // basic/special only fire from 'idle', so a resting hero ignores attack
+    // orders by construction — no extra guards needed.
     f.basic = () => { if (f.mode === 'idle') { f.mode = 'attack'; f.frame = -1; } };
     f.special = () => { if (f.mode === 'idle') { f.mode = 'special'; f.frame = -1; } };
-    f.setJob = (jobKey) => { f.job = jobKey; f.mode = 'idle'; f.frame = 0; loadJob(); };
+    f.setResting = (on) => {
+      if (on) { f.mode = 'rest'; f.frame = 0; img.src = restF[0]; }
+      else if (f.mode === 'rest') { f.mode = 'idle'; f.frame = 0; img.src = idleF[0]; }
+    };
+    f.setJob = (jobKey) => {
+      const wasResting = f.mode === 'rest';
+      f.job = jobKey; f.mode = wasResting ? 'rest' : 'idle'; f.frame = 0; loadJob();
+    };
     f.destroy = () => { f.alive = false; };
     return f;
   }
