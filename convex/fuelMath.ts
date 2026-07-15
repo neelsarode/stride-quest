@@ -17,7 +17,6 @@
 // =============================================================================
 import {
   BASE_IDLE_DPH,
-  DAILY_STEP_GOAL,
   FUEL,
   OFFLINE_CAP_MS,
   OVERDRIVE,
@@ -201,39 +200,31 @@ export function idleDamageForSegments(
   return damage;
 }
 
-// --- Overdrive charge + window math (STR-8) ------------------------------------
+// --- Overdrive window math (STR-8; charge model retired in STR-74) -------------
 
-/** Overdrive charge earned by a set of per-day step totals: every step ABOVE
- *  the daily goal charges the meter (per-day excess, never negative). */
-export function overdriveExcessFromDayTotals(
-  dayTotals: Iterable<number>,
-): number {
-  let excess = 0;
-  for (const t of dayTotals) excess += Math.max(0, t - DAILY_STEP_GOAL);
-  return excess;
-}
-
-/** Charge meter fraction in [0, 1]: (excess earned − excess consumed) / full
- *  charge, clamped. Holds at 1 until used; partial charge persists across days
- *  by construction (it's derived, nothing decays it). */
-export function overdriveChargeFraction(
-  excessEarned: number,
-  excessSpent: number,
-): number {
-  return Math.min(
-    Math.max(0, excessEarned - excessSpent) / OVERDRIVE.fullChargeExcessSteps,
-    1,
-  );
+/** Is Overdrive armed right now? The ONE shared predicate (Core Loop v2 §5.4):
+ *  the idle-damage channel (dashboard `overdrive.active` / `idle.dph`), the
+ *  Super Attack factor (combat.applyDeploy), and overdrive.overdriveStatus all
+ *  read THIS, so they can never disagree about whether the ×2 is on. Kept PURE
+ *  (takes the raw `overdriveActiveUntil` stamp, not the user doc) so it lives
+ *  here in fuelMath — no Convex imports — and is unit-testable. Overdrive is
+ *  goal-driven now: recordSteps stamps `overdriveActiveUntil = endOfEffectiveDay`
+ *  on a goal-hit, so this reads true until the daily reset, then false. */
+export function isOverdriveActive(
+  overdriveActiveUntil: number | undefined,
+  effNow: number,
+): boolean {
+  return (overdriveActiveUntil ?? 0) > effNow;
 }
 
 /** Hours of Overdrive remaining at a window's start, given the wall-clock
  *  active-until stamp. The settled window is anchored at the last settle stamp
  *  (the hero fights the FIRST cappedElapsed hours after it, then pauses), so
- *  Overdrive always occupies the front of the window — the offline-cap pause
- *  truncates the far end and can never eat the ×2 hours. Combined with
- *  activation itself settling, every charge yields EXACTLY durationHours of
- *  effective ×2 across settles. (Multiplier is OVERDRIVE.idleDamageMult, now 2
- *  per Core Loop v2 §6 — this window helper is unchanged.) */
+ *  Overdrive occupies the front of the window — the offline-cap pause truncates
+ *  the far end and can never eat the ×2 hours. Under Core Loop v2 the stamp is
+ *  end-of-effective-day (goal-armed, spec §5.4), so a mid-day settle prices the
+ *  hours until the daily reset at ×OVERDRIVE.idleDamageMult; burn is untouched.
+ *  This window helper itself is unchanged from the old model. */
 export function overdriveHoursAt(
   windowStartMs: number,
   overdriveUntil: number | undefined,

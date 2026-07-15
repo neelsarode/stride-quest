@@ -19,11 +19,13 @@ import { stepsForWeek } from "./steps";
 import { computeStreakMultiplier } from "./streak";
 import { continueStreak } from "./streakMath";
 import { settleShieldEarning } from "./shields";
+import { isOverdriveActive } from "./fuelMath";
 import {
   BONUS_BOSS,
   BOSS,
   CRIT,
   DAMAGE_PER_ENERGY,
+  OVERDRIVE,
   STREAK,
   bonusTierFor,
   bossMaxHP,
@@ -319,8 +321,22 @@ export async function applyDeploy(
   // this also boosts bonus-phase deploys — next week's own bonus damage —
   // one cap-guarded step of soft compounding (spec §9.3, decided).
   const boostMult = effectiveBoostMult("deploys", challenge.boostMult);
+  // Overdrive ×2 on the Super Attack (Core Loop v2 §5.4): when the player hit
+  // their daily goal, Overdrive is armed until the daily reset — and gated by
+  // OVERDRIVE.boostsSuperAttack, its multiplier now scales the Super Attack
+  // damage line too, not just idle. Reads the SAME isOverdriveActive predicate
+  // the idle channel uses (fuelMath), off the SAME `overdriveActiveUntil` stamp
+  // and clock (`effNow`), so idle and Super can never disagree about the ×2.
+  // Applied AFTER streak/crit/boost, exactly the way crit stacks on top. In the
+  // bonus phase this larger `damage` routes into the meter below unchanged — a
+  // goal-hit victory-lap Super feeds the crowned meter ×2 with no extra code.
+  const overdriveMult =
+    isOverdriveActive(user.overdriveActiveUntil, effNow) &&
+    OVERDRIVE.boostsSuperAttack
+      ? OVERDRIVE.idleDamageMult
+      : 1;
   const damage = Math.round(
-    available * DAMAGE_PER_ENERGY * critMult * sMult * boostMult,
+    available * DAMAGE_PER_ENERGY * critMult * sMult * boostMult * overdriveMult,
   );
 
   // Spend the whole bank (energySpent := lifetime earned → balance 0) and

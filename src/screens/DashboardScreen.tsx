@@ -49,7 +49,6 @@ export function DashboardScreen() {
     setShowHealthScreen,
     onDeploy,
     onCollectIdle,
-    onActivateOverdrive,
   } = useGameEngine();
 
   if (data === undefined) {
@@ -269,20 +268,16 @@ export function DashboardScreen() {
         />
       </View>
 
-      {/* Overdrive (STR-14) — the player-activated fever mode. Sits with the
-          action cluster: DEPLOY is the daily anchor, this is the earned spike. */}
+      {/* Overdrive (Core Loop v2 §5.4, STR-74) — RETRIGGERED: no longer a manual
+          activate. Hitting the daily goal auto-arms ×2 until the reset, boosting
+          idle AND the Super Attack. This card is now a status readout. */}
       <View style={styles.card}>
         <Text style={styles.cardLabel}>OVERDRIVE</Text>
         <OverdriveMeter
-          chargePct={data.overdrive.chargePct}
-          ready={data.overdrive.ready}
           active={data.overdrive.active}
-          remainingSeconds={data.overdrive.remainingSeconds}
-          idleDamageMult={data.overdrive.idleDamageMult}
-          durationHours={data.overdrive.durationHours}
-          resting={resting}
-          busy={busy}
-          onActivate={onActivateOverdrive}
+          mult={data.overdrive.mult}
+          stepsToday={data.overdrive.stepsToday}
+          goal={data.overdrive.goal}
         />
       </View>
 
@@ -291,7 +286,7 @@ export function DashboardScreen() {
         <Text style={styles.cardLabel}>IDLE COMBAT</Text>
         <Text style={styles.dimSmall}>
           Your hero auto-attacks at ×{player.idleMultiplier}
-          {data.overdrive.active ? ` · ⚡ OVERDRIVE ×${data.overdrive.idleDamageMult}` : ""} —{" "}
+          {data.overdrive.active ? ` · ⚡ OVERDRIVE ×${data.overdrive.mult}` : ""} —{" "}
           {Math.round(data.idle.dph).toLocaleString()} damage/hour right now. Accrues up to{" "}
           {Math.round(data.idle.capMs / 3_600_000)}h offline, then pauses.
         </Text>

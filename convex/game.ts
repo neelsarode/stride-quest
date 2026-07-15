@@ -173,27 +173,33 @@ export const dashboard = query({
       settledAt: user.fuelSettledAt ?? now,
     };
 
-    // Overdrive (STR-8 exposure): charge is DERIVED from the ledger (excess
-    // earned − spent). Remaining time is computed SERVER-side — the raw
-    // activeUntil stamp rides along for display formatting only, never for
-    // client date math.
-    const od = await overdriveStatus(ctx, user, now);
+    // Overdrive (Core Loop v2 §5.4 exposure): fully DERIVED from the
+    // `overdriveActiveUntil` stamp (goal-armed until the daily reset) + today's
+    // steps + config — no charge, no activate, no client date math. Mirrors the
+    // overdriveStatus read model.
+    const od = await overdriveStatus(ctx, user, now, date);
     const overdrive = {
-      charge: od.charge, // 0..1
-      chargePct: Math.round(od.charge * 100), // 0..100 for the meter label
-      ready: od.ready, // the button lights up
-      active: od.active, // the ×3 window is running
-      remainingSeconds: od.active
-        ? Math.max(0, Math.ceil((od.activeUntil! - now) / 1000))
-        : 0,
-      activeUntil: od.activeUntil, // raw effective-ms (display formatting only)
-      durationHours: OVERDRIVE.durationHours,
-      idleDamageMult: OVERDRIVE.idleDamageMult,
+      active: od.active, // the ×N window is running (goal hit today)
+      mult: od.mult, // OVERDRIVE.idleDamageMult (×2)
+      endsAt: od.endsAt, // effective-ms of the daily reset (null if inactive)
+      remainingSeconds: od.remainingSeconds, // live countdown source
+      stepsToday: od.stepsToday, // goal progress that arms Overdrive
+      goal: od.goal, // DAILY_STEP_GOAL
+      // TRANSITIONAL COMPAT (STR-74 → STR-76): src/feedback/* is owned by STR-76
+      // and left untouched here, but its loose `Snapshot` type still reads
+      // overdrive.idleDamageMult + overdrive.durationHours off this payload.
+      // idleDamageMult duplicates `mult`; durationHours reports the real whole
+      // hours left until the daily reset ("×2 for the next N hours" — truthful)
+      // until STR-76 reworks the banner copy to "until reset" and DELETES this
+      // pair. Nothing else consumes these two fields.
+      idleDamageMult: od.mult,
+      durationHours: Math.max(0, Math.ceil(od.remainingSeconds / 3600)),
     };
 
     // Idle: fuel-driven (STR-7). `dph` is the rate at the tank's CURRENT state
-    // (Battling full, Winded half, Resting zero — ×3 while Overdrive runs) for
-    // the client's live ticker; `pending` is the exact uncollected damage,
+    // (Battling full, Winded half, Resting zero — ×OVERDRIVE.idleDamageMult
+    // while Overdrive is armed, goal-driven now) for the client's live ticker;
+    // `pending` is the exact uncollected damage,
     // priced over the same piecewise windows the settle will use (so the
     // preview equals what lands).
     const idleMult =

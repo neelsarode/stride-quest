@@ -19,7 +19,6 @@ import { TEACHING } from "../config/assets";
 import { useGameEvents } from "../feedback/useGameEvents";
 import { useTeammateDamage } from "../feedback/useTeammateDamage";
 import { useFeedback } from "../feedback/FeedbackProvider";
-import { friendlyError } from "../feedback/errors";
 import { usePendingIdle } from "../usePendingIdle";
 import {
   isAvailable as healthKitAvailable,
@@ -38,7 +37,8 @@ export function useGameEngine() {
   const ensureSession = useMutation(api.users.ensureSession);
   const deployMut = useMutation(api.combat.deploy);
   const collectIdleMut = useMutation(api.combat.collectIdle);
-  const activateOverdriveMut = useMutation(api.overdrive.activateOverdrive);
+  // Overdrive is auto-armed on a goal-hit now (Core Loop v2 §5.4, STR-74): the
+  // manual activateOverdrive mutation is retired, so there is no activate handler.
   const markRalliesSeenMut = useMutation(api.rally.markRalliesSeen);
   const markBoostSeenMut = useMutation(api.users.markBoostSeen);
   const { emit } = useFeedback();
@@ -155,21 +155,6 @@ export function useGameEngine() {
     }
   }
 
-  // Pop the charged Overdrive (STR-14). The OVERDRIVE! banner fires from the
-  // reactive diff (useGameEvents), so a success needs no emit here; friendly
-  // server rejections (uncharged / resting / already running) surface as calm
-  // toasts via their ConvexError message.
-  async function onActivateOverdrive() {
-    setBusy(true);
-    try {
-      await activateOverdriveMut({});
-    } catch (e) {
-      emit({ type: "actionRejected", message: friendlyError(e) });
-    } finally {
-      setBusy(false);
-    }
-  }
-
   // One-time per-launch session maintenance (STR-44: formerly bootstrap — it
   // no longer creates a guild; the onboarding fork owns that). Tells the server
   // our timezone for day/week math.
@@ -213,7 +198,6 @@ export function useGameEngine() {
     setShowHealthScreen,
     onDeploy,
     onCollectIdle,
-    onActivateOverdrive,
   };
 }
 

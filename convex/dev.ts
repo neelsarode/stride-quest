@@ -18,9 +18,15 @@ import {
   getClockOffsetMs,
   dayString,
   weekRange,
+  endOfEffectiveDay,
 } from "./time";
 import { getUserGroup } from "./players";
-import { FUEL, OVERDRIVE, RALLY, multiplierForJobLevel } from "./gameConfig";
+import {
+  DAILY_STEP_GOAL,
+  FUEL,
+  RALLY,
+  multiplierForJobLevel,
+} from "./gameConfig";
 import {
   applyDeploy,
   ensureCurrentChallenge,
@@ -33,7 +39,6 @@ import { settleFuelAndIdle } from "./idle";
 import { STARTER_FUEL, fuelForBattlingHours } from "./fuelMath";
 import { settleShieldEarning } from "./shields";
 import { shieldsAfterEarning } from "./streakMath";
-import { overdriveExcessEarned } from "./overdrive";
 import { applyRally } from "./rally";
 import { energyEarned } from "./economy";
 import { deleteGuildCascade, hasOtherHumans } from "./guild";
@@ -194,6 +199,7 @@ async function injectFor(
   userId: Id<"users">,
   stepCount: number,
   date: string,
+  tzOffsetMinutes: number,
 ) {
   const clamped = Math.max(0, Math.floor(stepCount));
   // Injected steps grant fuel exactly like real syncs: on the day-max delta,
@@ -212,6 +218,16 @@ async function injectFor(
   // Shield earning settles on injects exactly like real syncs (STR-10) — the
   // dev inject-a-goal-day × advanceDay loop is how shield scenarios are built.
   await settleShieldEarning(ctx, userId, now);
+  // Overdrive retrigger (Core Loop v2 §5.4): an injected goal day arms Overdrive
+  // ×2 until the daily reset, IDENTICALLY to a real recordSteps sync — so the dev
+  // "inject a goal day" loop is now how Overdrive is tested (it REPLACES the
+  // retired fillOverdrive tool). Same end-of-day stamp; goal is a met-goal.
+  const dayMax = Math.max(prevDayMax, clamped);
+  if (dayMax >= DAILY_STEP_GOAL) {
+    await ctx.db.patch(userId, {
+      overdriveActiveUntil: endOfEffectiveDay(now, tzOffsetMinutes),
+    });
+  }
 }
 
 export const injectStepsFor = mutation({
@@ -224,9 +240,10 @@ export const injectStepsFor = mutation({
     assertDevEnabled();
     const caller = await getAuthUserId(ctx);
     const ug = caller ? await getUserGroup(ctx, caller) : null;
+    const tz = ug?.group.tzOffsetMinutes ?? 0;
     const now = await effectiveNow(ctx);
-    const day = date ?? dayString(now, ug?.group.tzOffsetMinutes ?? 0);
-    await injectFor(ctx, userId, stepCount, day);
+    const day = date ?? dayString(now, tz);
+    await injectFor(ctx, userId, stepCount, day, tz);
   },
 });
 
@@ -278,12 +295,8 @@ export const addSimulatedTeammate = mutation({
 
     if (dailySteps && dailySteps > 0) {
       const now = await effectiveNow(ctx);
-      await injectFor(
-        ctx,
-        botId,
-        dailySteps,
-        dayString(now, ug.group.tzOffsetMinutes ?? 0),
-      );
+      const tz = ug.group.tzOffsetMinutes ?? 0;
+      await injectFor(ctx, botId, dailySteps, dayString(now, tz), tz);
     }
     return botId;
   },
@@ -379,7 +392,8 @@ export const resetAccount = mutation({
       lastDeployDate: undefined,
       fuel: STARTER_FUEL,
       fuelSettledAt: now,
-      overdriveExcessSpent: 0,
+      // Overdrive is now goal-armed (Core Loop v2 §5.4): a clean slate just clears
+      // the arming stamp (overdriveExcessSpent is retired — no longer written).
       overdriveActiveUntil: undefined,
       shieldsHeld: 0,
       shieldLastEarnedWeek: undefined,
@@ -484,24 +498,10 @@ export const setFuelHours = mutation({
   },
 });
 
-/** Fill the Overdrive meter to exactly 100%. The charge is DERIVED
- *  ((excessEarned(ledger) − overdriveExcessSpent) / fullCharge, clamped), so
- *  this adjusts the SAME consumed-counter the derivation reads — never a
- *  parallel "charge" field that could diverge. `spent` may go negative here
- *  (a dev-only credit); the fraction clamps at 100%, and a real activation
- *  snaps spent back to the earned pool exactly as in production. */
-export const fillOverdrive = mutation({
-  args: {},
-  handler: async (ctx) => {
-    assertDevEnabled();
-    const caller = await getAuthUserId(ctx);
-    if (caller === null) throw new Error("Not signed in.");
-    const earned = await overdriveExcessEarned(ctx, caller);
-    await ctx.db.patch(caller, {
-      overdriveExcessSpent: earned - OVERDRIVE.fullChargeExcessSteps,
-    });
-  },
-});
+// fillOverdrive RETIRED (Core Loop v2 §5.4, STR-74): Overdrive is no longer a
+// chargeable meter. To test it, inject a goal day (≥ DAILY_STEP_GOAL) — injectFor
+// arms `overdriveActiveUntil = endOfEffectiveDay` exactly like a real sync, and
+// advanceDay rolls past the reset to watch it turn off (no punishment framing).
 
 /** Have a simulated teammate send the CALLER a rally, through the REAL
  *  applyRally path — rate limit (1/giver/day), receiver settle + Winded/Resting
@@ -527,9 +527,16 @@ export const simulateTeammateRally = mutation({
     );
     if (balance < RALLY.energyCost) {
       const now = await effectiveNow(ctx);
-      const today = dayString(now, ug.group.tzOffsetMinutes ?? 0);
+      const tz = ug.group.tzOffsetMinutes ?? 0;
+      const today = dayString(now, tz);
       const dayMax = await stepsForDate(ctx, giverId, today);
-      await injectFor(ctx, giverId, dayMax + (RALLY.energyCost - balance), today);
+      await injectFor(
+        ctx,
+        giverId,
+        dayMax + (RALLY.energyCost - balance),
+        today,
+        tz,
+      );
     }
     return await applyRally(ctx, giverId, caller);
   },

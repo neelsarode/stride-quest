@@ -109,15 +109,10 @@ export const FUEL = {
 export const OVERDRIVE = {
   idleDamageMult: 2, // TUNABLE start — was 3; all-day uptime → a gentler multiplier (spec §6.1)
   boostsSuperAttack: true, // TUNABLE start — the ×2 also multiplies the Super Attack damage line (spec §5.4)
-  // @deprecated Core Loop v2 — retired; logic removed in STR-74. Still READ by
-  // convex/overdrive.ts + convex/dev.ts + convex/fuelMath.ts (the charge model), so
-  // the value stays to keep compilation green until STR-74 deletes that path.
-  fullChargeExcessSteps: 4_000, // TUNABLE start — steps past DAILY_STEP_GOAL charged the meter
-  // @deprecated Core Loop v2 — retired; logic removed in STR-74. Still READ by
-  // convex/overdrive.ts + convex/game.ts (the fixed activate window), so the value stays.
-  durationHours: 4, // TUNABLE start — the old fixed activate window (now "until reset")
-  // maxStoredCharges (was 1) hard-deleted for Core Loop v2 — nothing outside a stale
-  // schema.ts comment referenced it (spec §5.4 retires the whole charge model).
+  // Core Loop v2 (STR-74) RETIRED the whole charge/activate model: the old
+  // fullChargeExcessSteps / durationHours / maxStoredCharges fields are DELETED
+  // (nothing reads them anymore — the charge helpers, the activate mutation, the
+  // fixed window, and the fillOverdrive dev tool all went with them).
 } as const;
 
 /** Rally: gift a Winded/Resting teammate some fight time, at a small real cost

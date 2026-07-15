@@ -82,15 +82,22 @@ export default defineSchema({
     // `undefined` means "never fueled yet" → bootstrap grants the starter tank.
     fuel: v.optional(v.number()),
     fuelSettledAt: v.optional(v.number()),
-    // --- Phase 3 Overdrive (spec §4). Charge is DERIVED like Energy:
-    //   excess earned (Σ per-day max(0, dayMax − DAILY_STEP_GOAL) from the ledger)
-    //   − overdriveExcessSpent, clamped to one full charge (4,000 excess).
-    // Activation consumes the WHOLE earned pool (maxStoredCharges = 1: overflow
-    // past 100% is lost, exactly like deploy zeroing the Energy bank).
+    // --- Overdrive (Core Loop v2, spec §5.4) — RETRIGGERED from the old
+    // charge-then-activate fever mode into an automatic goal-hit reward.
+    // @deprecated overdriveExcessSpent — the charge model is retired (STR-74).
+    // Kept as a non-breaking optional (NO migration), no longer written or read,
+    // exactly like challengeProgress.jobXp/energy; safe to drop in a later
+    // widen-narrow. Stale values on live docs are simply ignored.
     overdriveExcessSpent: v.optional(v.number()),
-    // Effective-ms timestamp when the current/most recent Overdrive ends. Stays
-    // on the doc after expiry — settles clamp the ×3 boundary inside their own
-    // window, so a stale value simply contributes 0 overdrive hours.
+    // Effective-ms wall-clock stamp for when the CURRENT Overdrive arming ends.
+    // REPURPOSED (Core Loop v2 §5.4): was the manual "+4h ×3" activate window;
+    // now recordSteps/injectFor auto-stamp it to endOfEffectiveDay(now) the moment
+    // today's steps cross DAILY_STEP_GOAL, so Overdrive ×2 runs until the daily
+    // reset and then reads as inactive (stamp in the past) until the next goal-hit
+    // re-arms it. `overdrive.active` is DERIVED as (stamp > effectiveNow); the
+    // settle machinery prices any live window off this same stamp
+    // (fuelMath.overdriveHoursAt). A stale value from the old manual system simply
+    // reads inactive (its time has passed).
     overdriveActiveUntil: v.optional(v.number()),
     // --- Phase 3 Streak Shields (STR-10, spec §6; PERSIST across weekly resets)
     // Settled shield count (0..STREAK_SHIELD.maxHeld). Earned by hitting the

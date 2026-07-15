@@ -1,17 +1,21 @@
 // =============================================================================
-// Overdrive window-pricing tests (STR-8, re-anchored for Core Loop v2 §6).
-// Pure functions, no Convex. Run with npm test.
-// Tunables in force: goal 6,000/day · ×2 idle mult · burn battling 225/h ·
+// Overdrive tests — Core Loop v2 (spec §5.4). Pure functions, no Convex.
+// Run with:  node --experimental-strip-types --test tests/
+// Tunables in force: goal 6,000/day · ×2 idle+super mult · burn battling 225/h ·
 // winded 112.5/h · threshold 1,350 · offline cap 10h · BASE_IDLE_DPH 150.
 //
-// The old charge/activate model is RETIRED (spec §5.4): the per-day-excess and
-// charge-fraction tests that lived here were DROPPED with this config change
-// (goal 8k→6k would have broken the excess ones, and the whole charge meter is
-// gone). STR-74 owns the new goal-gated "Overdrive until next reset" stamp +
-// OVERDRIVE.boostsSuperAttack logic and will add its own coverage. What remains
-// below still exercises the UNCHANGED piecewise OD window engine
-// (overdriveHoursAt / idleDamageForSegments / settleFuelAndIdleWindow), now at
-// the ×2 multiplier.
+// STR-74 RETIRED the charge/activate model (the per-day-excess + charge-fraction
+// tests were dropped in STR-73). Overdrive is now a GOAL-HIT reward: crossing
+// DAILY_STEP_GOAL stamps overdriveActiveUntil = endOfEffectiveDay(now), so ×2
+// runs until the daily reset and boosts BOTH idle AND the Super Attack.
+//
+// Coverage below:
+//   1. the UNCHANGED piecewise OD window engine (overdriveHoursAt /
+//      idleDamageForSegments / settleFuelAndIdleWindow), now at ×2 — proves idle
+//      still prices the armed window correctly;
+//   2. the NEW goal-armed stamp: endOfEffectiveDay + the shared isOverdriveActive
+//      predicate (the ONE check idle & Super both read);
+//   3. the NEW Super Attack ×2 factor (OVERDRIVE.boostsSuperAttack).
 // =============================================================================
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -22,14 +26,18 @@ import {
   settleFuelAndIdleWindow,
   walkFuel,
   idleDphFor,
+  isOverdriveActive,
 } from "../convex/fuelMath.ts";
+import { endOfEffectiveDay } from "../convex/time.ts";
 import { OVERDRIVE } from "../convex/gameConfig.ts";
 
 const HOUR_MS = 3_600_000;
 const approx = (a, b, msg) =>
   assert.ok(Math.abs(a - b) < 1e-9, msg ?? `${a} !== ${b}`);
 
-// --- the ×2 window inside the shared walk ---------------------------------------
+// =============================================================================
+// 1. The ×2 window inside the shared walk (engine unchanged; still prices idle).
+// =============================================================================
 
 test("overdrive doubles damage inside the boundary, burn is untouched", () => {
   // Full-ish tank (7,200), 6h window, overdrive covers the first 4h, mult 1:
@@ -101,14 +109,11 @@ test("overdrive boundary splits a fuel-state segment mid-window", () => {
   approx(r.fuel, 1_012.5);
 });
 
-// --- exactly `durationHours` effective hours, even across settles + offline gaps --
-// (durationHours is the retired fixed activate window, kept deprecated at 4; the
-// window-anchoring engine this pins is unchanged and survives into Core Loop v2.)
-
-test("acceptance: a charge yields EXACTLY 4 effective ×2 hours across settles + a 30h gap", () => {
-  // Activate at t0 (activation settles, so stamps = t0), tank 10,800, mult 1.
+test("an armed window yields EXACTLY its ×2 hours across settles + a 30h gap", () => {
+  // Overdrive armed until t0+4h (in the new model this is end-of-day, tested
+  // as a literal 4h remaining here), tank 10,800, mult 1.
   const t0 = 0;
-  const activeUntil = t0 + OVERDRIVE.durationHours * HOUR_MS; // t0 + 4h
+  const activeUntil = t0 + 4 * HOUR_MS;
   // Settle 1: open the app 2h in → 2h of ×2 = 600 damage.
   const s1 = settleFuelAndIdleWindow({
     fuel: 10_800,
@@ -131,8 +136,8 @@ test("acceptance: a charge yields EXACTLY 4 effective ×2 hours across settles +
     overdriveUntil: activeUntil,
   });
   assert.equal(s2.damage, 1_800);
-  // Total ×2 hours = 2 + 2 = exactly OVERDRIVE.durationHours. The offline
-  // pause truncated the FAR end of the window, never the overdrive head.
+  // Total ×2 hours = 2 + 2 = exactly the 4 armed hours. The offline pause
+  // truncated the FAR end of the window, never the overdrive head.
   const total = s1.damage + s2.damage; // 2,400
   const baseline = 12 * 150; // the same 12 settled hours without overdrive
   assert.equal(total - baseline, 4 * (300 - 150)); // exactly 4h of extra ×2
@@ -167,7 +172,84 @@ test("a resting hero earns nothing even under overdrive (×2 of zero is zero)", 
   assert.equal(r.burned, 0);
 });
 
-test("idleDphFor sanity under overdrive config: mult is data-driven", () => {
+test("idleDphFor sanity under overdrive config: mult is data-driven (×2)", () => {
   // The ×2 lives in OVERDRIVE.idleDamageMult (gameConfig), not hard-coded.
+  assert.equal(OVERDRIVE.idleDamageMult, 2);
   assert.equal(idleDphFor("battling", 1) * OVERDRIVE.idleDamageMult, 300);
+});
+
+// =============================================================================
+// 2. The NEW goal-armed stamp: endOfEffectiveDay + isOverdriveActive predicate.
+// =============================================================================
+
+test("endOfEffectiveDay is the next local midnight (tz 0 and tz -5)", () => {
+  // tz 0: 2026-07-15 10:30 UTC → 2026-07-16 00:00 UTC.
+  const nowUtc = Date.UTC(2026, 6, 15, 10, 30, 0);
+  assert.equal(endOfEffectiveDay(nowUtc, 0), Date.UTC(2026, 6, 16, 0, 0, 0));
+
+  // tz +300 (UTC-5): 2026-07-15 02:00 UTC is 2026-07-14 21:00 local → the next
+  // local midnight is 2026-07-15 00:00 local = 2026-07-15 05:00 UTC.
+  const nowUtc2 = Date.UTC(2026, 6, 15, 2, 0, 0);
+  assert.equal(endOfEffectiveDay(nowUtc2, 300), Date.UTC(2026, 6, 15, 5, 0, 0));
+});
+
+test("goal-hit arming: a fresh end-of-day stamp reads active until the reset", () => {
+  const now = Date.UTC(2026, 6, 15, 10, 30, 0);
+  const armedUntil = endOfEffectiveDay(now, 0); // the recordSteps stamp on a goal-hit
+  assert.ok(armedUntil > now); // always in the future → arms Overdrive
+  assert.equal(isOverdriveActive(armedUntil, now), true); // active right after the goal
+  assert.equal(isOverdriveActive(armedUntil, armedUntil - 1), true); // still active 1ms before reset
+  assert.equal(isOverdriveActive(armedUntil, armedUntil), false); // AT the reset → off (strictly >)
+  assert.equal(isOverdriveActive(armedUntil, armedUntil + 1), false); // after reset → off, no punish
+});
+
+test("isOverdriveActive predicate: unset / zero / past / future", () => {
+  const now = 1_000_000;
+  assert.equal(isOverdriveActive(undefined, now), false); // never armed
+  assert.equal(isOverdriveActive(0, now), false); // legacy zero
+  assert.equal(isOverdriveActive(now - 1, now), false); // stale (yesterday's stamp)
+  assert.equal(isOverdriveActive(now + 1, now), true); // armed
+});
+
+// =============================================================================
+// 3. The NEW Super Attack ×2 factor (spec §5.4, OVERDRIVE.boostsSuperAttack).
+// =============================================================================
+
+// Mirrors the pure factor in combat.applyDeploy (the mutation itself isn't
+// unit-testable; the factor expression is, like bonusMath tests pure helpers).
+function superAttackOverdriveMult(overdriveActiveUntil, effNow) {
+  return isOverdriveActive(overdriveActiveUntil, effNow) &&
+    OVERDRIVE.boostsSuperAttack
+    ? OVERDRIVE.idleDamageMult
+    : 1;
+}
+
+test("Super Attack factor is ×2 when armed & boostsSuperAttack, else ×1", () => {
+  assert.equal(OVERDRIVE.boostsSuperAttack, true);
+  const now = 1_000_000;
+  assert.equal(superAttackOverdriveMult(now + HOUR_MS, now), 2); // armed → ×2
+  assert.equal(superAttackOverdriveMult(now - 1, now), 1); // expired → ×1
+  assert.equal(superAttackOverdriveMult(undefined, now), 1); // never armed → ×1
+});
+
+test("worked example (spec §5.4): 10k bank, first-of-day crit, streak 1.4125", () => {
+  // The exact combat.applyDeploy damage line:
+  //   round(available × DAMAGE_PER_ENERGY(1) × critMult × streakMult × boost(1)
+  //         × overdriveMult)
+  const available = 10_000;
+  const critMult = 2; // first-of-day guaranteed crit
+  const streakMult = 1.4125; // the ticket's Job-2 streak scenario
+  const boost = 1;
+  const now = 1_000_000;
+
+  const withoutOD = Math.round(
+    available * 1 * critMult * streakMult * boost * superAttackOverdriveMult(undefined, now),
+  );
+  const withOD = Math.round(
+    available * 1 * critMult * streakMult * boost * superAttackOverdriveMult(now + HOUR_MS, now),
+  );
+
+  assert.equal(withoutOD, 28_250); // 10,000 × 2 × 1.4125
+  assert.equal(withOD, 56_500); // exactly ×2 the no-Overdrive Super Attack
+  assert.equal(withOD, withoutOD * OVERDRIVE.idleDamageMult); // the factor lands
 });

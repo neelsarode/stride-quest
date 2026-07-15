@@ -80,14 +80,13 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const resetAccount = useMutation(api.dev.resetAccount);
   const resetOnboarding = useMutation(api.dev.resetOnboarding);
   const setFuelHours = useMutation(api.dev.setFuelHours);
-  const fillOverdrive = useMutation(api.dev.fillOverdrive);
   const simRally = useMutation(api.dev.simulateTeammateRally);
   const drainTeammate = useMutation(api.dev.drainTeammate);
   const grantShield = useMutation(api.dev.grantShield);
   const consumeShield = useMutation(api.dev.consumeShield);
-  // The REAL activation mutation (what STR-14's button will call) — exposed
-  // here so Overdrive's ×3 window is testable before that UI exists.
-  const activateOverdrive = useMutation(api.overdrive.activateOverdrive);
+  // Overdrive is auto-armed on a goal-hit now (Core Loop v2 §5.4, STR-74): the
+  // fillOverdrive + activateOverdrive dev tools are retired — inject a goal day
+  // (the +N step buttons ≥ the goal) to arm it, advanceDay to watch it end.
 
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -144,12 +143,10 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
               {dash.fuel.state.toUpperCase()}
             </Text>
             <Text style={styles.readout}>
-              OD {dash.overdrive.chargePct}%
+              OD{" "}
               {dash.overdrive.active
-                ? ` · ACTIVE ${dash.overdrive.remainingSeconds}s left`
-                : dash.overdrive.ready
-                  ? " · READY"
-                  : ""}{" "}
+                ? `×${dash.overdrive.mult} ACTIVE ${dash.overdrive.remainingSeconds}s left`
+                : `${dash.overdrive.stepsToday}/${dash.overdrive.goal} to goal`}{" "}
               · SHIELDS {dash.shields.held}/{dash.shields.max}
             </Text>
             <Text style={styles.readout}>
@@ -217,8 +214,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
             <Btn label="Tank → 24h" onPress={run(() => setFuelHours({ hours: 24 }))} busy={busy} />
             <Btn label="Drain → Winded" onPress={run(() => setFuelHours({ hours: 3 }))} busy={busy} />
             <Btn label="Drain → Resting" onPress={run(() => setFuelHours({ hours: 0 }))} busy={busy} />
-            <Btn label="⚡ Overdrive 100%" onPress={run(() => fillOverdrive({}))} busy={busy} />
-            <Btn label="⚡ Activate ×3" onPress={run(() => activateOverdrive({}))} busy={busy} />
+            {/* Overdrive is goal-armed now (STR-74): inject a goal day above. */}
             <Btn label="+1 Shield" onPress={run(() => grantShield({}))} busy={busy} />
             <Btn label="−1 Shield" onPress={run(() => consumeShield({}))} busy={busy} />
           </Section>

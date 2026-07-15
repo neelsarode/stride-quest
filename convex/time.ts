@@ -58,6 +58,31 @@ function fmt(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** The guild-tz "end of the effective day" as a wall-clock instant (ms): the
+ *  NEXT local midnight after `instantMs`. Pure, and it reuses the exact tz
+ *  convention of dayString/weekRange — localMs = instantMs − tzOffsetMinutes·
+ *  MINUTE_MS (UTC getters then read the local calendar), and the local-midnight
+ *  is converted back to a real instant with + tzOffsetMinutes·MINUTE_MS.
+ *
+ *  Overdrive retrigger (Core Loop v2 §5.4): when today's steps cross the daily
+ *  goal, recordSteps/injectFor stamp `overdriveActiveUntil` to this instant, so
+ *  Overdrive ×2 runs until the daily reset and then reads as inactive (the stamp
+ *  is in the past) until the next goal-hit re-arms it. */
+export function endOfEffectiveDay(
+  instantMs: number,
+  tzOffsetMinutes: number,
+): number {
+  const local = new Date(instantMs - tzOffsetMinutes * MINUTE_MS);
+  // Next local calendar midnight (00:00 of the following local day), in local-ms.
+  const nextLocalMidnightMs = Date.UTC(
+    local.getUTCFullYear(),
+    local.getUTCMonth(),
+    local.getUTCDate() + 1,
+  );
+  // Convert that local-ms back to a real instant (undo the tz shift above).
+  return nextLocalMidnightMs + tzOffsetMinutes * MINUTE_MS;
+}
+
 // --- group-aware convenience (effective day/week for a guild) ----------------
 
 export async function effectiveDayForTz(

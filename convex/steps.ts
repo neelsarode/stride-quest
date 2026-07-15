@@ -7,11 +7,21 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getUserGroup } from "./players";
-import { effectiveDayForTz, effectiveNow, effectiveWeekForTz } from "./time";
+import {
+  effectiveDayForTz,
+  effectiveNow,
+  effectiveWeekForTz,
+  endOfEffectiveDay,
+} from "./time";
 import { settleFuelAndIdle } from "./idle";
 import { grantFuel, grantStarterFuelIfNew } from "./fuel";
 import { settleShieldEarning } from "./shields";
-import { FUEL, jobLevelForWeeklySteps, multiplierForJobLevel } from "./gameConfig";
+import {
+  DAILY_STEP_GOAL,
+  FUEL,
+  jobLevelForWeeklySteps,
+  multiplierForJobLevel,
+} from "./gameConfig";
 
 // A clearly absurd upper bound — a placeholder for real anti-cheat. The point is
 // that EVERY step number flows through the server, so validation (rate limits,
@@ -115,7 +125,22 @@ export const recordSteps = mutation({
     // settle earning so protection is in the pocket BEFORE it's needed.
     await settleShieldEarning(ctx, userId, now);
 
-    return await stepsForDate(ctx, userId, day);
+    // Overdrive retrigger (Core Loop v2 §5.4): the moment today's day-max crosses
+    // DAILY_STEP_GOAL, arm Overdrive ×2 until the daily reset by stamping
+    // `overdriveActiveUntil = endOfEffectiveDay(now)`. This is written LAST — only
+    // AFTER the settle above banked the pending fuel+idle window at the PRE-stamp
+    // state — so a past window is never retro-priced with today's end-of-day stamp
+    // (the settle-before-change invariant, spec §5.4). Idempotent: re-crossing the
+    // goal later today just re-writes the same end-of-day ms; falling back below
+    // the goal never disarms today's Overdrive (a met goal is a met goal).
+    const dayMax = await stepsForDate(ctx, userId, day);
+    if (dayMax >= DAILY_STEP_GOAL) {
+      await ctx.db.patch(userId, {
+        overdriveActiveUntil: endOfEffectiveDay(now, tz ?? 0),
+      });
+    }
+
+    return dayMax;
   },
 });
 
