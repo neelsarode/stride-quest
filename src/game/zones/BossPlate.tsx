@@ -33,7 +33,7 @@ import { zoneStyles } from "./zoneStyle";
 // --- local layout feel (component-local by design; the shared VERTICAL rhythm
 // lives in GAME_ZONES, reconciled in STR-71 — the plate's own row gaps / gutter
 // stay here where they're read).
-const PLATE_GAP = 2; // dp between plate text rows
+const PLATE_GAP = 6; // dp between plate rows (name / subtitle / bar) — was 2, too cramped
 const OUTER_PAD = 18; // total side gutter (9 dp each) — battlefield-ui BOSS_BAR_W math
 const GHOST_HOLD_MS = 300; // how long the red chip lingers before catching down
 

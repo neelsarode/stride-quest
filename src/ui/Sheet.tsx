@@ -52,7 +52,9 @@ export function Sheet({
 
   useEffect(() => {
     if (visible) {
-      ty.value = withSpring(0, { damping: 18, stiffness: 180 });
+      // Near-critical spring — a gentle settle with almost no overshoot (the
+      // old damping:18 overshot hard on a full-panel slide; toned down ~90%).
+      ty.value = withSpring(0, { damping: 26, stiffness: 200 });
       scrimO.value = withTiming(1, { duration: 180 });
     }
   }, [visible, ty, scrimO, panelH]);

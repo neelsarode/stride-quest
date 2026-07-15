@@ -81,10 +81,11 @@ export const GAME_ZONES = {
   /** Boss plate: centered gold HP bar (effective y≈104, mock #bossbar). Was 56 +
    *  a local BOSS_EXTRA_TOP=26; reconciled to a single offset in STR-71. */
   bossPlateTop: 90,
-  /** Party rail: horizontal portrait row, centered (effective y≈210 — below the
-   *  boss bar's bottom ≈168 with a clean gap, near the mock's 216 column start). */
-  partyRailTop: 196,
-  /** Right nav: guild / stats / help column (top-aligned with the party rail). */
+  /** Party rail: horizontal portrait row, centered. Sits just under the boss
+   *  bar's bottom with a small gap (was 196 — too far from the bar per playtest). */
+  partyRailTop: 180,
+  /** Right nav: guild / stats / help column (kept a touch lower so it clears the
+   *  full-width boss bar's right end). */
   rightNavTop: 196,
   rightNavRight: 9,
   /** Command dock (DEPLOY / COLLECT / steps ring), above the job strip. Raised
