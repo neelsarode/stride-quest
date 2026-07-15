@@ -23,6 +23,7 @@ over features.
 **Stride Quest** — https://linear.app/stridequest/project/stride-quest-40ccda389ff9).
 Milestones M1 (fuel hybrid loop) / M2 (battle-scene RN port) / M2.5 (onboarding
 & first session — spec: docs/superpowers/specs/2026-07-13-onboarding-design.md)
+/ M2.75 (game screen — full-screen pixel HUD; ✅ the DEFAULT home as of STR-71)
 / M3 (monetization) / M4 (platform & release) mirror the phases in §7. Keep
 issues updated as work happens (In Progress → Done); new work gets a ticket.
 
@@ -96,8 +97,14 @@ walking-app/
     ├── battle/              # ⭐ the LIVE battle scene (M2): Sprite/Fighter/Projectile/Boss/BattleScene,
     │                        #   ConnectedBattleScene (Convex adapter), RestZzz, prefetch,
     │                        #   + GENERATED anchors.ts/spriteMap.ts/sprites/ (`npm run pack-sprites`)
+    ├── fuelCopy.ts          # shared fuel-time copy (fmtFightShort/Time/MoreTime — one home, M2.75)
     ├── health/healthkit.ts(.ios.ts)  # step-source seam: stub vs real HealthKit
-    └── screens/             # DashboardScreen + BackendSetupScreen + onboarding/ (flow, choose-hero, guild, health beats)
+    ├── ui/                  # ⭐ baked pixel-HUD primitives (M2.75): PixelText/Frame/Bar/Button/
+    │                        #   Portrait/Ring/Beacon/Sheet/Popover/Modal + GENERATED uiMap/theme (`npm run pack-ui`)
+    ├── game/                # ⭐ the DEFAULT home (M2.75): GameScreen + useGameEngine (shared brain) +
+    │                        #   zones/* (TopBar/FuelGauge/BossPlate/PartyRail/RightNav/CommandDock/JobStrip/
+    │                        #   OverdriveBar) + Overlays + sheets/* — the full-screen HUD over the battle scene
+    └── screens/             # DashboardScreen (fallback behind the flag) + BackendSetupScreen + onboarding/
 ```
 
 **Two "one place to change it" modules (by design):**
@@ -444,14 +451,78 @@ deliberately NOT part of M2 (future polish; functional cards keep their style).
   REST switches) and LIVE SCENE (real events) sections. iOS Simulator
   spot-check of the scene = the M4 pass.
 
-### M2.75 — Game Screen (full-screen pixel HUD) — PLANNED, spiked 2026-07-15
-Spec: `docs/superpowers/specs/2026-07-15-game-screen-design.md` (decisions
-made). The dashboard becomes one full-screen stage: scene = the app canvas,
-stone+gold ui-kit HUD around it per `dashboard-ui.html`. Rendering DECIDED by
-spike: bake the deterministic ui-kit to PNGs via `ui-export-rig.html` (+
-bitmap-font atlas → `<PixelText>`); react-native-skia rejected (evidence in
-spec §2). Behind `DEV_FLAGS.useGameScreen`; no logic changes. Linear
-milestone **M2.75**, 8 tickets.
+### M2.75 — Game Screen (full-screen pixel HUD) ✅ COMPLETE + E2E-VERIFIED (STR-66…71, 2026-07-15)
+Spec: `docs/superpowers/specs/2026-07-15-game-screen-design.md` (decisions held).
+The app now **opens into one full-screen stage**: the live battle scene is the
+canvas, and the stone+gold ui-kit HUD floats around it as self-positioning ZONES
+(`src/game/zones/*` + `Overlays`/`sheets/*`) plus the re-skinned feedback layer —
+all baked-PNG + `<PixelText>` chrome (skia rejected; spike §2). **No game logic
+changed** — `GameScreen` and the classic `DashboardScreen` share ONE
+`useGameEngine`, so the flag only swaps presentation. As of STR-71 the game
+screen is the **DEFAULT home** (`DEV_FLAGS.useGameScreen = true`); DashboardScreen
+stays behind the flag as the fallback for one milestone (deletion is an M4 line).
+
+- **STR-71 reconcile** (integration polish before verify): the STR-67 starting
+  `GAME_ZONES` offsets over-constrained the top band (boss bottom kissed the
+  party rail). Retuned to the mock's rhythm at 390dp and folded STR-67's local
+  `BOSS_EXTRA_TOP` hack into `bossPlateTop` — identity→fuel→boss→rail now stack
+  with clean gaps (effective y ≈ fuel 66 / boss 104 / rail 210, matching
+  `dashboard-ui.html`). Consolidated the flagged local consts: STR-69's
+  per-class/job `PORTRAIT_SPRITES` map → shared `src/config/assets.ts`
+  (`portraitSpriteFor`); the duplicated `fmtFightShort` → shared `src/fuelCopy.ts`
+  imported by BOTH FuelGauge and DashboardScreen (byte-identical strings). Fixed
+  the long-string OVERFLOW: the `toast_silver`/`banner_gold` frames are
+  horizontal 3-slices (fixed one-line height), so a taller/9-slice bake is out of
+  scope (§5) — instead `Toast` + `Banner` now **shrink-to-fit width** (scale the
+  chip+text down uniformly only when a line would run off-screen; short strings
+  keep the crisp base scale; copy byte-identical). The banner subtitle overflow
+  was found live in scenario 2 (the resting "…rejoins the fight." line clipped
+  both edges) and fixed with the same clamp.
+- **E2E-VERIFIED in the browser** (STR-16/STR-59 rigor; cloud dev deployment,
+  `useGameScreen = true`, 390dp + desktop, numbers predicted-then-checked-to-the-
+  digit), all 8 scenarios pass:
+  1. **Solo loop:** inject +10k → JOB 1→2, FUEL 54h (24h starter+10k = 48h tank
+     +6h winded tail), OD 50% (excess 2k/4k), energy 10k, ring goal-hit; DEPLOY =
+     `CRIT! 28,250` (10,000 × 1.4125 streak × ×2 first-of-day crit), boss
+     629,995→601,745 (exact −28,250), gold bar ghost+flash, streak 0→1, energy→0;
+     collect banks pending (auto-collect on mount: 3,000 idle @ JOB 2 (300/h ×10h
+     cap) → boss →598,745).
+  2. **State coverage:** Winded = amber chip (never red); Resting = calm/sky chip
+     + dignified "CATCHING BREATH" banner (never red); job-up badge+XP+banner;
+     Overdrive charge→glowing ACTIVATE→activate ("OVERDRIVE! / X3 4H")→"X3 …"
+     countdown; streak-shield chip (⬇X1).
+  3. **Bonus week:** kill = `CRIT! 624,000` (150,000 × 2.08 × ×2) → crowned plate
+     "CROWNED THE SLOTH TYRANT / VICTORY WEEK" + accumulating meter + tier ticks;
+     STR-53 regression GREEN — bonus deploys keep spending/ticking (−20,800 =
+     10,000×2.08 grew the meter 157,500→136,700; −249,600 crossed ×1.1 →
+     "X1.1 POWER SECURED" + "44,410 MORE… ×1.2"); Monday rollover → boost chip
+     "X1.1 POWER" on the plate + reward banner "X1.1 POWER ALL WEEK! / CREW DEALT
+     270,590 BONUS DAMAGE LAST WEEK." ONCE (no re-fire on reload).
+  4. **Co-op:** roster grows live on join (rail gained a tile); a teammate deploy
+     animates on-screen (−20,000) and drops the ONE shared boss bar
+     (149,998→129,998); rally round-trip via the rail popover — recipient
+     celebration "BOT 651 RALLIED YOU!" + outbound SEND RALLY 500 → sender toast
+     (500 energy spent, beacon cleared). (Driven through the DevPanel simulated-
+     teammate tools, which run the REAL shared-guild/boss mutations + reactive
+     queries — a 2nd isolated browser context was not spun up; the second-screen
+     render is the identical component/query.)
+  5. **Layout:** 390dp stacks cleanly with no top-zone collisions and matches the
+     mock; desktop width flips ART_SCALE 2→3 and the HUD scales up correctly.
+     KNOWN minor nit (not a regression): at ART_SCALE 3 the Overdrive ACTIVATE bar
+     and the DEPLOY streak chip overlap ~12–19dp — a pre-existing STR-68 dock
+     scale-3 tuning matter (phone scale-2 is clean); needs scale-aware dock
+     positioning, left for STR-68 follow-up.
+  6. **Regression, flag OFF:** classic DashboardScreen fully functional
+     (fuelCopy consolidation verified live — "fights 44h more" / "44 more hours");
+     onboarding founder smoke (choose hero → START A GUILD → CREATE → land in
+     battle) unaffected; `fx-test.html?verify=1` → `PASS — 80/80`.
+  7. **Perf:** DevPanel UI-GALLERY RENDER COUNT stayed FLAT (3→3) across ~4s
+     (~240 frames) of shared-value bar/beacon/ring animation (spec §12 zero-per-
+     frame-re-render proof); 0 console errors on every clean load (the only
+     session errors were expected game rejections surfaced from dev tools).
+  8. **Flip:** `DEV_FLAGS.useGameScreen` default → `true`; `tsc --noEmit` clean;
+     78/78 tests; scenario-1 re-confirmed with the flag on (`CRIT! 4,313` ==
+     the exact boss HP drop).
 
 ### Phase 3+ — Deferred (architect for, don't build)
 Recognition screens, IAP, cosmetics, guild-vs-guild / global.
