@@ -1,23 +1,251 @@
 // =============================================================================
-// PartyRail — GameScreen party zone (horizontal portrait row + invite slot).
-// SCAFFOLD STUB (M2.75): positioned empty container only.
-// ► Filled by STR-69 (party rail + right nav + popovers + sheets). Names hidden
-// until tap (owner decision — spec §10-Q2); tap a portrait → member popover.
+// PartyRail — GameScreen party zone (STR-69). A horizontal row of 18-art
+// portrait tiles from guild.overview (1–8 members, me included): each tile is a
+// portrait + status dot + a fuel sliver, with a gold rally BEACON + red dot on
+// a RESTING teammate (the at-a-glance "go rally them" call — not self-shame, so
+// my own resting stays the dignified sky dot with no beacon). An invite (+) slot
+// caps the row while there's an open seat. NAMES ARE HIDDEN until tap (owner
+// decision, spec §10-Q2) — tapping a tile opens its member popover, tapping the
+// (+) opens the invite popover (both hosted by ../Overlays).
 // =============================================================================
-import { View } from "react-native";
+import { useRef } from "react";
+import { Pressable, View, type ImageSourcePropType } from "react-native";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import {
+  Beacon,
+  Portrait,
+  StatusDot,
+  UIScaleProvider,
+  type HeroState,
+} from "../../ui";
+import { BakedImage } from "../../ui/Baked";
+import { UI_FILLS, UI_PALETTE } from "../../ui/theme";
+import { GUILD } from "../../../convex/gameConfig";
 import { GAME_ZONES } from "../../config/assets";
 import { useGameLayout } from "../useGameLayout";
+import { toggleInvite, toggleMember, type AnchorRect } from "../Overlays";
 import { zoneStyles } from "./zoneStyle";
 
+// Full-body portrait sprites per class × job level (south.png). RN-web has no
+// Image.resolveAssetSource, so each carries its intrinsic square pixel size for
+// the Portrait crop math (sizes measured from the art; sizes vary per job).
+// TODO consolidate into a generated shared map (assets.ts is STR-68-owned this
+// milestone) — same shape as src/battle/spriteMap.ts.
+const PORTRAIT_SPRITES: Record<string, { src: ImageSourcePropType; size: number }[]> = {
+  archer: [
+    { src: require("../../../characters/archer/1_greenhorn/south.png"), size: 120 },
+    { src: require("../../../characters/archer/2_scout/south.png"), size: 124 },
+    { src: require("../../../characters/archer/3_hunter/south.png"), size: 128 },
+    { src: require("../../../characters/archer/4_ranger/south.png"), size: 124 },
+    { src: require("../../../characters/archer/5_sentinel/south.png"), size: 128 },
+  ],
+  assassin: [
+    { src: require("../../../characters/assassin/1_footpad/south.png"), size: 116 },
+    { src: require("../../../characters/assassin/2_prowler/south.png"), size: 128 },
+    { src: require("../../../characters/assassin/3_nightblade/south.png"), size: 124 },
+    { src: require("../../../characters/assassin/4_assassin/south.png"), size: 124 },
+    { src: require("../../../characters/assassin/5_shadowlord/south.png"), size: 128 },
+  ],
+  bard: [
+    { src: require("../../../characters/bard/1_busker/south.png"), size: 124 },
+    { src: require("../../../characters/bard/2_minstrel/south.png"), size: 120 },
+    { src: require("../../../characters/bard/3_troubadour/south.png"), size: 120 },
+    { src: require("../../../characters/bard/4_bard/south.png"), size: 124 },
+    { src: require("../../../characters/bard/5_maestro/south.png"), size: 128 },
+  ],
+  mage: [
+    { src: require("../../../characters/mage/1_apprentice/south.png"), size: 124 },
+    { src: require("../../../characters/mage/2_adept/south.png"), size: 124 },
+    { src: require("../../../characters/mage/3_conjurer/south.png"), size: 124 },
+    { src: require("../../../characters/mage/4_sorcerer/south.png"), size: 128 },
+    { src: require("../../../characters/mage/5_archmage/south.png"), size: 120 },
+  ],
+  medic: [
+    { src: require("../../../characters/medic/1_acolyte/south.png"), size: 124 },
+    { src: require("../../../characters/medic/2_healer/south.png"), size: 128 },
+    { src: require("../../../characters/medic/3_cleric/south.png"), size: 120 },
+    { src: require("../../../characters/medic/4_priest/south.png"), size: 124 },
+    { src: require("../../../characters/medic/5_hierophant/south.png"), size: 128 },
+  ],
+  paladin: [
+    { src: require("../../../characters/paladin/1_squire/south.png"), size: 124 },
+    { src: require("../../../characters/paladin/2_knight/south.png"), size: 120 },
+    { src: require("../../../characters/paladin/3_crusader/south.png"), size: 120 },
+    { src: require("../../../characters/paladin/4_paladin/south.png"), size: 124 },
+    { src: require("../../../characters/paladin/5_lightbringer/south.png"), size: 128 },
+  ],
+  warlock: [
+    { src: require("../../../characters/warlock/1_initiate/south.png"), size: 120 },
+    { src: require("../../../characters/warlock/2_cultist/south.png"), size: 120 },
+    { src: require("../../../characters/warlock/3_hexer/south.png"), size: 120 },
+    { src: require("../../../characters/warlock/4_warlock/south.png"), size: 120 },
+    { src: require("../../../characters/warlock/5_dreadlord/south.png"), size: 128 },
+  ],
+  warrior: [
+    { src: require("../../../characters/warrior/1_rookie/south.png"), size: 124 },
+    { src: require("../../../characters/warrior/2_strider/south.png"), size: 124 },
+    { src: require("../../../characters/warrior/3_vanguard/south.png"), size: 124 },
+    { src: require("../../../characters/warrior/4_champion/south.png"), size: 128 },
+    { src: require("../../../characters/warrior/5_warlord/south.png"), size: 128 },
+  ],
+};
+
+function portraitFor(cls: string, jobLevel: number) {
+  const jobs = PORTRAIT_SPRITES[cls] ?? PORTRAIT_SPRITES.warrior;
+  return jobs[Math.min(Math.max(jobLevel, 1), 5) - 1];
+}
+
+// Fuel-sliver proxy per hero state — overview carries heroState, not a raw fuel
+// value for teammates, so the sliver reads the state (battling = a full green
+// bar, winded = a short amber one, resting = empty → "rally me").
+const SLIVER: Record<HeroState, { frac: number; fam: { mid: string } } | null> = {
+  battling: { frac: 1, fam: UI_FILLS.green },
+  winded: { frac: 0.34, fam: UI_FILLS.yellow },
+  resting: null,
+  rally: null,
+};
+
+type Member = {
+  userId: string;
+  displayName: string;
+  class: string;
+  isMe: boolean;
+  jobLevel: number;
+  heroState: HeroState;
+};
+
 export function PartyRail() {
-  const { topPad } = useGameLayout();
+  const { topPad, artScale } = useGameLayout();
+  const overview = useQuery(api.guild.overview, {});
+  const members = (overview?.members ?? []) as Member[];
+  const showInvite =
+    overview?.inviteCode != null && members.length < GUILD.maxMembers;
+
   return (
     <View
       testID="zone-party-rail"
-      style={[zoneStyles.zone, zoneStyles.centeredRow, { top: topPad + GAME_ZONES.partyRailTop }]}
+      style={[
+        zoneStyles.zone,
+        zoneStyles.centeredRow,
+        { top: topPad + GAME_ZONES.partyRailTop },
+      ]}
     >
-      {/* STR-69: 18-art portrait tiles from guild.overview (1–8, me incl.), fuel
-          sliver + status dot + rally beacon on resting mates, invite (+) slot at end. */}
+      <UIScaleProvider value={artScale}>
+        <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 3 * artScale }}>
+          {members.map((m) => (
+            <PartyTile key={m.userId} member={m} scale={artScale} />
+          ))}
+          {showInvite && <InviteSlot scale={artScale} />}
+        </View>
+      </UIScaleProvider>
     </View>
+  );
+}
+
+function PartyTile({ member, scale }: { member: Member; scale: number }) {
+  const ref = useRef<View>(null);
+  const restingMate = member.heroState === "resting" && !member.isMe;
+  const dotState: HeroState = restingMate ? "rally" : member.heroState;
+  const sprite = portraitFor(member.class, member.jobLevel);
+
+  const onPress = () => {
+    ref.current?.measureInWindow((x, y, width, height) => {
+      const rect: AnchorRect = { x, y, width, height };
+      toggleMember(member.userId, rect);
+    });
+  };
+
+  return (
+    <Pressable ref={ref} onPress={onPress} style={{ alignItems: "center" }}>
+      <View style={{ width: 18 * scale, height: 18 * scale }}>
+        {/* Beacon drawn first so the portrait paints over its centre, leaving
+            the 1-art-px gold ring showing as a border (battlefield-ui recipe). */}
+        {restingMate && (
+          <View style={{ position: "absolute", left: -1 * scale, top: -1 * scale }}>
+            <Beacon active scale={scale} />
+          </View>
+        )}
+        <Portrait
+          size={18}
+          source={sprite.src}
+          sourceSize={sprite.size}
+          cropKey={member.class}
+          scale={scale}
+        />
+        <View style={{ position: "absolute", right: 0, bottom: 0 }}>
+          <StatusDot state={dotState} scale={scale} />
+        </View>
+      </View>
+      <FuelSliver state={member.heroState} scale={scale} />
+    </Pressable>
+  );
+}
+
+function FuelSliver({ state, scale }: { state: HeroState; scale: number }) {
+  const s = SLIVER[state];
+  return (
+    <View
+      style={{
+        width: 18 * scale,
+        height: 5 * scale,
+        marginTop: 1 * scale,
+        borderRadius: 2 * scale,
+        backgroundColor: UI_PALETTE.outline,
+        overflow: "hidden",
+      }}
+    >
+      {s && (
+        <View
+          style={{
+            position: "absolute",
+            left: 1 * scale,
+            top: 1 * scale,
+            width: Math.max(1, Math.round(16 * s.frac)) * scale,
+            height: 3 * scale,
+            backgroundColor: s.fam.mid,
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+function InviteSlot({ scale }: { scale: number }) {
+  const ref = useRef<View>(null);
+  const onPress = () => {
+    ref.current?.measureInWindow((x, y, width, height) => {
+      toggleInvite({ x, y, width, height });
+    });
+  };
+  return (
+    <Pressable ref={ref} onPress={onPress} style={{ alignItems: "center" }}>
+      <View style={{ width: 18 * scale, height: 18 * scale }}>
+        <BakedImage name="portrait_18" scale={scale} />
+        {/* chunky + centred in the 18-art-px well (silver, all-even geometry) */}
+        <View
+          style={{
+            position: "absolute",
+            left: 6 * scale,
+            top: 8 * scale,
+            width: 6 * scale,
+            height: 2 * scale,
+            backgroundColor: UI_PALETTE.silver_rim,
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            left: 8 * scale,
+            top: 6 * scale,
+            width: 2 * scale,
+            height: 6 * scale,
+            backgroundColor: UI_PALETTE.silver_rim,
+          }}
+        />
+      </View>
+      {/* spacer matching the mates' fuel-sliver row so tops align */}
+      <View style={{ width: 18 * scale, height: 5 * scale, marginTop: 1 * scale }} />
+    </Pressable>
   );
 }
