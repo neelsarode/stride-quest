@@ -33,6 +33,7 @@
     "ios": "expo start --ios",
     "convex": "convex dev",
     "pack-sprites": "node scripts/pack-sprites.mjs",
+    "pack-ui": "node scripts/pack-ui.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.mjs"
   },

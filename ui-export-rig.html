@@ -5,27 +5,55 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Stride Quest — UI export rig (bake ui-kit → PNGs)</title>
 <!--
-  UI EXPORT RIG — SPIKE PROTOTYPE for the M2.75 Game Screen
-  (docs/superpowers/specs/2026-07-15-game-screen-design.md).
+  UI EXPORT RIG — the M2.75 Game Screen asset pipeline, step 1 (STR-63).
+  Spec: docs/superpowers/specs/2026-07-15-game-screen-design.md (§2 render
+  decision, §3 pipeline, §4 text, §5 dynamic sizing, §6 zone inventory, §13 files).
 
   Bakes the procedural ui-kit chrome (assets/ui-kit.js) into PNG assets the
-  React Native app can render — RN has no canvas, but the kit is fully
-  deterministic, so every component can be exported once and composited in RN
-  as: baked frame Image + plain View fills + <PixelText> from the font atlas.
-  (Exactly how dashboard-ui.html composites #fuelfill inside bar art.)
+  React Native app renders as Images — RN has no canvas, but the kit is fully
+  deterministic, so every component is exported once and composited in RN as:
+  baked frame/face Image + plain View fills inside the wells + <PixelText> from
+  the font atlas. (Exactly how dashboard-ui.html composites #fuelfill inside bar
+  art, and how the battle scene plays packed sprite strips.)
 
-  What it does:
-    - draws each entry of EXPORT_SPECS at art scale, then nearest-neighbor
-      upscales to @1x/@2x/@3x (1 art px = 2dp on phones, so @1x = ×2 canvas px)
-    - bakes the kit's pixel FONT into a white glyph atlas + width metrics
-    - publishes window.__EXPORTS = { files: {name: dataURL}, metrics, report }
-      for a script (or Playwright) to save via scripts/pack-ui.mjs
-    - renders a COMPOSITE CHECK: rebuilds a live bar + label using ONLY the
-      exported PNGs + positioned divs — the DOM twin of the RN component tree.
+  This GROWS the spike (which proved 3 components + font atlas) into the WHOLE
+  ui-style-lab.html inventory (the UI source of truth). Theme baked = S8
+  CELESTIAL SILVER only (spec §3, §10-Q3): silver frames, gold + sky vitals.
 
-  Determinism contract: same ui-kit.js in → byte-identical PNGs out (the kit
-  draws with integer fillRect + a seeded speckle hash; no Date, no random).
-  Verified in the M2.75 spike: two fresh loads → identical SHA-256 per file.
+  WHAT IS BAKED (spec rule: FRAMES / FACES / GLYPHS — never text/data/numbers):
+    - hi-fi bar frames (full h20, slim h14) as 3-SLICE (left cap / 1px stretch
+      mid / right cap). The frame is horizontally uniform mid-band EXCEPT
+      speckles + glint, so those live on the CAPS ONLY (documented fidelity
+      delta, spec §5). Wells bake dark; fills overlay at runtime.
+    - button/plate FACES (gold + silver): DEPLOY 56x37, nav 18x18, collect
+      24x24, modal-close 15x14 (fixed); secondary text buttons + banner + modal
+      title plate as 3-SLICE gradient faces (dynamic label width).
+    - chip / toast / tooltip 3-slice faces; tooltip down-pointer sprite.
+    - badge roundel, portrait frames (18/20/22/30), status dots x4, rally beacon
+      rings x3, steps ring (33-frame strip), invite plus, 8-cell segment frame.
+    - popover + modal FRAMES as vertical 3-SLICE (fixed width, dynamic height) +
+      pointer arrows.
+    - icon sprites (heart/gem/coin/star/shield/swords/banner/arrows) in natural
+      palette colors.
+    - font_white + font_white_outlined atlases (+ metrics for both).
+
+  SCALE (spec §3): the kit draws at ART resolution (1 art px = 1 canvas px);
+  the rig upscales nearest-neighbour to @1x = 2 canvas px per art px (1 art px =
+  2dp on phones). @2x (×4) and @3x (×6) are derived by scripts/pack-ui.mjs via
+  deterministic nearest-neighbour so the JSON stays small — RN's asset suffixes
+  then give every device integer-exact pixels with ZERO runtime scaling.
+
+  HEADLESS PRODUCTION (documented so it is reproducible — the house rule that
+  the HTML rig renders and a repo script packs, fx-anchors / pack-sprites style):
+    1. serve the repo:            python3 -m http.server 8899
+    2. open http://localhost:8899/ui-export-rig.html  (file:// taints canvas)
+    3. dump window.__EXPORTS to ui-export.json (a human clicks DOWNLOAD; a
+       headless driver returns window.__EXPORTS from an evaluate → file)
+    4. npm run pack-ui  → src/ui/assets/*.png + src/ui/uiMap.ts + src/ui/theme.ts
+
+  Determinism contract: same ui-kit.js in → byte-identical PNGs out (integer
+  fillRect + a seeded speckle hash; no Date, no random). Two fresh loads produce
+  identical SHA-256 per file (M2.75 spike-verified; pack-ui re-verifies bytes).
 -->
 <style>
   :root { color-scheme: dark; }
@@ -37,192 +65,461 @@
     margin-top: 14px; background: #15181d; }
   h2 { font-size: 11px; letter-spacing: 2px; color: #98a2b0; font-weight: 700;
     margin: 0 0 8px; text-transform: uppercase; }
-  .row { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
   .cell { text-align: center; }
-  .cell .cap { font-size: 9px; color: #667080; margin-top: 4px; }
-  #report { font-size: 11px; line-height: 1.7; color: #98a2b0; white-space: pre; }
+  .cell .cap { font-size: 8px; color: #667080; margin-top: 3px; max-width: 120px; }
+  #report { font-size: 11px; line-height: 1.6; color: #98a2b0; white-space: pre; }
+  #dl { background: #ffce6b; color: #201607; border: 0; border-radius: 5px;
+    font: inherit; font-weight: 700; font-size: 13px; padding: 9px 18px; cursor: pointer; }
+  #dlstatus { font-size: 11px; color: #9ae06b; margin-left: 12px; }
 </style>
 </head>
 <body>
 <div id="page">
-  <h2 style="margin-top:18px">UI EXPORT RIG — bakes assets/ui-kit.js → PNG (spike, M2.75)</h2>
-  <section><h2>Exported components (@1x = 2 canvas px per art px)</h2><div class="row" id="gallery"></div></section>
-  <section><h2>Font atlas (white, tintable)</h2><div id="fontrow"></div></section>
-  <section><h2>Composite check — baked PNGs + divs only (the RN component tree, in DOM)</h2>
-    <div id="check" style="padding:10px 6px 14px"></div>
-    <div class="cap" style="font-size:9px;color:#667080">No live canvas here: frame = exported PNG, fill = a positioned div, label = glyph divs sampling the exported atlas. If this looks right, the RN version looks right.</div>
+  <h2 style="margin-top:18px">UI EXPORT RIG — bakes assets/ui-kit.js → PNG (STR-63, full inventory)</h2>
+  <section>
+    <button id="dl">DOWNLOAD ui-export.json</button>
+    <span id="dlstatus"></span>
+    <div class="cell cap" style="max-width:none;margin-top:8px">
+      Also staged on <code>window.__EXPORTS</code> for headless packing (npm run pack-ui).
+    </div>
   </section>
+  <section><h2>Exported components (shown @3x density)</h2><div class="row" id="gallery"></div></section>
+  <section><h2>Font atlases (white + outlined, tintable)</h2><div id="fontrow" class="row"></div></section>
   <section><h2>Export report</h2><div id="report">drawing…</div></section>
 </div>
 
 <script src="assets/ui-kit.js"></script>
 <script>
 'use strict';
-// ---------------------------------------------------------------------------
-// Spike inventory — 3 representative components. The full M2.75 inventory
-// (every component in the spec's port table) extends EXPORT_SPECS the same way.
-// Dynamic text is NEVER baked (labels/costs/numbers come from <PixelText>);
-// wells stay baked dark (fills overlay INSIDE them, dashboard-ui style).
-// ---------------------------------------------------------------------------
-const AG = M('silver'), AU = M('gold');   // S8 CELESTIAL SILVER (the live style)
+// ===========================================================================
+// S8 CELESTIAL SILVER — the one theme baked for M2.75 (spec §3/§10-Q3).
+// Materials: AG silver = primary frames; AU gold = accent/secondary faces.
+// Wells: night_w / night_wd (midnight). Fills (gold vitals, sky fuel) are
+// runtime Views — never baked (spec §5) — but their hexes ship in theme.ts.
+// ===========================================================================
+const AG = M('silver'), AU = M('gold');
+const hex = k => PALETTE[k];
+const fam3 = (l, m, d) => ({ light: hex(l), mid: hex(m), dark: hex(d) });
 
-const EXPORT_SPECS = [
-  // The gold hero-button face (DEPLOY family) — static emblem, no text baked.
-  { name: 'btn_gold_swords_56x37', w: 56, h: 37,
-    draw: ctx => hifiButton(ctx, 0, 0, 56, 36, AU, { sprite: CROSSED_SWORDS }) },
-  // Slim silver bar frame at the style-lab canonical width — well baked dark,
-  // fill is a runtime View inside {wx:3, wy:3, ww:w-6, wh:h-6}.
-  { name: 'bar_slim_silver_144x14', w: 144, h: 14,
-    draw: ctx => hifiFrameSlim(ctx, 0, 0, 144, 14, 6, AG, 'night_w') },
-  // Party-rail portrait frame (18 art px, battlefield-ui recipe) — the
-  // character sprite is cropped INTO the well at runtime (PORTRAIT_CROPS).
-  { name: 'portrait_frame_silver_18x18', w: 18, h: 18,
-    draw: ctx => hifiFrameSlim(ctx, 0, 0, 18, 18, 5, AG, 'night_wd') },
+// Accent chip ramps (battlefield-ui.html:314 recipe: 6-step lerp of a family).
+const RAMP_GREEN = makeRamp('acc_green', [PALETTE.green_light, PALETTE.green_mid, PALETTE.green_dark], 6, false);
+const RAMP_RED   = makeRamp('acc_red',   [PALETTE.red_light,   PALETTE.red_mid,   PALETTE.red_dark],   6, false);
+const RAMP_GOLD  = makeRamp('acc_gold',  [PALETTE.gold1,       PALETTE.gold2,     PALETTE.gold4],      6, false);
+
+// @1x = 2 canvas px per art px (1 art px = 2dp on phones). pack-ui derives @2x
+// (×2) and @3x (×3) from @1x so the JSON only carries @1x.
+const DP_PER_ART = 2;
+
+/* ------------------------------ canvas utils ----------------------------- */
+function artCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, w); c.height = Math.max(1, h);
+  const x = c.getContext('2d');
+  x.imageSmoothingEnabled = false;
+  return { c, x };
+}
+// crop sx,sy,sw,sh out of a source canvas (art-resolution, no resample).
+function crop(src, sx, sy, sw, sh) {
+  const { c, x } = artCanvas(sw, sh);
+  x.drawImage(src, sx, sy, sw, sh, 0, 0, sw, sh);
+  return c;
+}
+// integer nearest-neighbour upscale (smoothing off → crisp).
+function up(src, k) {
+  const { c, x } = artCanvas(src.width * k, src.height * k);
+  x.drawImage(src, 0, 0, c.width, c.height);
+  return c;
+}
+// Suppress the two horizontally-VARYING frame ops (speckle + glint) for the
+// stretch-slice renders — mid slices must be horizontally uniform or the
+// stretch tiles a speck/glint into a streak (spec §5 "speckles on caps only").
+// ui-kit's function declarations are reassignable globals (classic script);
+// hifiFrame calls them by the global binding, so this actually takes effect
+// (probe-verified before this rig was written).
+function withNoSpeckle(fn) {
+  const s = window.speckle, g = window.glint;
+  window.speckle = () => {}; window.glint = () => {};
+  try { fn(); } finally { window.speckle = s; window.glint = g; }
+}
+
+/* ------------------------- small face helpers ---------------------------- */
+// Extracted from ui-kit's hifiChip/hifiToast/hifiTooltip — the FACE only
+// (no baked label; labels are runtime <PixelText>, spec rule 5).
+function chipFace(ctx, w, h, m, ramp) {
+  fillRounded(ctx, 0, 0, w, h, 4, m.out);
+  fillRoundedGradient(ctx, 1, 1, w - 2, h - 2, 3, ramp);
+}
+function toastFace(ctx, w, h, m, wellKey) {
+  fillRounded(ctx, 0, 0, w, h, 5, m.out);
+  fillRounded(ctx, 1, 1, w - 2, h - 2, 4, t => t < .25 ? m.dp : wellKey);
+}
+function tooltipFace(ctx, w, h, m, wellKey) {
+  fillRounded(ctx, 0, 0, w, h, 3, m.out);
+  fillRounded(ctx, 1, 1, w - 2, h - 2, 2, wellKey);
+}
+// Rally beacon ring — the exact 1px notched gold ring from battlefield-ui.html:626
+// (breathes on resting mates). Transparent centre; the portrait shows through.
+function beaconRing(ctx, S, key) {
+  px(ctx, 2, 0, S - 4, 1, key);   px(ctx, 2, S - 1, S - 4, 1, key);
+  px(ctx, 0, 2, 1, S - 4, key);   px(ctx, S - 1, 2, 1, S - 4, key);
+  px(ctx, 1, 1, 1, 1, key);       px(ctx, S - 2, 1, 1, 1, key);
+  px(ctx, 1, S - 2, 1, 1, key);   px(ctx, S - 2, S - 2, 1, 1, key);
+}
+
+/* ===========================================================================
+ * THE INVENTORY. Each entry is one of:
+ *   fixed   : bake one art canvas at (w,h).
+ *   slice3h : horizontal 3-slice — left cap / 1px stretch mid / right cap.
+ *             draw(ctx, w) renders the component at width w; h = canvas height.
+ *   slice3v : vertical 3-slice — top cap / 1px stretch mid / bottom cap (fixed
+ *             width, dynamic height). draw(ctx, h); w = canvas width.
+ *   ring    : the 33-frame steps-ring strip.
+ * capW/capH is the cap thickness (>= corner radius + glint reach). bakeW/bakeH
+ * is a scratch size wide/tall enough to have a clean uniform mid band.
+ * =========================================================================== */
+const SEG_T = { mat: AG, well: 'night_w', wellD: 'night_wd',
+  seg: fam3('sky_light', 'sky_mid', 'sky_dark') };
+
+const INVENTORY = [
+  /* ---- bar frames (3-slice, spec §5 full=boss/plate, slim=xp/fuel) -------- */
+  { name: 'bar_full', type: 'slice3h', h: 20, capW: 10, bakeW: 40,
+    cat: 'bar', draw: (c, w) => hifiFrame(c, 0, 0, w, 20, 7, AG, 'night_w', 'night_wd') },
+  { name: 'bar_slim', type: 'slice3h', h: 14, capW: 9, bakeW: 36,
+    cat: 'bar', draw: (c, w) => hifiFrameSlim(c, 0, 0, w, 14, 6, AG, 'night_wd') },
+
+  /* ---- fixed button / plate faces (spec §5 fixed-size chrome) ------------- */
+  // Plain faces — emblem (swords/gem/star/banner) + cost/number composite at
+  // runtime from the icon sprites + <PixelText> (spec rule 5). Canvas height =
+  // face height + 1 for hifiFace's drop-shadow row (spike convention: the
+  // named canvas size is the PNG size, the face is 1px shorter).
+  { name: 'btn_deploy_gold', type: 'fixed', w: 56, h: 37,
+    cat: 'button', draw: c => hifiFace(c, 0, 0, 56, 36, 6, AU) },
+  { name: 'btn_nav_silver', type: 'fixed', w: 18, h: 18,
+    cat: 'button', draw: c => hifiFace(c, 0, 0, 18, 17, 6, AG) },
+  { name: 'btn_collect_silver', type: 'fixed', w: 24, h: 24,
+    cat: 'button', draw: c => hifiFace(c, 0, 0, 24, 23, 6, AG) },
+  { name: 'btn_close_gold', type: 'fixed', w: 15, h: 14,
+    cat: 'button', draw: c => hifiFace(c, 0, 0, 15, 13, 5, AU) },
+
+  /* ---- gradient faces (3-slice — dynamic label width) -------------------- */
+  // NOTE (documented fidelity delta, spec §5 spirit): a gradient face dithers
+  // its band boundaries with a per-column checkerboard; the 1px stretch mid
+  // loses that boundary dither, so transitions read as very slightly harder
+  // bands. Acceptable — same tradeoff as speckles-on-caps-only.
+  { name: 'btn_gold', type: 'slice3h', h: 16, capW: 9, bakeW: 40,
+    cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 15, 6, AU) },
+  { name: 'btn_silver', type: 'slice3h', h: 16, capW: 9, bakeW: 40,
+    cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 15, 6, AG) },
+  { name: 'plate_silver', type: 'slice3h', h: 12, capW: 7, bakeW: 32,
+    cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 11, 5, AG) },   // modal title plate
+  { name: 'banner_gold', type: 'slice3h', h: 23, capW: 12, bakeW: 48,
+    cat: 'banner', draw: (c, w) => hifiFace(c, 0, 0, w, 22, 8, AU) },
+
+  /* ---- chip / toast / tooltip faces (3-slice, spec §5) ------------------- */
+  { name: 'chip_green', type: 'slice3h', h: 10, capW: 7, bakeW: 28,
+    cat: 'chip', draw: (c, w) => chipFace(c, w, 10, AG, RAMP_GREEN) },
+  { name: 'chip_red', type: 'slice3h', h: 10, capW: 7, bakeW: 28,
+    cat: 'chip', draw: (c, w) => chipFace(c, w, 10, AG, RAMP_RED) },
+  { name: 'chip_gold', type: 'slice3h', h: 10, capW: 7, bakeW: 28,
+    cat: 'chip', draw: (c, w) => chipFace(c, w, 10, AG, RAMP_GOLD) },
+  { name: 'toast_silver', type: 'slice3h', h: 13, capW: 8, bakeW: 32,
+    cat: 'toast', draw: (c, w) => toastFace(c, w, 13, AG, 'night_wd') },
+  { name: 'tooltip_silver', type: 'slice3h', h: 11, capW: 6, bakeW: 24,
+    cat: 'tooltip', draw: (c, w) => tooltipFace(c, w, 11, AG, 'night_wd') },
+  { name: 'tooltip_pointer', type: 'fixed', w: 3, h: 2,
+    cat: 'tooltip', draw: c => { px(c, 0, 0, 3, 1, AG.out); px(c, 1, 1, 1, 1, AG.out); } },
+
+  /* ---- badge roundel (fixed) --------------------------------------------- */
+  { name: 'badge_silver', type: 'fixed', w: 18, h: 19,
+    cat: 'badge', draw: c => hifiFace(c, 0, 0, 18, 18, 8, AG) },
+
+  /* ---- portrait frames (fixed; rail 18, top-bar 20, roster 22, plate 30) - */
+  { name: 'portrait_18', type: 'fixed', w: 18, h: 18,
+    cat: 'portrait', draw: c => hifiFrameSlim(c, 0, 0, 18, 18, 5, AG, 'night_wd') },
+  { name: 'portrait_20', type: 'fixed', w: 20, h: 20,
+    cat: 'portrait', draw: c => hifiFrameSlim(c, 0, 0, 20, 20, 5, AG, 'night_wd') },
+  { name: 'portrait_22', type: 'fixed', w: 22, h: 22,
+    cat: 'portrait', draw: c => hifiFrameSlim(c, 0, 0, 22, 22, 5, AG, 'night_wd') },
+  { name: 'portrait_30', type: 'fixed', w: 30, h: 30,
+    cat: 'portrait', draw: c => hifiFrameSlim(c, 0, 0, 30, 30, 5, AG, 'night_wd') },
+
+  /* ---- status dots x4 (fixed 5x5; rally = red call-to-action) ------------ */
+  { name: 'dot_battling', type: 'fixed', w: 5, h: 5, cat: 'dot',
+    draw: c => hifiStatusDot(c, 0, 0, 'battling') },
+  { name: 'dot_winded', type: 'fixed', w: 5, h: 5, cat: 'dot',
+    draw: c => hifiStatusDot(c, 0, 0, 'winded') },
+  { name: 'dot_resting', type: 'fixed', w: 5, h: 5, cat: 'dot',
+    draw: c => hifiStatusDot(c, 0, 0, 'resting') },
+  { name: 'dot_rally', type: 'fixed', w: 5, h: 5, cat: 'dot',
+    draw: c => hifiStatusDot(c, 0, 0, 'red_mid') },
+
+  /* ---- rally beacon rings x3 (fixed 20x20; BEACON_KEYS brightnesses) ------ */
+  { name: 'beacon_dim', type: 'fixed', w: 20, h: 20, cat: 'beacon',
+    draw: c => beaconRing(c, 20, 'gold4') },
+  { name: 'beacon_mid', type: 'fixed', w: 20, h: 20, cat: 'beacon',
+    draw: c => beaconRing(c, 20, 'gold2') },
+  { name: 'beacon_bright', type: 'fixed', w: 20, h: 20, cat: 'beacon',
+    draw: c => beaconRing(c, 20, 'gold1') },
+
+  /* ---- steps ring: 33 quantized frames (0/32..32/32) as one strip -------- */
+  { name: 'steps_ring', type: 'ring', frames: 33, frameW: 30, frameH: 30, cat: 'ring' },
+
+  /* ---- popover + modal FRAMES (vertical 3-slice: fixed width, any height) - */
+  { name: 'popover_silver', type: 'slice3v', w: 132, capH: 8, bakeH: 40, cat: 'popover',
+    draw: (c, h) => hifiFrameSlim(c, 0, 0, 132, h, 5, AG, 'night_w') },
+  { name: 'modal_silver', type: 'slice3v', w: 146, capH: 12, bakeH: 48, cat: 'modal',
+    draw: (c, h) => hifiFrame(c, 0, 0, 146, h, 6, AG, 'night_w', 'night_wd') },
+  // pointer arrows (fixed; sit flush against the frame edge, ui-kit hifiPopover)
+  { name: 'popover_arrow_top', type: 'fixed', w: 5, h: 3, cat: 'popover', draw: c => {
+      // ui-kit.js:791 'top' arrow, translated to a 5x3 canvas (rows above edge).
+      px(c, 0, 2, 5, 1, AG.out); px(c, 1, 1, 3, 1, AG.out); px(c, 2, 0, 1, 1, AG.out);
+      px(c, 1, 2, 3, 1, AG.rim); px(c, 2, 1, 1, 1, AG.rim);
+    } },
+  { name: 'popover_arrow_left', type: 'fixed', w: 3, h: 5, cat: 'popover', draw: c => {
+      // ui-kit.js:786 'left' arrow, translated to a 3x5 canvas (cols left of edge).
+      px(c, 2, 0, 1, 5, AG.out); px(c, 1, 1, 1, 3, AG.out); px(c, 0, 2, 1, 1, AG.out);
+      px(c, 2, 1, 1, 3, AG.rim); px(c, 1, 2, 1, 1, AG.rim);
+    } },
+
+  /* ---- invite plus (fixed; the frame reuses portrait_22) ----------------- */
+  { name: 'invite_plus', type: 'fixed', w: 8, h: 8, cat: 'invite', draw: c => {
+      px(c, 0, 3, 8, 2, 'sky_mid'); px(c, 3, 0, 2, 8, 'sky_mid');   // ui-style-lab.html:197
+    } },
+
+  /* ---- 8-cell segment frame (fixed; cell fills overlay at runtime) ------- */
+  { name: 'seg_silver', type: 'fixed', w: 8 * 11 + 7 + 6, h: 7 + 6, cat: 'seg',
+    draw: c => hifiSeg(c, 0, 0, 8, 11, 7, 0, SEG_T) },   // val 0 → wells + separators, no fills
 ];
 
-// @1x = 2 canvas px per art px (1 art px = 2dp on phones; RN asset suffixes
-// then give devices integer-exact pixels: @2x = 4, @3x = 6 canvas px/art px).
-const DP_PER_ART = 2;
-const SCALES = [1, 2, 3];
-
-function drawArt(spec){
-  const c = document.createElement('canvas');
-  c.width = spec.w; c.height = spec.h;
-  const ctx = c.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  spec.draw(ctx);
-  return c;
-}
-function upscale(src, k){
-  const c = document.createElement('canvas');
-  c.width = src.width * k; c.height = src.height * k;
-  const ctx = c.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(src, 0, 0, c.width, c.height);
-  return c;
+/* ---- icon sprites (fixed, natural palette colours; ui-kit sprite data) --- */
+const ICONS = [
+  ['icon_heart', HEART], ['icon_gem', GEM], ['icon_coin', COIN], ['icon_star', STAR],
+  ['icon_shield', SHIELD], ['icon_swords', CROSSED_SWORDS], ['icon_banner', BANNER],
+  ['icon_arrow_up', ARROW_UP], ['icon_arrow_right', ARROW_RIGHT],
+  ['icon_arrow_down', ARROW_DOWN], ['icon_arrow_left', ARROW_LEFT],
+];
+for (const [name, sprite] of ICONS) {
+  INVENTORY.push({ name, type: 'fixed', w: spriteW(sprite), h: spriteH(sprite), cat: 'icon',
+    draw: c => drawSprite(c, sprite, 0, 0) });
 }
 
-// ---- font atlas: every FONT glyph, white, 1px gaps, 5px rows -------------
-function bakeFontAtlas(){
-  const chars = Object.keys(FONT);
-  let w = 0;
-  const metrics = {};
-  for (const ch of chars){
-    const gw = FONT[ch][0].length;
-    metrics[ch] = { x: w, w: gw };
-    w += gw + 1;
+/* ===========================================================================
+ * BUILD — render each entry, populate files{} (@1x dataURLs), dims{}, slices{}.
+ * =========================================================================== */
+const files = {};      // "<name>.png" → @1x dataURL (art px × DP_PER_ART)
+const dims = {};       // "<name>" → { w, h } in ART px
+const slices = {};     // slice family → assembly metadata for the runtime
+const cats = {};       // "<name>" → category (for pack-ui's count table)
+const galleryItems = [];
+
+function drawArt(w, h, drawFn) {
+  const { c, x } = artCanvas(w, h);
+  drawFn(x);
+  return c;
+}
+function emit(name, artCv, cat) {
+  dims[name] = { w: artCv.width, h: artCv.height };
+  cats[name] = cat;
+  files[name + '.png'] = up(artCv, DP_PER_ART).toDataURL('image/png');
+  return artCv;
+}
+
+for (const spec of INVENTORY) {
+  if (spec.type === 'fixed') {
+    const art = drawArt(spec.w, spec.h, spec.draw);
+    emit(spec.name, art, spec.cat);
+    galleryItems.push([spec.name, art]);
+
+  } else if (spec.type === 'slice3h') {
+    // caps rendered WITH speckle/glint; 1px mid rendered WITHOUT (uniform).
+    const withS = drawArt(spec.bakeW, spec.h, c => spec.draw(c, spec.bakeW));
+    const noS = drawArt(spec.bakeW, spec.h, c => withNoSpeckle(() => spec.draw(c, spec.bakeW)));
+    const left = crop(withS, 0, 0, spec.capW, spec.h);
+    const right = crop(withS, spec.bakeW - spec.capW, 0, spec.capW, spec.h);
+    const mid = crop(noS, Math.floor(spec.bakeW / 2), 0, 1, spec.h);
+    emit(spec.name + '_left', left, spec.cat);
+    emit(spec.name + '_mid', mid, spec.cat);
+    emit(spec.name + '_right', right, spec.cat);
+    slices[spec.name] = { axis: 'h', h: spec.h, capW: spec.capW,
+      parts: [spec.name + '_left', spec.name + '_mid', spec.name + '_right'] };
+    galleryItems.push([spec.name, withS]);
+
+  } else if (spec.type === 'slice3v') {
+    const withS = drawArt(spec.w, spec.bakeH, c => spec.draw(c, spec.bakeH));
+    const noS = drawArt(spec.w, spec.bakeH, c => withNoSpeckle(() => spec.draw(c, spec.bakeH)));
+    const top = crop(withS, 0, 0, spec.w, spec.capH);
+    const bottom = crop(withS, 0, spec.bakeH - spec.capH, spec.w, spec.capH);
+    const mid = crop(noS, 0, Math.floor(spec.bakeH / 2), spec.w, 1);
+    emit(spec.name + '_top', top, spec.cat);
+    emit(spec.name + '_mid', mid, spec.cat);
+    emit(spec.name + '_bottom', bottom, spec.cat);
+    slices[spec.name] = { axis: 'v', w: spec.w, capH: spec.capH,
+      parts: [spec.name + '_top', spec.name + '_mid', spec.name + '_bottom'] };
+    galleryItems.push([spec.name, withS]);
+
+  } else if (spec.type === 'ring') {
+    // 33 frames side-by-side; frame i = fill fraction i/(frames-1). Radiant gold
+    // progress (gold2) over a dark track (night_w); transparent centre. The
+    // stair-stepping IS the aesthetic (spec §5) — 33 states read as continuous.
+    const strip = drawArt(spec.frameW * spec.frames, spec.frameH, c => {
+      for (let i = 0; i < spec.frames; i++) {
+        drawPixelRing(c, i * spec.frameW + spec.frameW / 2, spec.frameH / 2,
+          14, 11, i / (spec.frames - 1), 'gold2', 'night_w');
+      }
+    });
+    emit(spec.name, strip, spec.cat);
+    slices[spec.name] = { kind: 'ringstrip', frames: spec.frames,
+      frameW: spec.frameW, frameH: spec.frameH };
+    galleryItems.push([spec.name, strip]);
   }
+}
+
+/* ------------------------------ font atlases ----------------------------- */
+// white: every FONT glyph, white, 1px gaps, 5px rows (spec §4). Tintable in RN.
+function bakeFontAtlasWhite() {
+  const chars = Object.keys(FONT);
+  const metrics = {};
+  let w = 0;
+  for (const ch of chars) { const gw = FONT[ch][0].length; metrics[ch] = { x: w, w: gw }; w += gw + 1; }
   w -= 1;
-  const c = document.createElement('canvas');
-  c.width = w; c.height = 5;
-  const ctx = c.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  for (const ch of chars){
+  const c = document.createElement('canvas'); c.width = w; c.height = 5;
+  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  for (const ch of chars) {
     const g = FONT[ch], m = metrics[ch];
     for (let r = 0; r < 5; r++)
       for (let col = 0; col < g[r].length; col++)
         if (g[r][col] === '#') px(ctx, m.x + col, r, 1, 1, 'white');
   }
-  return { canvas: c, metrics, letterSpacing: 1, lineHeight: 5 };
+  return { canvas: c, metrics, letterSpacing: 1, lineHeight: 5, pad: 0 };
+}
+// outlined: glyph + baked 1px outline, in a (gw+2)×7 cell (spec §4). ink is
+// inset by `pad`=1; runtime draws the cell at (cursor-pad) so outlines overlap
+// the letter-spacing gap → same visual advance (gw+letterSpacing) as white.
+function bakeFontAtlasOutlined() {
+  const chars = Object.keys(FONT), PAD = 1, cellH = 7;
+  const metrics = {};
+  let x = 0;
+  for (const ch of chars) { const gw = FONT[ch][0].length; metrics[ch] = { x, w: gw + 2 * PAD }; x += gw + 2 * PAD + 1; }
+  const W = x - 1;
+  const c = document.createElement('canvas'); c.width = W; c.height = cellH;
+  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  for (const ch of chars) {
+    const g = FONT[ch], m = metrics[ch], gw = g[0].length;
+    const ink = [];
+    for (let r = 0; r < 5; r++)
+      for (let col = 0; col < gw; col++)
+        if (g[r][col] === '#') ink.push([col + PAD, r + PAD]);
+    const inkSet = new Set(ink.map(([a, b]) => a + ',' + b));
+    const outSet = new Set();
+    for (const [a, b] of ink)
+      for (let dx = -1; dx <= 1; dx++)
+        for (let dy = -1; dy <= 1; dy++) {
+          if (!dx && !dy) continue;
+          const k = (a + dx) + ',' + (b + dy);
+          if (!inkSet.has(k)) outSet.add(k);
+        }
+    for (const k of outSet) { const [a, b] = k.split(',').map(Number); px(ctx, m.x + a, b, 1, 1, 'outline'); }
+    for (const [a, b] of ink) px(ctx, m.x + a, b, 1, 1, 'white');
+  }
+  return { canvas: c, metrics, letterSpacing: 1, lineHeight: cellH, pad: PAD };
 }
 
-// ---------------------------------------------------------------------------
-const files = {};
+const fontWhite = bakeFontAtlasWhite();
+const fontOutlined = bakeFontAtlasOutlined();
+emit('font_white', fontWhite.canvas, 'font');
+emit('font_white_outlined', fontOutlined.canvas, 'font');
+
+/* ------------------------------ theme payload ---------------------------- */
+// Everything the runtime needs that is NOT a PNG: palette hexes for View fills,
+// fill families, state colours, scrim, portrait crops, well insets, font metrics.
+const theme = {
+  palette: {
+    white: hex('white'), outline: hex('outline'),
+    night_w: hex('night_w'), night_wd: hex('night_wd'),
+    silver_rim: hex('silver1'), silver_dark: hex('silver4'),
+    gold_light: hex('gold1'), gold_mid: hex('gold2'), gold_dark: hex('gold4'),
+    sky_light: hex('sky_light'), sky_mid: hex('sky_mid'), sky_dark: hex('sky_dark'),
+    red_light: hex('red_light'),
+  },
+  // Bar fills overlay inside the baked wells (spec §5). Which family each bar
+  // uses is a zone decision; these are the S8 palettes the zones draw from.
+  fills: {
+    gold: fam3('gold1', 'gold2', 'gold4'),        // boss HP, overdrive
+    sky: fam3('sky_light', 'sky_mid', 'sky_dark'), // fuel, job XP, segment cells
+    green: fam3('green_light', 'green_mid', 'green_dark'), // member fuel > .5
+    yellow: fam3('yellow_light', 'yellow_mid', 'yellow_dark'), // member fuel .25–.5
+    red: fam3('red_light', 'red_mid', 'red_dark'), // member fuel < .25
+    ghost: hex('red_light'),   // chip-ghost (damage preview)
+    flash: hex('white'),       // damage-blink overlay
+  },
+  // Well rects to inset a fill View into (spec §5): {inset x,y; shrink dw,dh; r}.
+  wellInsets: {
+    slim: { x: 3, y: 3, dw: 6, dh: 6, radius: 2 },
+    full: { x: 6, y: 6, dw: 12, dh: 12, radius: 2 },
+  },
+  stateColors: {
+    battling: hex('green_mid'), winded: hex('yellow_mid'),
+    resting: hex('sky_mid'), rally: hex('red_mid'),
+  },
+  scrim: { modal: 'rgba(6,8,12,0.6)' },   // battlefield-ui.html:56
+  portraitCrops: PORTRAIT_CROPS,          // ui-kit.js — full-body sprite crops
+  fontMetrics: {
+    white: { glyphs: fontWhite.metrics, letterSpacing: fontWhite.letterSpacing,
+      lineHeight: fontWhite.lineHeight, pad: fontWhite.pad },
+    outlined: { glyphs: fontOutlined.metrics, letterSpacing: fontOutlined.letterSpacing,
+      lineHeight: fontOutlined.lineHeight, pad: fontOutlined.pad },
+  },
+};
+
+/* --------------------------------- publish ------------------------------- */
+const payload = {
+  meta: { generatedBy: 'ui-export-rig.html', dpPerArt: DP_PER_ART, scales: [1, 2, 3],
+    theme: 'S8 CELESTIAL SILVER', note: '@1x only in JSON; pack-ui derives @2x/@3x' },
+  files, dims, slices, cats, theme,
+  report: Object.keys(files).sort().join('\n'),
+};
+window.__EXPORTS = payload;
+window.__EXPORT_JSON = JSON.stringify(payload);
+
+/* ------------------------------ human preview ---------------------------- */
 const gallery = document.getElementById('gallery');
-for (const spec of EXPORT_SPECS){
-  const art = drawArt(spec);
-  for (const s of SCALES){
-    const scaled = upscale(art, s * DP_PER_ART);
-    files[`${spec.name}${s > 1 ? '@' + s + 'x' : ''}.png`] = scaled.toDataURL('image/png');
-  }
+for (const [name, art] of galleryItems) {
   const cell = document.createElement('div');
   cell.className = 'cell';
-  const shown = upscale(art, 3 * DP_PER_ART);
-  cell.appendChild(shown);
+  cell.appendChild(up(art, 3 * DP_PER_ART));
   const cap = document.createElement('div');
   cap.className = 'cap';
-  cap.textContent = `${spec.name} (${spec.w}×${spec.h} art px)`;
-  cell.appendChild(cap);
-  gallery.appendChild(cell);
-}
-const font = bakeFontAtlas();
-for (const s of SCALES){
-  const scaled = upscale(font.canvas, s * DP_PER_ART);
-  files[`font_white${s > 1 ? '@' + s + 'x' : ''}.png`] = scaled.toDataURL('image/png');
+  cap.textContent = `${name} (${art.width}×${art.height})`;
+  cell.appendChild(cap); gallery.appendChild(cell);
 }
 {
-  const shown = upscale(font.canvas, 3);
-  shown.className = 'px';
-  document.getElementById('fontrow').appendChild(shown);
-}
-
-// ---- composite check: RN tree in DOM (img + divs, no canvas) --------------
-// <PixelText> twin: one div per glyph, background = the EXPORTED atlas PNG,
-// background-position = -glyph.x. RN version: per-glyph <Image> inside an
-// overflow-hidden <View>, translated by -x — the exact Sprite.tsx technique.
-function pixelTextDiv(str, artScale, atlasPng, color){
-  const wrap = document.createElement('div');
-  wrap.style.cssText = `display:flex;gap:${font.letterSpacing * artScale}px;height:${5 * artScale}px`;
-  for (const ch of str.toUpperCase()){
-    const m = font.metrics[ch] || font.metrics['.'];
-    const g = document.createElement('div');
-    // (RN uses tintColor on the white atlas; DOM twin uses mask for parity)
-    g.style.cssText = `width:${m.w * artScale}px;height:${5 * artScale}px;`
-      + `background:${color};image-rendering:pixelated;`
-      + `-webkit-mask:url(${atlasPng}) ${-m.x * artScale}px 0 / auto ${5 * artScale}px no-repeat;`
-      + `mask:url(${atlasPng}) ${-m.x * artScale}px 0 / auto ${5 * artScale}px no-repeat;`;
-    wrap.appendChild(g);
+  const fr = document.getElementById('fontrow');
+  for (const [nm, atlas] of [['font_white', fontWhite.canvas], ['font_white_outlined', fontOutlined.canvas]]) {
+    const cell = document.createElement('div'); cell.className = 'cell';
+    const shown = up(atlas, 3); shown.className = 'px'; cell.appendChild(shown);
+    const cap = document.createElement('div'); cap.className = 'cap';
+    cap.textContent = `${nm} (${atlas.width}×${atlas.height})`;
+    cell.appendChild(cap); fr.appendChild(cell);
   }
-  return wrap;
-}
-{
-  const S = 3 * DP_PER_ART;             // show at @3x density for the screenshot
-  const check = document.getElementById('check');
-  // bar: frame PNG + fill div inside the slim-frame well (wx 3, wy 3), 62% full
-  const bar = document.createElement('div');
-  bar.style.cssText = `position:relative;width:${144 * S}px;height:${14 * S}px`;
-  const frame = document.createElement('img');
-  frame.className = 'px';
-  frame.src = files['bar_slim_silver_144x14@3x.png'];
-  frame.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
-  bar.appendChild(frame);
-  const fill = document.createElement('div');
-  const ww = 144 - 6, fillW = Math.round(ww * 0.62);
-  fill.style.cssText = `position:absolute;left:${3 * S}px;top:${3 * S}px;`
-    + `width:${fillW * S}px;height:${8 * S}px;border-radius:${2 * S}px;`
-    + `background:linear-gradient(180deg,${PALETTE.gold1} 0 ${S}px,${PALETTE.gold2} ${S}px calc(100% - ${S}px),${PALETTE.gold4} calc(100% - ${S}px) 100%)`;
-  bar.appendChild(fill);
-  const label = pixelTextDiv('62,000 / 100,000', S, files['font_white@3x.png'], PALETTE.white);
-  label.style.position = 'absolute';
-  label.style.left = '50%'; label.style.top = '50%';
-  label.style.transform = 'translate(-50%,-50%)';
-  bar.appendChild(label);
-  check.appendChild(bar);
-  // button + free-standing tinted text
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;align-items:center;gap:24px;margin-top:14px';
-  const btn = document.createElement('img');
-  btn.className = 'px';
-  btn.src = files['btn_gold_swords_56x37@3x.png'];
-  btn.style.cssText = `width:${56 * S}px;height:${37 * S}px`;
-  row.appendChild(btn);
-  const port = document.createElement('img');
-  port.className = 'px';
-  port.src = files['portrait_frame_silver_18x18@3x.png'];
-  port.style.cssText = `width:${18 * S}px;height:${18 * S}px`;
-  row.appendChild(port);
-  row.appendChild(pixelTextDiv('PIXELTEXT: TINT ME', S, files['font_white@3x.png'], PALETTE.gold1));
-  check.appendChild(row);
 }
 
-// ---- publish for the save script / Playwright ------------------------------
-window.__EXPORTS = {
-  files,
-  fontMetrics: { glyphs: font.metrics, letterSpacing: font.letterSpacing, lineHeight: font.lineHeight, dpPerArt: DP_PER_ART },
-  report: Object.keys(files).map(k => `${k}  (${Math.round(files[k].length * 3 / 4 / 1024 * 10) / 10} KB b64)`).join('\n'),
-};
+const nFiles = Object.keys(files).length;
+const byCat = {};
+for (const s of INVENTORY) byCat[s.cat] = (byCat[s.cat] || 0) + 1;
 document.getElementById('report').textContent =
-  Object.keys(files).length + ' files staged on window.__EXPORTS\n' + window.__EXPORTS.report;
+  `${nFiles} @1x PNGs staged on window.__EXPORTS (pack-ui derives @2x/@3x → ${nFiles * 3} files).\n` +
+  `${INVENTORY.length} inventory entries + 2 font atlases.\n\n` +
+  Object.keys(files).sort().join('\n');
+
+/* ------------------------------ download button -------------------------- */
+document.getElementById('dl').addEventListener('click', () => {
+  const blob = new Blob([window.__EXPORT_JSON], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'ui-export.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  document.getElementById('dlstatus').textContent = '✓ saved ui-export.json';
+});
 </script>
 </body>
 </html>

@@ -1,0 +1,92 @@
+// GENERATED — regen via ui-export-rig.html + npm run pack-ui, never hand-edit.
+// (scripts/pack-ui.mjs decodes ui-export.json. Single source of truth is the
+// procedural kit assets/ui-kit.js — a kit change means: rerun the rig, then
+// `npm run pack-ui`, then diff. Same house rule as fx-anchors / pack-sprites.)
+//
+// Static require() map for every baked HUD component. RN's asset resolver picks
+// the @2x / @3x sibling automatically, so each entry points at the @1x file.
+// Frame/face art dims (art px) live in ./theme.ts UI_DIMS under the same keys;
+// 3-slice assembly + ring metadata live in ./theme.ts UI_SLICES.
+
+export const UI_ASSETS = {
+  "badge_silver": require("./assets/badge_silver.png"),
+  "banner_gold_left": require("./assets/banner_gold_left.png"),
+  "banner_gold_mid": require("./assets/banner_gold_mid.png"),
+  "banner_gold_right": require("./assets/banner_gold_right.png"),
+  "bar_full_left": require("./assets/bar_full_left.png"),
+  "bar_full_mid": require("./assets/bar_full_mid.png"),
+  "bar_full_right": require("./assets/bar_full_right.png"),
+  "bar_slim_left": require("./assets/bar_slim_left.png"),
+  "bar_slim_mid": require("./assets/bar_slim_mid.png"),
+  "bar_slim_right": require("./assets/bar_slim_right.png"),
+  "beacon_bright": require("./assets/beacon_bright.png"),
+  "beacon_dim": require("./assets/beacon_dim.png"),
+  "beacon_mid": require("./assets/beacon_mid.png"),
+  "btn_close_gold": require("./assets/btn_close_gold.png"),
+  "btn_collect_silver": require("./assets/btn_collect_silver.png"),
+  "btn_deploy_gold": require("./assets/btn_deploy_gold.png"),
+  "btn_gold_left": require("./assets/btn_gold_left.png"),
+  "btn_gold_mid": require("./assets/btn_gold_mid.png"),
+  "btn_gold_right": require("./assets/btn_gold_right.png"),
+  "btn_nav_silver": require("./assets/btn_nav_silver.png"),
+  "btn_silver_left": require("./assets/btn_silver_left.png"),
+  "btn_silver_mid": require("./assets/btn_silver_mid.png"),
+  "btn_silver_right": require("./assets/btn_silver_right.png"),
+  "chip_gold_left": require("./assets/chip_gold_left.png"),
+  "chip_gold_mid": require("./assets/chip_gold_mid.png"),
+  "chip_gold_right": require("./assets/chip_gold_right.png"),
+  "chip_green_left": require("./assets/chip_green_left.png"),
+  "chip_green_mid": require("./assets/chip_green_mid.png"),
+  "chip_green_right": require("./assets/chip_green_right.png"),
+  "chip_red_left": require("./assets/chip_red_left.png"),
+  "chip_red_mid": require("./assets/chip_red_mid.png"),
+  "chip_red_right": require("./assets/chip_red_right.png"),
+  "dot_battling": require("./assets/dot_battling.png"),
+  "dot_rally": require("./assets/dot_rally.png"),
+  "dot_resting": require("./assets/dot_resting.png"),
+  "dot_winded": require("./assets/dot_winded.png"),
+  "font_white": require("./assets/font_white.png"),
+  "font_white_outlined": require("./assets/font_white_outlined.png"),
+  "icon_arrow_down": require("./assets/icon_arrow_down.png"),
+  "icon_arrow_left": require("./assets/icon_arrow_left.png"),
+  "icon_arrow_right": require("./assets/icon_arrow_right.png"),
+  "icon_arrow_up": require("./assets/icon_arrow_up.png"),
+  "icon_banner": require("./assets/icon_banner.png"),
+  "icon_coin": require("./assets/icon_coin.png"),
+  "icon_gem": require("./assets/icon_gem.png"),
+  "icon_heart": require("./assets/icon_heart.png"),
+  "icon_shield": require("./assets/icon_shield.png"),
+  "icon_star": require("./assets/icon_star.png"),
+  "icon_swords": require("./assets/icon_swords.png"),
+  "invite_plus": require("./assets/invite_plus.png"),
+  "modal_silver_bottom": require("./assets/modal_silver_bottom.png"),
+  "modal_silver_mid": require("./assets/modal_silver_mid.png"),
+  "modal_silver_top": require("./assets/modal_silver_top.png"),
+  "plate_silver_left": require("./assets/plate_silver_left.png"),
+  "plate_silver_mid": require("./assets/plate_silver_mid.png"),
+  "plate_silver_right": require("./assets/plate_silver_right.png"),
+  "popover_arrow_left": require("./assets/popover_arrow_left.png"),
+  "popover_arrow_top": require("./assets/popover_arrow_top.png"),
+  "popover_silver_bottom": require("./assets/popover_silver_bottom.png"),
+  "popover_silver_mid": require("./assets/popover_silver_mid.png"),
+  "popover_silver_top": require("./assets/popover_silver_top.png"),
+  "portrait_18": require("./assets/portrait_18.png"),
+  "portrait_20": require("./assets/portrait_20.png"),
+  "portrait_22": require("./assets/portrait_22.png"),
+  "portrait_30": require("./assets/portrait_30.png"),
+  "seg_silver": require("./assets/seg_silver.png"),
+  "steps_ring": require("./assets/steps_ring.png"),
+  "toast_silver_left": require("./assets/toast_silver_left.png"),
+  "toast_silver_mid": require("./assets/toast_silver_mid.png"),
+  "toast_silver_right": require("./assets/toast_silver_right.png"),
+  "tooltip_pointer": require("./assets/tooltip_pointer.png"),
+  "tooltip_silver_left": require("./assets/tooltip_silver_left.png"),
+  "tooltip_silver_mid": require("./assets/tooltip_silver_mid.png"),
+  "tooltip_silver_right": require("./assets/tooltip_silver_right.png"),
+} as const;
+
+/** Every baked HUD sprite key — 3-slice parts are "<name>_left|_mid|_right"
+ *  (horizontal) or "<name>_top|_mid|_bottom" (vertical); see UI_SLICES. */
+export type UiAssetKey = keyof typeof UI_ASSETS;
+
+export default UI_ASSETS;
