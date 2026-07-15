@@ -444,6 +444,15 @@ deliberately NOT part of M2 (future polish; functional cards keep their style).
   REST switches) and LIVE SCENE (real events) sections. iOS Simulator
   spot-check of the scene = the M4 pass.
 
+### M2.75 — Game Screen (full-screen pixel HUD) — PLANNED, spiked 2026-07-15
+Spec: `docs/superpowers/specs/2026-07-15-game-screen-design.md` (decisions
+made). The dashboard becomes one full-screen stage: scene = the app canvas,
+stone+gold ui-kit HUD around it per `dashboard-ui.html`. Rendering DECIDED by
+spike: bake the deterministic ui-kit to PNGs via `ui-export-rig.html` (+
+bitmap-font atlas → `<PixelText>`); react-native-skia rejected (evidence in
+spec §2). Behind `DEV_FLAGS.useGameScreen`; no logic changes. Linear
+milestone **M2.75**, 8 tickets.
+
 ### Phase 3+ — Deferred (architect for, don't build)
 Recognition screens, IAP, cosmetics, guild-vs-guild / global.
 

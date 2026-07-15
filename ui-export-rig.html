@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — UI export rig (bake ui-kit → PNGs)</title>
+<!--
+  UI EXPORT RIG — SPIKE PROTOTYPE for the M2.75 Game Screen
+  (docs/superpowers/specs/2026-07-15-game-screen-design.md).
+
+  Bakes the procedural ui-kit chrome (assets/ui-kit.js) into PNG assets the
+  React Native app can render — RN has no canvas, but the kit is fully
+  deterministic, so every component can be exported once and composited in RN
+  as: baked frame Image + plain View fills + <PixelText> from the font atlas.
+  (Exactly how dashboard-ui.html composites #fuelfill inside bar art.)
+
+  What it does:
+    - draws each entry of EXPORT_SPECS at art scale, then nearest-neighbor
+      upscales to @1x/@2x/@3x (1 art px = 2dp on phones, so @1x = ×2 canvas px)
+    - bakes the kit's pixel FONT into a white glyph atlas + width metrics
+    - publishes window.__EXPORTS = { files: {name: dataURL}, metrics, report }
+      for a script (or Playwright) to save via scripts/pack-ui.mjs
+    - renders a COMPOSITE CHECK: rebuilds a live bar + label using ONLY the
+      exported PNGs + positioned divs — the DOM twin of the RN component tree.
+
+  Determinism contract: same ui-kit.js in → byte-identical PNGs out (the kit
+  draws with integer fillRect + a seeded speckle hash; no Date, no random).
+  Verified in the M2.75 spike: two fresh loads → identical SHA-256 per file.
+-->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #101216; color: #b9c0cf;
+    font-family: ui-monospace, Menlo, monospace; }
+  #page { max-width: 1080px; margin: 0 auto; padding: 22px 18px 60px; }
+  canvas, img.px { image-rendering: pixelated; image-rendering: crisp-edges; }
+  section { border: 1px solid #24272f; border-radius: 6px; padding: 12px 14px 14px;
+    margin-top: 14px; background: #15181d; }
+  h2 { font-size: 11px; letter-spacing: 2px; color: #98a2b0; font-weight: 700;
+    margin: 0 0 8px; text-transform: uppercase; }
+  .row { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; }
+  .cell { text-align: center; }
+  .cell .cap { font-size: 9px; color: #667080; margin-top: 4px; }
+  #report { font-size: 11px; line-height: 1.7; color: #98a2b0; white-space: pre; }
+</style>
+</head>
+<body>
+<div id="page">
+  <h2 style="margin-top:18px">UI EXPORT RIG — bakes assets/ui-kit.js → PNG (spike, M2.75)</h2>
+  <section><h2>Exported components (@1x = 2 canvas px per art px)</h2><div class="row" id="gallery"></div></section>
+  <section><h2>Font atlas (white, tintable)</h2><div id="fontrow"></div></section>
+  <section><h2>Composite check — baked PNGs + divs only (the RN component tree, in DOM)</h2>
+    <div id="check" style="padding:10px 6px 14px"></div>
+    <div class="cap" style="font-size:9px;color:#667080">No live canvas here: frame = exported PNG, fill = a positioned div, label = glyph divs sampling the exported atlas. If this looks right, the RN version looks right.</div>
+  </section>
+  <section><h2>Export report</h2><div id="report">drawing…</div></section>
+</div>
+
+<script src="assets/ui-kit.js"></script>
+<script>
+'use strict';
+// ---------------------------------------------------------------------------
+// Spike inventory — 3 representative components. The full M2.75 inventory
+// (every component in the spec's port table) extends EXPORT_SPECS the same way.
+// Dynamic text is NEVER baked (labels/costs/numbers come from <PixelText>);
+// wells stay baked dark (fills overlay INSIDE them, dashboard-ui style).
+// ---------------------------------------------------------------------------
+const AG = M('silver'), AU = M('gold');   // S8 CELESTIAL SILVER (the live style)
+
+const EXPORT_SPECS = [
+  // The gold hero-button face (DEPLOY family) — static emblem, no text baked.
+  { name: 'btn_gold_swords_56x37', w: 56, h: 37,
+    draw: ctx => hifiButton(ctx, 0, 0, 56, 36, AU, { sprite: CROSSED_SWORDS }) },
+  // Slim silver bar frame at the style-lab canonical width — well baked dark,
+  // fill is a runtime View inside {wx:3, wy:3, ww:w-6, wh:h-6}.
+  { name: 'bar_slim_silver_144x14', w: 144, h: 14,
+    draw: ctx => hifiFrameSlim(ctx, 0, 0, 144, 14, 6, AG, 'night_w') },
+  // Party-rail portrait frame (18 art px, battlefield-ui recipe) — the
+  // character sprite is cropped INTO the well at runtime (PORTRAIT_CROPS).
+  { name: 'portrait_frame_silver_18x18', w: 18, h: 18,
+    draw: ctx => hifiFrameSlim(ctx, 0, 0, 18, 18, 5, AG, 'night_wd') },
+];
+
+// @1x = 2 canvas px per art px (1 art px = 2dp on phones; RN asset suffixes
+// then give devices integer-exact pixels: @2x = 4, @3x = 6 canvas px/art px).
+const DP_PER_ART = 2;
+const SCALES = [1, 2, 3];
+
+function drawArt(spec){
+  const c = document.createElement('canvas');
+  c.width = spec.w; c.height = spec.h;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  spec.draw(ctx);
+  return c;
+}
+function upscale(src, k){
+  const c = document.createElement('canvas');
+  c.width = src.width * k; c.height = src.height * k;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(src, 0, 0, c.width, c.height);
+  return c;
+}
+
+// ---- font atlas: every FONT glyph, white, 1px gaps, 5px rows -------------
+function bakeFontAtlas(){
+  const chars = Object.keys(FONT);
+  let w = 0;
+  const metrics = {};
+  for (const ch of chars){
+    const gw = FONT[ch][0].length;
+    metrics[ch] = { x: w, w: gw };
+    w += gw + 1;
+  }
+  w -= 1;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = 5;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  for (const ch of chars){
+    const g = FONT[ch], m = metrics[ch];
+    for (let r = 0; r < 5; r++)
+      for (let col = 0; col < g[r].length; col++)
+        if (g[r][col] === '#') px(ctx, m.x + col, r, 1, 1, 'white');
+  }
+  return { canvas: c, metrics, letterSpacing: 1, lineHeight: 5 };
+}
+
+// ---------------------------------------------------------------------------
+const files = {};
+const gallery = document.getElementById('gallery');
+for (const spec of EXPORT_SPECS){
+  const art = drawArt(spec);
+  for (const s of SCALES){
+    const scaled = upscale(art, s * DP_PER_ART);
+    files[`${spec.name}${s > 1 ? '@' + s + 'x' : ''}.png`] = scaled.toDataURL('image/png');
+  }
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  const shown = upscale(art, 3 * DP_PER_ART);
+  cell.appendChild(shown);
+  const cap = document.createElement('div');
+  cap.className = 'cap';
+  cap.textContent = `${spec.name} (${spec.w}×${spec.h} art px)`;
+  cell.appendChild(cap);
+  gallery.appendChild(cell);
+}
+const font = bakeFontAtlas();
+for (const s of SCALES){
+  const scaled = upscale(font.canvas, s * DP_PER_ART);
+  files[`font_white${s > 1 ? '@' + s + 'x' : ''}.png`] = scaled.toDataURL('image/png');
+}
+{
+  const shown = upscale(font.canvas, 3);
+  shown.className = 'px';
+  document.getElementById('fontrow').appendChild(shown);
+}
+
+// ---- composite check: RN tree in DOM (img + divs, no canvas) --------------
+// <PixelText> twin: one div per glyph, background = the EXPORTED atlas PNG,
+// background-position = -glyph.x. RN version: per-glyph <Image> inside an
+// overflow-hidden <View>, translated by -x — the exact Sprite.tsx technique.
+function pixelTextDiv(str, artScale, atlasPng, color){
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `display:flex;gap:${font.letterSpacing * artScale}px;height:${5 * artScale}px`;
+  for (const ch of str.toUpperCase()){
+    const m = font.metrics[ch] || font.metrics['.'];
+    const g = document.createElement('div');
+    // (RN uses tintColor on the white atlas; DOM twin uses mask for parity)
+    g.style.cssText = `width:${m.w * artScale}px;height:${5 * artScale}px;`
+      + `background:${color};image-rendering:pixelated;`
+      + `-webkit-mask:url(${atlasPng}) ${-m.x * artScale}px 0 / auto ${5 * artScale}px no-repeat;`
+      + `mask:url(${atlasPng}) ${-m.x * artScale}px 0 / auto ${5 * artScale}px no-repeat;`;
+    wrap.appendChild(g);
+  }
+  return wrap;
+}
+{
+  const S = 3 * DP_PER_ART;             // show at @3x density for the screenshot
+  const check = document.getElementById('check');
+  // bar: frame PNG + fill div inside the slim-frame well (wx 3, wy 3), 62% full
+  const bar = document.createElement('div');
+  bar.style.cssText = `position:relative;width:${144 * S}px;height:${14 * S}px`;
+  const frame = document.createElement('img');
+  frame.className = 'px';
+  frame.src = files['bar_slim_silver_144x14@3x.png'];
+  frame.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+  bar.appendChild(frame);
+  const fill = document.createElement('div');
+  const ww = 144 - 6, fillW = Math.round(ww * 0.62);
+  fill.style.cssText = `position:absolute;left:${3 * S}px;top:${3 * S}px;`
+    + `width:${fillW * S}px;height:${8 * S}px;border-radius:${2 * S}px;`
+    + `background:linear-gradient(180deg,${PALETTE.gold1} 0 ${S}px,${PALETTE.gold2} ${S}px calc(100% - ${S}px),${PALETTE.gold4} calc(100% - ${S}px) 100%)`;
+  bar.appendChild(fill);
+  const label = pixelTextDiv('62,000 / 100,000', S, files['font_white@3x.png'], PALETTE.white);
+  label.style.position = 'absolute';
+  label.style.left = '50%'; label.style.top = '50%';
+  label.style.transform = 'translate(-50%,-50%)';
+  bar.appendChild(label);
+  check.appendChild(bar);
+  // button + free-standing tinted text
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:24px;margin-top:14px';
+  const btn = document.createElement('img');
+  btn.className = 'px';
+  btn.src = files['btn_gold_swords_56x37@3x.png'];
+  btn.style.cssText = `width:${56 * S}px;height:${37 * S}px`;
+  row.appendChild(btn);
+  const port = document.createElement('img');
+  port.className = 'px';
+  port.src = files['portrait_frame_silver_18x18@3x.png'];
+  port.style.cssText = `width:${18 * S}px;height:${18 * S}px`;
+  row.appendChild(port);
+  row.appendChild(pixelTextDiv('PIXELTEXT: TINT ME', S, files['font_white@3x.png'], PALETTE.gold1));
+  check.appendChild(row);
+}
+
+// ---- publish for the save script / Playwright ------------------------------
+window.__EXPORTS = {
+  files,
+  fontMetrics: { glyphs: font.metrics, letterSpacing: font.letterSpacing, lineHeight: font.lineHeight, dpPerArt: DP_PER_ART },
+  report: Object.keys(files).map(k => `${k}  (${Math.round(files[k].length * 3 / 4 / 1024 * 10) / 10} KB b64)`).join('\n'),
+};
+document.getElementById('report').textContent =
+  Object.keys(files).length + ' files staged on window.__EXPORTS\n' + window.__EXPORTS.report;
+</script>
+</body>
+</html>
