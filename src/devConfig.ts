@@ -6,11 +6,12 @@ export const DEV_FLAGS = {
   /** Show the dev control panel (clock time-travel, step injector, teammates). */
   showDevPanel: __DEV__,
   /** Route the home to the new full-screen GameScreen (STR-66 / M2.75) instead
-   *  of the classic DashboardScreen. Default OFF — the game screen ships behind
-   *  this flag so the working app never breaks; App.tsx picks the screen by it.
-   *  Flip to true (here, or via a dev toggle) to preview the full-bleed battle
-   *  stage + HUD zones. Deletion of DashboardScreen is an M4 cleanup line. */
-  useGameScreen: false,
+   *  of the classic DashboardScreen. Default ON as of STR-71 — M2.75 verified the
+   *  full-screen HUD loop end-to-end (8 scenarios) and flipped this to the
+   *  milestone deliverable; App.tsx picks the screen by it. DashboardScreen stays
+   *  behind the flag as the fallback for one milestone (its deletion is an M4
+   *  cleanup line). Set false here to fall back to the classic dashboard. */
+  useGameScreen: true,
   /** Preview the HealthKit beat (STR-48) where HealthKit doesn't exist: flip to
    *  true to see Beat 3 in onboarding + the CONNECT HEALTH chip in the browser.
    *  The web stub has no data, so "connect" lands on the gentle no-data state —
