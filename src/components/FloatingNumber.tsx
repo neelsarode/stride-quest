@@ -1,13 +1,25 @@
-// A damage/heal number that rises and fades, then self-removes. Placeholder for
-// the eventual "flying number" art. All timings/colors come from assets.ts.
+// A damage/idle number that rises and fades, then self-removes — the overlay
+// layer (the battle scene renders its OWN in-scene damage numbers; these are the
+// FeedbackProvider's floating numbers). The MOTION is unchanged (ANIM.floatRise*
+// rise + fade curve) — STR-70 only swaps the CHROME: the old system Animated.Text
+// with a soft shadow becomes an outlined <PixelText> (glyph + baked 1px dark
+// outline), which stays legible over the busy battle scene at any position — the
+// whole reason spec §4/§8 specify the outlined variant here.
+//
+// The outlined atlas is two-tone and rendered as-is, so per-number tinting
+// (crit orange / idle green) is intentionally not applied; the crit read is
+// carried by its larger size + the "CRIT!" prefix, idle vs damage by the +/-
+// sign — exactly as the treatments already build them. `color` stays in the
+// props (FeedbackProvider spreads it) but no longer selects a tint.
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet } from "react-native";
+import { Animated } from "react-native";
 import { ANIM } from "../config/assets";
+import { PixelText } from "../ui";
+import { atlasText } from "./atlasText";
 
 export function FloatingNumber({
   id,
   text,
-  color,
   size,
   onDone,
 }: {
@@ -34,20 +46,13 @@ export function FloatingNumber({
     inputRange: [0, 0.7, 1],
     outputRange: [1, 1, 0],
   });
+  // Map the treatments' dp font size (26 normal / 40 crit) to an integer art
+  // scale so the number lands crisp: normal ≈ 4, crit ≈ 6 (the ANIM.critScale
+  // 1.5 ratio). floor 2 keeps it never smaller than the HUD baseline.
+  const numScale = Math.max(2, Math.round(size / 6.5));
   return (
-    <Animated.Text
-      style={[styles.num, { color, fontSize: size, transform: [{ translateY }], opacity }]}
-    >
-      {text}
-    </Animated.Text>
+    <Animated.View style={{ transform: [{ translateY }], opacity }}>
+      <PixelText text={atlasText(text)} variant="outlined" scale={numScale} />
+    </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  num: {
-    fontWeight: "900",
-    textShadowColor: "#000",
-    textShadowRadius: 5,
-    textShadowOffset: { width: 0, height: 1 },
-  },
-});
