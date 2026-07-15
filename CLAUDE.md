@@ -524,6 +524,21 @@ stays behind the flag as the fallback for one milestone (deletion is an M4 line)
      78/78 tests; scenario-1 re-confirmed with the flag on (`CRIT! 4,313` ==
      the exact boss HP drop).
 
+### Core Loop v2 — Continuous Combat + Super Attack 📋 PLANNED (spec + tickets 2026-07-15)
+Spec: `docs/superpowers/specs/2026-07-15-core-loop-v2-design.md` (owner-approved
+direction, decisions locked). Revises the fuel-hybrid loop into a *living* fight:
+(1) the party **continuously auto-attacks** while fueled (scene-layer driver keyed
+off each member's Battling/Winded/Resting state — idle economy unchanged, just
+visible); (2) **COLLECT removed** — idle auto-applies on open, no tap; (3) **DEPLOY →
+SUPER ATTACK** — same whole-bank math, new **combo/flurry** visual scaling with the
+bank size; (4) **Overdrive retriggered** — no meter/activate; **hitting the daily
+goal auto-enters ×2 Overdrive until the next reset**, now boosting idle AND super
+attacks. Fuel/Winded/Resting, streaks, shields, rally, the crowned bonus week, and
+the M2.75 game screen all survive; only `CommandDock`/`OverdriveBar` change on the UI
+side. Proposed tunables (Neel to confirm): `DAILY_STEP_GOAL` 8k→6k (+ re-anchor fuel
+burn 300→225), `BOSS.baseHP` 150k→300k, `OVERDRIVE.idleDamageMult` 3→2. Milestone:
+**Core Loop v2 — Continuous Combat + Super Attack** (backlog).
+
 ### Phase 3+ — Deferred (architect for, don't build)
 Recognition screens, IAP, cosmetics, guild-vs-guild / global.
 
