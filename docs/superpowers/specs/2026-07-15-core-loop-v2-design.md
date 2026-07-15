@@ -392,22 +392,18 @@ time travel + a fresh anonymous account, numbers checked to the digit:**
    via shields); rally/guild/game-screen untouched; `npm run typecheck` clean; test
    suite green (overdrive rewritten, fuel/bonus audited).
 
-## 11. Open questions for Neel
+## 11. Open questions for Neel — RESOLVED 2026-07-15
 
-1. **Daily goal value.** Recommend **6,000** (reachable → Overdrive fires often, the
-   intended feel), which requires re-anchoring `FUEL.burnPerHourBattling` **300→225**
-   (+ fuel/overdrive test retune). Or keep **8,000/300** (zero fuel-test churn, lower
-   Overdrive uptime). **Pick one** — it sets the whole day's rhythm.
-2. **Boss baseHP.** Recommend **300,000** to hold the day-5 kill under the doubled
-   engaged output. Comfortable, or tune during playtest?
-3. **Overdrive on Super Attack.** Locked "all damage" per the owner. Confirm the
-   ×16.2 worst-case ceiling is acceptable, or set `OVERDRIVE.boostsSuperAttack: false`
-   (idle-only) — a one-line config flip if pacing gets swingy.
-4. **Settle idle on Super Attack?** Optional: bank the session's pending idle onto the
-   boss at the start of a Super Attack, so its HP visibly drops beyond the flurry
-   (tighter feel, muddies the flurry number slightly). Default off.
-5. **Ambient special flourish?** The continuous loop is basics-only (specials reserved
-   for Super Attack / Overdrive / teammate hits — keeps ultimates meaningful). Want an
-   occasional every-Nth ambient special for richness, like the old mock?
-6. **Combo finisher split.** `finisherFrac 0.5` (half on the finisher). Bigger finisher
-   (0.6–0.7) reads more like "one crit"; smaller reads more like "a barrage." Feel call.
+1. **Daily goal → 6,000.** `DAILY_STEP_GOAL 8,000→6,000`; re-anchor
+   `FUEL.burnPerHourBattling 300→225` and retune the fuel/overdrive tests (owner
+   decision — reachable goal so Overdrive fires daily).
+2. **Boss baseHP → 300,000** as the starting retune; fine-tune in playtest.
+3. **Overdrive on Super Attack → KEEP "all"** (`boostsSuperAttack: true`). The ×2
+   multiplies the Super Attack too; the rare max-stack ceiling is accepted (all
+   upside, never a punish).
+4. **Settle idle on Super Attack → OFF** (default; keep the flurry number clean).
+5. **Ambient specials → NO — basics only** (owner decision). The continuous loop is
+   steady basic attacks; specials/ultimates are reserved for Super Attack, keeping
+   that moment distinct and impactful.
+6. **Combo finisher split → `finisherFrac 0.5`** (barrage feel, matches the "fast
+   succession" vision).
