@@ -1,7 +1,7 @@
 # STRIDE QUEST — Project Guide (CLAUDE.md)
 
 > Living doc. Keep this updated with architecture, key decisions, the data model,
-> and current status so any session has full context. Last updated: **2026-07-14**.
+> and current status so any session has full context. Last updated: **2026-07-15**.
 
 ---
 
@@ -93,8 +93,11 @@ walking-app/
     ├── devConfig.ts         # dev-only flags (step injector)
     ├── secureStorage.ts(.web.ts)  # auth token storage (keychain / localStorage)
     ├── config/assets.ts     # ⭐ ALL visuals (colors, sizes, sprite path map)
+    ├── battle/              # ⭐ the LIVE battle scene (M2): Sprite/Fighter/Projectile/Boss/BattleScene,
+    │                        #   ConnectedBattleScene (Convex adapter), RestZzz, prefetch,
+    │                        #   + GENERATED anchors.ts/spriteMap.ts/sprites/ (`npm run pack-sprites`)
     ├── health/healthkit.ts(.ios.ts)  # step-source seam: stub vs real HealthKit
-    └── screens/             # DashboardScreen + BackendSetupScreen
+    └── screens/             # DashboardScreen + BackendSetupScreen + onboarding/ (flow, choose-hero, guild, health beats)
 ```
 
 **Two "one place to change it" modules (by design):**
@@ -243,8 +246,10 @@ Tuning lives in `convex/gameConfig.ts` (all marked TUNABLE starting values);
 feel-layer timings/colors in `src/config/assets.ts` (`ANIM`/`FEEDBACK`/`BANNER`/`JUICE`).
 
 ### Phase 2.5 — Battle FX layer ✅ (built 2026-07-11/12, preview-side)
-Every class/job now has a full attack kit, proven in the HTML previews (not yet
-in the RN app — port plan is `docs/fx-rn-port-plan.md`, decisions already made).
+Every class/job now has a full attack kit, proven in the HTML previews — and
+since **ported into the RN app** (see **M2** below; the port plan was
+`docs/fx-rn-port-plan.md`, executed as decided). The HTML rig REMAINS the
+tuning + anchor-measurement environment.
 - **Art** (PixelLab, ~640 generations): per-class projectile + ultimate
   projectile + impact burst for all 8 classes (`assets/effects/`), plus a
   class-themed `special/` ultimate animation for ALL 40 jobs (job 5 = 17f,
@@ -381,8 +386,66 @@ distinct classes today); the `joinGuildByCode` solo-switch branch has no
 single-window UI surface post-onboarding yet (backend verified; a guild-board
 join surface would expose it).
 
+### M2 — Battle scene IN the RN app ✅ COMPLETE + E2E-VERIFIED (STR-17…24 + STR-62, 2026-07-14/15)
+Port executed per `docs/fx-rn-port-plan.md` — every decision held. The live
+battle scene is now the **dashboard centerpiece** (the placeholder sprite box
+is gone; the boss card stays the numeric HP/bonus readout — the boss VISUAL
+lives only in the scene). The full stone+gold pixel ui-kit HUD port is
+deliberately NOT part of M2 (future polish; functional cards keep their style).
+- **Module `src/battle/`**: `Sprite` (strip player on Reanimated shared values
+  — zero React re-renders, D2), `Fighter` (idle/attack/special/rest ≙
+  makeFighter, scheduled release), `Projectile`+`Boss` (D3 anchor geometry;
+  hit flash = white-tinted strip copy), `BattleScene` (layout + choreography +
+  `fire()` handle + z-particles), `ConnectedBattleScene` (⭐ the Convex
+  adapter), `RestZzz`, `prefetch`, + GENERATED `anchors.ts`/`spriteMap.ts`/
+  `sprites/` via `npm run pack-sprites` (anchor RESCAN still lives in
+  `fx-test.html?scan=1` — HTML rig stays the measurement path).
+- **Parity vs `battlefield-ui.html`** (served side-by-side, DOM-measured):
+  **pixel-EXACT layout** at the same container — all 8 hero boxes + the boss
+  box 0.0px off at 878×560; the auto-scale growth branch identical (381.6px
+  both at 390×950 phone fit); every impact at bossChestX ±0.1px; CYCLE 3600 /
+  STAGGER 420 / every-4th-special cadence; tap-hero-to-ult; crowned swap; kneel
+  + z's. **Documented deltas:** CSS `calc(% ± px)` → `computeSceneLayout()` px
+  math off onLayout (same constants, in `fxConfig SCENE`); bg
+  `object-position 50% 35%` → cover-center; shadow blur / boss drop-shadow /
+  `image-rendering: pixelated` are web-only CSS passthrough → native gets
+  crisp-ellipse shadow + smoothed upscale (iOS polish pass pending).
+- **Real events (D5)** through a `subscribe` tap on FeedbackProvider
+  (`useFeedbackEvent`; overlay treatments untouched — the scene is additive):
+  deploy → YOUR fighter's special with the **real damage number** (verified
+  −28,250 == the exact boss HP drop); teammate hit → THAT member's fighter
+  (`damageDealt` now carries `userId`), special when deploy-sized (≥5k
+  tunable) else basic; idle collect (incl. on-open auto-collect) → staggered
+  party volley, banked total split across the hits (3,000 → 3 × −1000);
+  Overdrive → your fighter chains specials on cycle turns; boss `won` →
+  crowned-form swap (reactive, ~250ms after the kill write) while the
+  FALLS/RISES banners stay feedback-layer; bonus-week deploys keep animating
+  (−20,800 grew the meter by exactly 20,800). Roster = `guild.overview`
+  (me front, per-member class/weekly-job/fuel-state; Resting → kneel +
+  z-particles, wake stops both) — fully reactive (grew 2→3 live when a bot
+  joined) and renders ANY 1–8 party (D5).
+- **Perf:** per-roster strip prefetch at mount (`src/battle/prefetch.ts`,
+  session-memoized), ~8 concurrent-projectile cap, no per-frame re-renders
+  (DevPanel RENDER COUNT stays flat while strips run).
+- **STR-62 (worklets on web):** the frozen-sprites bug was the long-lived
+  Metro predating the `react-native-worklets` install — a `--clear` restart
+  fixed it (the served bundle now emits worklet factories with populated
+  `__closure`). NO babel.config.js needed; STR-20's shared-values-in-deps
+  workaround kept as defense-in-depth. ⚠️ First native iOS build after
+  Reanimated landed needs `npx expo run:ios`.
+- **Verified 2026-07-15 in the browser** (cloud dev deployment): a fresh
+  anonymous account onboarded through the real flow (MAGE picked) sees the
+  scene with THEIR class; first deploy pulses (teaching hint) then fires the
+  mage special with the exact number; the crowned week renders the crowned
+  boss in-scene beside the gold bonus meter; 78/78 tests; `tsc --noEmit`
+  clean; zero console errors on a clean full load. (This closes M2.5's "the
+  battle-scene hero-sprite render of the roster awaits M2" note.) DevPanel
+  keeps BATTLE SCENE (timer-parity QA rig w/ 8/3/1-hero + JOB + CROWNED +
+  REST switches) and LIVE SCENE (real events) sections. iOS Simulator
+  spot-check of the scene = the M4 pass.
+
 ### Phase 3+ — Deferred (architect for, don't build)
-Other classes, recognition screens, IAP, cosmetics, guild-vs-guild / global.
+Recognition screens, IAP, cosmetics, guild-vs-guild / global.
 
 ---
 
