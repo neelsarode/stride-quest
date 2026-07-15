@@ -98,6 +98,20 @@ export const SCENE = {
   staggerMs: 420,
   specialEvery: 4,
 
+  // Continuous idle-attack loop (Core Loop v2, spec §5.1 / §6). The connected
+  // scene drives a per-member ambient BASIC swing (basics only — spec §11 Q5;
+  // specials/ultimates stay reserved for the Super Attack) keyed off each
+  // member's live fuel state. STR-77 consumes these; they carry NO damage number
+  // (the idle economy is server-settled, not per-swing). Period per member =
+  //   idleLoopCycleMs × (winded ? windedCycleMult : 1)
+  //                   × (overdrive && isMe ? overdriveCycleMult : 1),
+  // first fire offset by index × idleLoopStaggerMs so the party doesn't swing in
+  // unison. Resting members are skipped (they kneel).
+  idleLoopCycleMs: 2200, // TUNABLE start — Battling ambient swing period
+  idleLoopStaggerMs: 300, // TUNABLE start — per-member phase offset (staggered columns)
+  windedCycleMult: 2.0, // TUNABLE start — Winded swings ~2× slower (visibly tired)
+  overdriveCycleMult: 0.65, // TUNABLE start — your Overdrive speeds the loop up (~0.65× period)
+
   // Perf mitigation (plan §Perf risks): cap concurrently mounted projectiles.
   maxConcurrentShots: 8,
 } as const;

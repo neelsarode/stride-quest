@@ -238,6 +238,24 @@ export const JUICE = {
   shakeIntensity: 8,
 } as const;
 
+/** SUPER ATTACK combo/flurry (Core Loop v2, spec §5.3 / §6). FEEL LAYER ONLY —
+ *  the deploy DAMAGE math is unchanged (STR-77 sizes the visual from these,
+ *  no balance/economy/test impact). The flurry length scales with the BANK
+ *  (energy spent, = steps walked since the last Super Attack), not the damage,
+ *  so it honestly visualizes walking rather than a crit/streak luck roll:
+ *    N = clamp(round(spent / energyPerHit), minHits, maxHits)
+ *  plays N−1 fast basic buildup swings + a final special finisher, staggered
+ *  hitStaggerMs apart. Damage split (sums to the real total exactly): the
+ *  finisher carries finisherFrac of the total (the big "hero number"), the rest
+ *  splits evenly across the buildups, any rounding remainder → the finisher. */
+export const SUPER_ATTACK = {
+  energyPerHit: 1500, // TUNABLE start — spent ÷ this → hit count
+  minHits: 2, // TUNABLE start
+  maxHits: 10, // TUNABLE start
+  hitStaggerMs: 110, // TUNABLE start — fast "rat-a-tat… BOOM" barrage
+  finisherFrac: 0.5, // TUNABLE start — final special = 50% of total; buildups split the rest
+} as const;
+
 export type BannerVariant = keyof typeof BANNER;
 
 /** Directions available for each sprite (matches the art folders). */

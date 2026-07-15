@@ -2,9 +2,9 @@
 // Fuel math — PURE functions only (no Convex imports), like gameConfig.
 // =============================================================================
 // Steps are fuel (1 step = 1 fuel) for a hero who fights 24/7. The tank drains
-// piecewise by hero state:
-//   Battling  fuel > windedThreshold   → full burn (300/h)
-//   Winded    0 < fuel ≤ threshold     → half burn (150/h), so the last nominal
+// piecewise by hero state (rates re-anchored for Core Loop v2, spec §6):
+//   Battling  fuel > windedThreshold   → full burn (225/h)
+//   Winded    0 < fuel ≤ threshold     → half burn (112.5/h), so the last nominal
 //                                        6 hours stretch to 12 real hours
 //   Resting   fuel = 0                 → no burn. Resting is never punished:
 //                                        fuel never goes negative, ever.
@@ -28,14 +28,14 @@ const HOUR_MS = 3_600_000;
 
 // --- derived constants (all in FUEL units, i.e. steps) -----------------------
 
-/** 14,400 fuel — the most a tank can hold (48h of battling). */
+/** 10,800 fuel — the most a tank can hold (48h of battling, at 225/h). */
 export const TANK_CAP_FUEL = FUEL.tankCapHours * FUEL.burnPerHourBattling;
-/** 7,200 fuel — what a brand-new hero starts with (24h of battling). */
+/** 5,400 fuel — what a brand-new hero starts with (24h of battling, at 225/h). */
 export const STARTER_FUEL = FUEL.starterFuelHours * FUEL.burnPerHourBattling;
-/** 1,800 fuel — at or below this the hero is Winded. */
+/** 1,350 fuel — at or below this the hero is Winded (6h × 225/h). */
 export const WINDED_THRESHOLD_FUEL =
   FUEL.windedThresholdHours * FUEL.burnPerHourBattling;
-/** 150 fuel/h — the Winded burn rate. */
+/** 112.5 fuel/h — the Winded burn rate (225 × 0.5). */
 export const WINDED_BURN_PER_HOUR =
   FUEL.burnPerHourBattling * FUEL.windedBurnMult;
 
@@ -128,17 +128,17 @@ export function addFuel(fuel: number, amount: number): number {
   return Math.min(Math.max(0, fuel + Math.max(0, amount)), TANK_CAP_FUEL);
 }
 
-/** Fuel one Rally grants (STR-9): 6 hours at the battling rate = 1,800, PLUS a
+/** Fuel one Rally grants (STR-9): 6 hours at the battling rate = 1,350, PLUS a
  *  1-fuel wake margin. Why the margin: the state boundary puts the threshold
- *  itself in the Winded band (fuel must be STRICTLY above 1,800 to Battle), and
- *  a fully-drained tank sits at exactly 0 — so a bare 1,800 grant would land an
+ *  itself in the Winded band (fuel must be STRICTLY above 1,350 to Battle), and
+ *  a fully-drained tank sits at exactly 0 — so a bare 1,350 grant would land an
  *  empty receiver exactly ON the threshold, still Winded. A rally is a WAKE-UP
- *  (spec §5): the +1 (≈12 seconds of battling) guarantees every rallied hero
- *  comes back Battling. */
+ *  (spec §5): the +1 (≈16 seconds of battling at 225/h) guarantees every rallied
+ *  hero comes back Battling. */
 export const RALLY_FUEL_GRANT =
   RALLY.fuelHoursGiven * FUEL.burnPerHourBattling + 1;
 
-/** NOMINAL battling-hours worth of a fuel amount (fuel ÷ 300/h) — the unit the
+/** NOMINAL battling-hours worth of a fuel amount (fuel ÷ 225/h) — the unit the
  *  spec sizes everything in ("48h tank", "6h rally"). Display-oriented: a rally
  *  row's `fuelGiven` reads back as "≈6 hours". For REAL time-to-empty (which
  *  stretches the winded tail) use hoursToEmpty. */
@@ -158,7 +158,7 @@ export function fuelForBattlingHours(hours: number): number {
 
 /** REAL hours of fighting left in the tank from this level ("your hero can
  *  fight for 9 more hours") — the winded stretch burns at half rate, so the
- *  last 1,800 nominal fuel lasts 12 real hours, not 6. */
+ *  last 1,350 nominal fuel lasts 12 real hours, not 6. */
 export function hoursToEmpty(fuel: number): number {
   const f = Math.max(0, fuel);
   const battlingHours =
@@ -230,9 +230,10 @@ export function overdriveChargeFraction(
  *  active-until stamp. The settled window is anchored at the last settle stamp
  *  (the hero fights the FIRST cappedElapsed hours after it, then pauses), so
  *  Overdrive always occupies the front of the window — the offline-cap pause
- *  truncates the far end and can never eat the ×3 hours. Combined with
+ *  truncates the far end and can never eat the ×2 hours. Combined with
  *  activation itself settling, every charge yields EXACTLY durationHours of
- *  effective ×3 across settles. */
+ *  effective ×2 across settles. (Multiplier is OVERDRIVE.idleDamageMult, now 2
+ *  per Core Loop v2 §6 — this window helper is unchanged.) */
 export function overdriveHoursAt(
   windowStartMs: number,
   overdriveUntil: number | undefined,
@@ -259,7 +260,7 @@ export function overdriveHoursAt(
  *
  * `overdriveUntil` (STR-8, optional): wall-clock effective-ms when Overdrive
  * ends. Damage inside it is ×OVERDRIVE.idleDamageMult; burn never changes.
- * Every sub-window anchors the ×3 boundary at its own start stamp, so an
+ * Every sub-window anchors the ×2 boundary at its own start stamp, so an
  * expired stamp simply contributes zero overdrive hours.
  */
 export function settleFuelAndIdleWindow(args: {

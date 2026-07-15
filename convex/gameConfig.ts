@@ -60,8 +60,12 @@ export const STREAK = {
   firstDeployGuaranteedCrit: true, // TUNABLE start
 } as const;
 
-/** Fairness: a personal daily step goal; hitting it celebrates regardless of total. */
-export const DAILY_STEP_GOAL = 8000; // TUNABLE start
+/** Fairness: a personal daily step goal; hitting it celebrates regardless of total.
+ *  Core Loop v2 (spec §6): lowered 8,000 → 6,000 so the goal is reachable and its
+ *  reward — auto-Overdrive ×2 until the next daily reset — fires most days. Re-anchored
+ *  in lockstep with FUEL.burnPerHourBattling (24h of battling must stay < a goal day)
+ *  and also feeds the streak-intensity ratio and the Overdrive trigger. */
+export const DAILY_STEP_GOAL = 6000; // TUNABLE start
 /** Floor so day-1 players (no history) aren't divide-by-zero in improvement scoring. */
 export const IMPROVEMENT_FLOOR = 4000; // TUNABLE start
 
@@ -78,28 +82,42 @@ export const RECOGNITION = {
 // ============================================================================
 
 /** Fuel: steps power a hero who fights 24/7. 1 step = 1 fuel; the UI shows
- *  time-to-empty. 300/h battling means a full 24h of fighting costs 7,200 steps —
- *  just under the 8k daily goal, so goal-hitters bank a surplus instead of
- *  treading water. Hero states: Battling (fuel above the winded threshold),
- *  Winded (low fuel: half damage, half burn — the last nominal 6h stretch to 12),
- *  Resting (empty: no damage, no burn, never punished). */
+ *  time-to-empty. Core Loop v2 (spec §6) re-anchored burnPerHourBattling 300 → 225
+ *  alongside DAILY_STEP_GOAL 8,000 → 6,000: a full 24h of fighting now costs 5,400
+ *  steps — still under the 6k daily goal, so goal-hitters bank a ~600-fuel (~+2.7h)
+ *  surplus instead of treading water. Hero states: Battling (fuel above the winded
+ *  threshold), Winded (low fuel: half damage, half burn — the last nominal 6h
+ *  stretch to 12), Resting (empty: no damage, no burn, never punished). The derived
+ *  anchors (TANK_CAP/STARTER/WINDED_THRESHOLD/winded rate in fuelMath.ts) re-anchor
+ *  automatically off burnPerHourBattling — see that file. */
 export const FUEL = {
   fuelPerStep: 1, // TUNABLE start
-  burnPerHourBattling: 300, // TUNABLE start — 24h of fighting ≈ 7,200 steps
-  tankCapHours: 48, // TUNABLE start — 14,400 fuel max banked
-  starterFuelHours: 24, // TUNABLE start — new heroes fight from minute one
-  windedThresholdHours: 6, // TUNABLE start — = 1,800 fuel
+  burnPerHourBattling: 225, // TUNABLE start — was 300; 24h of fighting ≈ 5,400 steps (spec §6)
+  tankCapHours: 48, // TUNABLE start — derived TANK_CAP 10,800 fuel max banked
+  starterFuelHours: 24, // TUNABLE start — new heroes fight from minute one (derived 5,400)
+  windedThresholdHours: 6, // TUNABLE start — derived WINDED_THRESHOLD = 1,350 fuel
   windedDamageMult: 0.5, // TUNABLE start
   windedBurnMult: 0.5, // TUNABLE start
 } as const;
 
-/** Overdrive: player-activated fever mode, charged by steps PAST the daily goal.
- *  Pure reward — normal fuel burn, never a cost. */
+/** Overdrive (Core Loop v2, spec §5.4 / §6): RETRIGGERED from the old
+ *  charge-then-activate fever mode into an automatic goal-hit reward. Hitting
+ *  DAILY_STEP_GOAL auto-enters Overdrive at ×idleDamageMult until the next daily
+ *  reset (no meter, no ACTIVATE button, no stored charge), boosting BOTH the
+ *  continuous idle attacks AND Super Attacks. Still a pure reward — fuel burn is
+ *  never affected. */
 export const OVERDRIVE = {
-  fullChargeExcessSteps: 4_000, // TUNABLE start — steps past DAILY_STEP_GOAL charge the meter
-  durationHours: 4, // TUNABLE start
-  idleDamageMult: 3, // TUNABLE start
-  maxStoredCharges: 1, // TUNABLE start
+  idleDamageMult: 2, // TUNABLE start — was 3; all-day uptime → a gentler multiplier (spec §6.1)
+  boostsSuperAttack: true, // TUNABLE start — the ×2 also multiplies the Super Attack damage line (spec §5.4)
+  // @deprecated Core Loop v2 — retired; logic removed in STR-74. Still READ by
+  // convex/overdrive.ts + convex/dev.ts + convex/fuelMath.ts (the charge model), so
+  // the value stays to keep compilation green until STR-74 deletes that path.
+  fullChargeExcessSteps: 4_000, // TUNABLE start — steps past DAILY_STEP_GOAL charged the meter
+  // @deprecated Core Loop v2 — retired; logic removed in STR-74. Still READ by
+  // convex/overdrive.ts + convex/game.ts (the fixed activate window), so the value stays.
+  durationHours: 4, // TUNABLE start — the old fixed activate window (now "until reset")
+  // maxStoredCharges (was 1) hard-deleted for Core Loop v2 — nothing outside a stale
+  // schema.ts comment referenced it (spec §5.4 retires the whole charge model).
 } as const;
 
 /** Rally: gift a Winded/Resting teammate some fight time, at a small real cost
@@ -122,10 +140,11 @@ export const STREAK_SHIELD = {
  *  close. bossMaxHP(tier, members) = baseHP × max(1,members) × tierScaling^(tier−1). */
 export const BOSS = {
   defaultName: "The Sloth Tyrant",
-  // Retuned 60k → 150k for the fuel hybrid: per-member weekly output rises
-  // (24/7 fueled idle + daily crit deploys + Overdrive), so an engaged crew
-  // kills around day 5–6 instead of one-shotting it. — TUNABLE start
-  baseHP: 150_000,
+  // Retuned 60k → 150k for the fuel hybrid, then 150k → 300k for Core Loop v2
+  // (spec §6): all-day Overdrive ×2 + Overdrive-on-Super roughly doubles engaged
+  // per-member output, so the boss HP rises to hold the ~day-5 kill. Bonus tiers
+  // auto-scale (they're fractions of bossMaxHP). — TUNABLE start
+  baseHP: 300_000,
   tierScaling: 1.4, // each kill-spawn is 40% tougher — TUNABLE start
   placeholderMaxHP: 100_000, // fallback only
 } as const;
