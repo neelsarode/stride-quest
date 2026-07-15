@@ -50,6 +50,7 @@ export function DashboardScreen() {
   const collectIdleMut = useMutation(api.combat.collectIdle);
   const activateOverdriveMut = useMutation(api.overdrive.activateOverdrive);
   const markRalliesSeenMut = useMutation(api.rally.markRalliesSeen);
+  const markBoostSeenMut = useMutation(api.users.markBoostSeen);
   const { emit } = useFeedback();
 
   const [busy, setBusy] = useState(false);
@@ -107,15 +108,15 @@ export function DashboardScreen() {
     if (sawNew) markRalliesSeenMut({}).catch(() => {});
   }, [unseenRallies, emit, markRalliesSeenMut]);
 
-  // Reward banner (STR-57): "the crew dealt X bonus damage — ×N power all this
-  // week!" — fires once per challenge per app session, whether the boost
-  // arrived on a cold open (first open after rollover) or live (weekly reset
-  // while the app is up). Keyed by boss id so a second dev rollover in the
-  // same session announces its own reward; a tier-0 rollover has boost = null
-  // and shows NOTHING extra (never-punish guardrail).
+  // Reward banner (STR-57 + STR-61): "the crew dealt X bonus damage — ×N power
+  // all this week!" — fires once EVER per boosted week, by server state: the
+  // dashboard's boost.seen reflects users.boostSeenChallengeId, and we stamp it
+  // right after showing. The ref only guards the reactive window between the
+  // emit and the stamp's write landing (same shape as the rally played-set).
+  // A tier-0 rollover has boost = null and shows NOTHING extra (never-punish).
   const boostBannerFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!data?.boost || !data.boss) return;
+    if (!data?.boost || data.boost.seen || !data.boss) return;
     if (boostBannerFor.current === data.boss.id) return;
     boostBannerFor.current = data.boss.id;
     emit({
@@ -123,7 +124,8 @@ export function DashboardScreen() {
       mult: data.boost.mult,
       sourceDamage: data.boost.sourceDamage,
     });
-  }, [data, emit]);
+    markBoostSeenMut({ challengeId: data.boss.id }).catch(() => {});
+  }, [data, emit, markBoostSeenMut]);
 
   // Teaching layer (STR-49): the boss-arrival banner frames the week on the
   // FIRST post-onboarding render — keyed off the onboardedAt stamp's

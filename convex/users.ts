@@ -120,6 +120,35 @@ export const completeOnboarding = mutation({
 });
 
 /**
+ * STR-61 — one-shot seen-stamp for the Monday boost-reward banner. The
+ * dashboard exposes `boost.seen` (boostSeenChallengeId === current challenge);
+ * the client shows the banner only while unseen, then stamps here — so it
+ * fires once EVER per boosted week (across reloads/devices), not once per
+ * session. Same server-state pattern as firstIdleCollectedAt/hasEverDeployed.
+ * Idempotent; membership-checked so a stray id can't stamp someone else's week.
+ */
+export const markBoostSeen = mutation({
+  args: { challengeId: v.id("challenges") },
+  handler: async (ctx, { challengeId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) throw new Error("Not signed in.");
+    const challenge = await ctx.db.get(challengeId);
+    if (!challenge) return;
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user_and_group", (q) =>
+        q.eq("userId", userId).eq("groupId", challenge.groupId),
+      )
+      .first();
+    if (membership === null) return;
+    const user = await ctx.db.get(userId);
+    if (user && user.boostSeenChallengeId !== challengeId) {
+      await ctx.db.patch(userId, { boostSeenChallengeId: challengeId });
+    }
+  },
+});
+
+/**
  * Per-launch session maintenance (formerly `bootstrap`). Idempotent, safe to
  * call on every app open. It NEVER creates a guild (STR-44's load-bearing
  * restructure) — it only maintains what already exists:

@@ -60,6 +60,11 @@ export default defineSchema({
     // §Teaching Layer). First-time-only BY SERVER STATE, never localStorage,
     // so the moment fires exactly once across devices/reinstalls.
     firstIdleCollectedAt: v.optional(v.number()),
+    // The challenge whose Monday boost-reward banner this user has already
+    // seen (STR-61). Same one-shot-by-server-state pattern as the two stamps
+    // above: the client shows the banner only while unseen, then stamps —
+    // once ever per boosted week, across reloads and devices.
+    boostSeenChallengeId: v.optional(v.id("challenges")),
 
     // --- Phase 2 account-level meta (PERSISTS across weekly resets) ---
     // Energy is DERIVED: balance = energyEarned(ledger) − energySpent. We store

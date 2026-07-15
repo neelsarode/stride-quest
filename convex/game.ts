@@ -142,6 +142,10 @@ export const dashboard = query({
         ? {
             mult: challenge.boostMult,
             sourceDamage: challenge.boostSourceDamage ?? 0,
+            // STR-61: has this user already seen this week's reward banner?
+            // One-shot BY SERVER STATE (users.markBoostSeen stamps it), so the
+            // banner fires once ever — not once per app session.
+            seen: user.boostSeenChallengeId === challenge._id,
           }
         : null;
 
