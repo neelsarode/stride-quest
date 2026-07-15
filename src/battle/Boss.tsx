@@ -41,7 +41,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { FX } from "./fxConfig";
-import { Sprite } from "./Sprite";
+import { PIXELATED, Sprite } from "./Sprite";
 import { SPRITES, type SpriteKey } from "./spriteMap";
 import manifestJson from "./sprites/manifest.json";
 
@@ -187,7 +187,7 @@ export const Boss = forwardRef<BossHandle, BossProps>(function Boss(
         <Animated.Image
           source={SPRITES[idleKey]}
           tintColor="#ffffff"
-          style={[{ width: frames * w, height: h }, overlayFrameStyle]}
+          style={[{ width: frames * w, height: h }, PIXELATED, overlayFrameStyle]}
           resizeMode="stretch"
           fadeDuration={0}
         />

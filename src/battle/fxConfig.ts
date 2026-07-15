@@ -47,6 +47,61 @@ export const FX = {
   specialBumpPx: 9,
 } as const;
 
+/**
+ * Scene layout constants (battlefield-ui.html parity — plan step 5, STR-21).
+ * The HTML preview remains the tuning environment; any change to its inline
+ * constants must be mirrored here 1:1. Values verified 2026-07-14.
+ *
+ * The HTML mixes CSS percent and px (`calc(4% - 18px)`); RN has no calc(), so
+ * BattleScene computes everything in px from the stage's onLayout size —
+ * same numbers, same result (documented adaptation #1).
+ */
+export const SCENE = {
+  // css px per source art px: desktop vs iPhone-class widths (PHONE flag).
+  pxPerSrcDesktop: 1.7,
+  pxPerSrcPhone: 1.4,
+  phoneMaxWidth: 430, // stage width at/below this = phone fit
+
+  srcHero: 128, // hero art canvas (display height = srcHero × pxPerSrc for ALL jobs)
+  srcBoss: 256, // boss art canvas (min display height before auto-scale)
+
+  // Party formation: two staggered columns; hero i sits at
+  // bottom (partyBasePct + i·partyStepPct)% − partyDy px,
+  // left (col%)·stageW + partyDx px. Front hero (i=0) uses the RIGHT column.
+  partyBasePct: 22,
+  partyStepPctDesktop: 5,
+  partyStepPctPhone: 4.2,
+  colLeftPct: -8,
+  colRightPct: 4,
+  partyDx: -18, // px nudge: negative = left
+  partyDy: 50, // px nudge: positive = down
+  heroZFront: 9, // front hero zIndex; each row behind = one less (parity: 9…2)
+
+  // Boss placement: bottom edge at 22% of stage height, right edge overhanging
+  // the stage by 30% of the boss's own width (HTML: right:0 + translateX(30%)).
+  bossBottomPct: 0.22,
+  bossOverhangFrac: 0.3,
+
+  // AUTO-SCALE rule: the boss is never shorter than the party stack — its
+  // visible top must reach the top party member's head. Pads are MEASURED
+  // first-visible-pixel rows (horse art starts 6px into its 256 canvas, the
+  // crowned form 1px; hero heads sit ~20% into their canvas).
+  bossTopPad: {
+    horse_256: 6 / 256,
+    horse_crowned_256: 1 / 256,
+  } as Record<string, number>,
+  heroTopPad: 0.2,
+
+  // Idle choreography (timer parity): basics every cycle, staggered down the
+  // party; each hero's every-4th attack upgrades to their special.
+  cycleMs: 3600,
+  staggerMs: 420,
+  specialEvery: 4,
+
+  // Perf mitigation (plan §Perf risks): cap concurrently mounted projectiles.
+  maxConcurrentShots: 8,
+} as const;
+
 /** The 8 playable classes (characters/ + assets/effects/ folder names). */
 export const CLASS_NAMES = [
   "warrior",

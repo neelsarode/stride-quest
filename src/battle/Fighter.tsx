@@ -40,6 +40,12 @@ import { FX_ANCHORS, FX_SPECIAL_ANCHORS, type FxAnchor } from "./anchors";
 import { FX, type ClassName } from "./fxConfig";
 import { Sprite } from "./Sprite";
 import type { SpriteKey } from "./spriteMap";
+import manifestJson from "./sprites/manifest.json";
+
+const MANIFEST = manifestJson as Record<
+  SpriteKey,
+  { frames: number; w: number; h: number; file: string }
+>;
 
 export type FighterMode = "idle" | "rest" | "attack" | "special";
 export type AttackKind = "basic" | "special";
@@ -82,12 +88,24 @@ export interface FighterProps {
    * overlays (z-particles) off this; the DevPanel demo shows it as a readout.
    */
   onModeChange?: (mode: FighterMode) => void;
+  /**
+   * On-screen height in px (HTML parity: `.hero img { height: 100% }` renders
+   * every anim at HERO_PX regardless of source canvas size). The sprite scales
+   * from its native frame height with feet planted (left-bottom origin), so a
+   * caller that bottom-anchors the fighter keeps it grounded. Frame sizes are
+   * constant across a job's anims (pack-sprites invariant), so the scale never
+   * jumps mid-swing. Omit = native size (DevPanel demos).
+   */
+  displayHeight?: number;
   /** Outer positioning/transform styles, forwarded to the Sprite window. */
   style?: StyleProp<ViewStyle>;
 }
 
 export const Fighter = forwardRef<FighterHandle, FighterProps>(
-  function Fighter({ cls, job, onRelease, onModeChange, style }, ref) {
+  function Fighter(
+    { cls, job, onRelease, onModeChange, displayHeight, style },
+    ref,
+  ) {
     const [mode, setMode] = useState<FighterMode>("idle");
     // Restart token for one-shots (Sprite playKey): bumped per swing so a
     // fresh attack replays from frame 0 even right after the previous one.
@@ -207,6 +225,16 @@ export const Fighter = forwardRef<FighterHandle, FighterProps>(
             : FX.attackFps;
     const looping = mode === "idle" || mode === "rest";
 
+    // displayHeight (see prop doc): scale the native frame window so the
+    // rendered height is exactly displayHeight, feet staying planted.
+    const scaleStyle =
+      displayHeight != null
+        ? {
+            transform: [{ scale: displayHeight / MANIFEST[animKey].h }],
+            transformOrigin: "left bottom" as const,
+          }
+        : null;
+
     return (
       <Sprite
         animKey={animKey}
@@ -214,7 +242,7 @@ export const Fighter = forwardRef<FighterHandle, FighterProps>(
         loop={looping}
         playKey={playKey}
         onDone={looping ? undefined : handleDone}
-        style={style}
+        style={scaleStyle ? [scaleStyle, style] : style}
       />
     );
   },

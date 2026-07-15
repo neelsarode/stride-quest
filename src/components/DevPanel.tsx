@@ -9,6 +9,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { FX_ANCHORS } from "../battle/anchors";
+import { BattleScene, type SceneHero } from "../battle/BattleScene";
 import { Boss, type BossHandle } from "../battle/Boss";
 import {
   Fighter,
@@ -162,6 +163,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
           <SpriteDemo />
           <FighterDemo />
           <BattleDemo />
+          <BattleSceneDemo />
 
           <Section title="TIME">
             <Btn label="Advance day +1" onPress={run(() => advanceDay({ days: 1 }))} busy={busy} />
@@ -536,6 +538,84 @@ function BattleDemo() {
   );
 }
 
+// STR-21 verification vehicle for src/battle/BattleScene.tsx (plan step 5):
+// the full timer-driven scene in preview parity — battlefield-ui.html's roster
+// order, JOB switcher, CROWNED and REST toggles, plus a party-size cycler
+// (8 → 3 → 1) proving the roster-agnostic layout + boss auto-scale. Tap a hero
+// to fire their ultimate. Stays useful after the event wiring as the layout QA
+// rig (autoPlay here, events on the dashboard).
+const SCENE_DEMO_CLASSES: ClassName[] = [
+  "mage",
+  "assassin",
+  "warrior",
+  "archer",
+  "paladin",
+  "bard",
+  "medic",
+  "warlock",
+];
+const SCENE_DEMO_SIZES = [8, 3, 1] as const;
+
+function BattleSceneDemo() {
+  const [open, setOpen] = useState(false);
+  const [sizeIdx, setSizeIdx] = useState(0);
+  const [jobIdx, setJobIdx] = useState(4); // job 5 (preview default)
+  const [crowned, setCrowned] = useState(false);
+  const [resting, setResting] = useState(false);
+
+  const count = SCENE_DEMO_SIZES[sizeIdx];
+  const heroes: SceneHero[] = SCENE_DEMO_CLASSES.slice(0, count).map((cls) => {
+    const jobs = JOBS_BY_CLASS[cls] ?? [];
+    return {
+      id: `scene-demo-${cls}`,
+      cls,
+      job: jobs[Math.min(jobIdx, jobs.length - 1)],
+      resting,
+    };
+  });
+
+  return (
+    <View style={styles.section}>
+      <Pressable onPress={() => setOpen((o) => !o)}>
+        <Text style={styles.sectionTitle}>BATTLE SCENE {open ? "▲" : "▼"}</Text>
+      </Pressable>
+      {open && (
+        <>
+          <Text style={styles.readout}>
+            {count} heroes · JOB {jobIdx + 1}
+            {crowned ? " · CROWNED" : ""}
+            {resting ? " · RESTING" : ""} · tap a hero → ult
+          </Text>
+          <BattleScene
+            heroes={heroes}
+            bossKey={crowned ? "horse_crowned_256" : "horse_256"}
+            autoPlay
+            style={styles.sceneStage}
+          />
+          <View style={styles.row}>
+            <Btn
+              label={`HEROES ${count} ▸`}
+              onPress={() => setSizeIdx((i) => (i + 1) % SCENE_DEMO_SIZES.length)}
+            />
+            <Btn
+              label={`JOB ${jobIdx + 1} ▸`}
+              onPress={() => setJobIdx((i) => (i + 1) % 5)}
+            />
+            <Btn
+              label={crowned ? "👑 CROWNED ✓" : "👑 CROWNED"}
+              onPress={() => setCrowned((c) => !c)}
+            />
+            <Btn
+              label={resting ? "REST ✓ (wake)" : "REST"}
+              onPress={() => setResting((r) => !r)}
+            />
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
@@ -598,6 +678,9 @@ const styles = StyleSheet.create({
   },
   battleHero: { position: "absolute", left: 10, bottom: 10 },
   battleBoss: { position: "absolute", right: 10, bottom: 10 },
+  // BattleSceneDemo: a fixed-height window onto the full scene (the scene
+  // itself is size-agnostic — it lays out from its own onLayout box).
+  sceneStage: { height: 560, borderRadius: 8 },
   teammate: { gap: 6, marginTop: 2 },
   teammateName: { color: PALETTE.text, fontSize: 13, fontWeight: "600" },
   btn: {
