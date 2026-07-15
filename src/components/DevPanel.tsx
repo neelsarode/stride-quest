@@ -4,9 +4,34 @@
 // and manage simulated teammates so time-based + co-op mechanics are testable in
 // minutes. Deliberately loud (magenta, dashed) so it reads as NOT-real UI.
 // =============================================================================
-import { useCallback, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Easing,
+  cancelAnimation,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import { useMutation, useQuery } from "convex/react";
+import {
+  Badge,
+  Bar,
+  type BarHandle,
+  Beacon,
+  Button,
+  Chip,
+  Modal,
+  PixelText,
+  Popover,
+  Portrait,
+  Ring,
+  Sheet,
+  StatusDot,
+  UIScaleProvider,
+} from "../ui";
+import { BakedImage } from "../ui/Baked";
+import { UI_PALETTE } from "../ui/theme";
 import { api } from "../../convex/_generated/api";
 import { FX_ANCHORS } from "../battle/anchors";
 import { BattleScene, type SceneHero } from "../battle/BattleScene";
@@ -161,6 +186,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
 
       {open && (
         <>
+          <UiGallery />
           <SpriteDemo />
           <FighterDemo />
           <BattleDemo />
@@ -251,6 +277,309 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
           </Section>
         </>
       )}
+    </View>
+  );
+}
+
+// =============================================================================
+// STR-64 verification vehicle — the UI GALLERY. Renders every src/ui primitive
+// in every state, at 2x AND 3x (toggle), on the S8 CELESTIAL SILVER background,
+// so it can be screenshot side-by-side against ui-style-lab.html. The RENDER
+// COUNT readout is the M2 zero-re-render proof: with ANIMATE on, the fills,
+// flash, beacon and ring all move on shared values while the count stays FLAT.
+// Dev-only (lives inside the already-gated DevPanel). Throwaway once GameScreen
+// composes these for real.
+// =============================================================================
+const GALLERY_PORTRAITS = {
+  warrior: require("../../characters/warrior/5_warlord/south.png"),
+  mage: require("../../characters/mage/5_archmage/south.png"),
+  archer: require("../../characters/archer/5_sentinel/south.png"),
+  medic: require("../../characters/medic/5_hierophant/south.png"),
+} as const;
+// south.png intrinsic sizes (RN-web has no Image.resolveAssetSource).
+const GALLERY_PORTRAIT_SIZE: Record<keyof typeof GALLERY_PORTRAITS, number> = {
+  warrior: 128,
+  mage: 120,
+  archer: 128,
+  medic: 128,
+};
+
+const GALLERY_PARTY = [
+  { cls: "warrior", state: "battling" },
+  { cls: "mage", state: "battling" },
+  { cls: "archer", state: "winded" },
+  { cls: "medic", state: "resting" },
+] as const;
+
+function GLabel({ children }: { children: React.ReactNode }) {
+  return <Text style={styles.galLabel}>{children}</Text>;
+}
+
+// Memoised (no props) so the Dashboard's ambient 1Hz idle-ticker re-renders
+// don't cascade in — the RENDER COUNT then reflects ONLY this component's own
+// state changes, so with ANIMATE on it stays perfectly flat while the
+// shared-value chrome runs at 60fps (the M2 zero-re-render acceptance proof).
+const UiGallery = memo(function UiGallery() {
+  // Incremented on EVERY React render — with ANIMATE on it MUST stay flat.
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+
+  const [open, setOpen] = useState(false);
+  const [scale, setScale] = useState(2);
+  const [animate, setAnimate] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Shared-value drives for the ANIMATE proof — updating these never touches
+  // React (no setState), so they animate with the render count frozen.
+  const barLoop = useSharedValue(0.55);
+  const ghostLoop = useSharedValue(0.72);
+  const ringLoop = useSharedValue(0.78);
+  const flashRef = useRef<BarHandle>(null);
+
+  useEffect(() => {
+    if (animate) {
+      barLoop.value = withRepeat(
+        withTiming(0.92, { duration: 1500, easing: Easing.inOut(Easing.quad) }),
+        -1,
+        true,
+      );
+      ghostLoop.value = withRepeat(
+        withTiming(0.99, { duration: 1500, easing: Easing.inOut(Easing.quad) }),
+        -1,
+        true,
+      );
+      ringLoop.value = withRepeat(
+        withTiming(1, { duration: 2800, easing: Easing.linear }),
+        -1,
+        false,
+      );
+      flashRef.current?.flash();
+      const id = setInterval(() => flashRef.current?.flash(), 1400);
+      return () => clearInterval(id);
+    }
+    cancelAnimation(barLoop);
+    cancelAnimation(ghostLoop);
+    cancelAnimation(ringLoop);
+    barLoop.value = 0.55;
+    ghostLoop.value = 0.72;
+    ringLoop.value = 0.78;
+  }, [animate, barLoop, ghostLoop, ringLoop]);
+
+  const BAR_W = 118;
+
+  return (
+    <View style={styles.section}>
+      <Pressable onPress={() => setOpen((o) => !o)}>
+        <Text style={styles.sectionTitle}>UI GALLERY {open ? "▲" : "▼"}</Text>
+      </Pressable>
+      {open && (
+        <>
+          <View style={styles.row}>
+            <Btn label={`SCALE ${scale}x ▸`} onPress={() => setScale((v) => (v === 2 ? 3 : 2))} />
+            <Btn label={animate ? "ANIMATE ✓" : "ANIMATE"} onPress={() => setAnimate((a) => !a)} />
+            <Btn label="⚡ FLASH" onPress={() => flashRef.current?.flash()} />
+          </View>
+          <Text style={styles.readout}>
+            RENDER COUNT {renderCount.current} · {scale}x ·{" "}
+            {animate ? "ANIMATING (count must stay flat)" : "static"}
+          </Text>
+
+          <UIScaleProvider value={scale}>
+            <View nativeID="ui-gallery-stage" style={styles.galStage}>
+              {/* ---- BARS ---- */}
+              <GLabel>BARS · boss (full, gold) + ghost chip</GLabel>
+              <Bar variant="full" width={BAR_W} value={0.62} ghost={0.74} fill="gold" label="62,000 / 100,000" />
+              <GLabel>fuel / xp / overdrive (slim)</GLabel>
+              <Bar variant="slim" width={BAR_W} value={0.44} fill="sky" label="FIGHTS 21H" />
+              <Bar variant="slim" width={BAR_W} value={0.48} fill="sky" label="12,000 / 25,000 XP" />
+              <Bar variant="slim" width={BAR_W} value={0.62} fill="gold" label="62%" />
+              <GLabel>fill families + flash (tap ⚡ FLASH)</GLabel>
+              <View style={styles.galRow}>
+                <Bar variant="slim" width={46} value={0.85} fill="gold" />
+                <Bar variant="slim" width={46} value={0.6} fill="sky" />
+                <Bar variant="slim" width={46} value={0.5} fill="green" />
+                <Bar variant="slim" width={46} value={0.35} fill="yellow" />
+                <Bar variant="slim" width={46} value={0.15} fill="red" />
+              </View>
+              <Bar ref={flashRef} variant="full" width={BAR_W} value={0.7} fill="gold" label="FLASH" />
+              <GLabel>ANIMATED (shared-value driven — render count stays flat)</GLabel>
+              <Bar variant="full" width={BAR_W} progress={barLoop} ghostProgress={ghostLoop} fill="gold" label="LIVE" />
+              <Bar variant="slim" width={BAR_W} progress={barLoop} fill="sky" />
+
+              {/* ---- BUTTONS ---- */}
+              <GLabel>BUTTONS (pressed = content drops 1 art px — tap to see)</GLabel>
+              <View style={styles.galRow}>
+                <Button asset="btn_deploy_gold" label="DEPLOY" />
+                <Button material="silver" label="MENU" />
+                <Button material="gold" label="GO" />
+                <Button material="silver" label="OK" />
+                <Button material="silver" label="?" labelScale={2} />
+              </View>
+              <View style={styles.galRow}>
+                <Button asset="btn_nav_silver">
+                  <BakedImage name="icon_banner" scale={scale} />
+                </Button>
+                <Button asset="btn_collect_silver">
+                  <BakedImage name="icon_star" scale={scale} />
+                </Button>
+                <Button asset="btn_close_gold" label="X" />
+              </View>
+
+              {/* ---- CHIPS + BADGES ---- */}
+              <GLabel>CHIPS + BADGES</GLabel>
+              <View style={styles.galRow}>
+                <Chip label="+320" color="gold" />
+                <Chip label="+1,050" color="green" />
+                <Chip label="RALLY" color="red" />
+                <Badge label="1" />
+                <Badge label="5" />
+                <Badge label="12" />
+              </View>
+
+              {/* ---- STATUS DOTS ---- */}
+              <GLabel>STATUS DOTS (battling / winded / resting / rally)</GLabel>
+              <View style={styles.galRow}>
+                <StatusDot state="battling" />
+                <StatusDot state="winded" />
+                <StatusDot state="resting" />
+                <StatusDot state="rally" />
+              </View>
+
+              {/* ---- PORTRAITS ---- */}
+              <GLabel>PORTRAITS (30 hero · 18 party rail w/ dots + beacon · empty)</GLabel>
+              <View style={styles.galRow}>
+                <Portrait
+                  size={30}
+                  source={GALLERY_PORTRAITS.warrior}
+                  cropKey="warrior"
+                  sourceSize={GALLERY_PORTRAIT_SIZE.warrior}
+                />
+                {GALLERY_PARTY.map((m) => (
+                  <View key={m.cls} style={{ width: 18 * scale, height: 18 * scale }}>
+                    {m.state === "resting" && (
+                      <View style={{ position: "absolute", left: -1 * scale, top: -1 * scale }}>
+                        <Beacon active={animate} />
+                      </View>
+                    )}
+                    <Portrait
+                      size={18}
+                      source={GALLERY_PORTRAITS[m.cls as keyof typeof GALLERY_PORTRAITS]}
+                      cropKey={m.cls}
+                      sourceSize={GALLERY_PORTRAIT_SIZE[m.cls as keyof typeof GALLERY_PORTRAITS]}
+                    />
+                    <View style={{ position: "absolute", right: 0, bottom: 0 }}>
+                      <StatusDot state={m.state} />
+                    </View>
+                  </View>
+                ))}
+                <Portrait size={22} />
+              </View>
+
+              {/* ---- RING + BEACON ---- */}
+              <GLabel>STEPS RING (0 / .25 / .5 / .78 / 1 · animated) + rally beacon</GLabel>
+              <View style={styles.galRow}>
+                <Ring value={0} />
+                <Ring value={0.25} />
+                <Ring value={0.5} />
+                <Ring value={0.78} />
+                <Ring value={1} />
+                <Ring progress={ringLoop} />
+                <Beacon active />
+              </View>
+
+              {/* ---- PIXEL TEXT ---- */}
+              <GLabel>PIXEL TEXT · plain / outlined / engraved</GLabel>
+              <View style={styles.galRow}>
+                <PixelText text="HERO-EHB8" color={UI_PALETTE.white} />
+                <PixelText text="THE NIGHTMARE" color={UI_PALETTE.gold_mid} />
+              </View>
+              <View style={{ backgroundColor: UI_PALETTE.gold_mid, padding: 3 * scale }}>
+                <PixelText text="62,000 / 100,000" variant="outlined" />
+              </View>
+              <View style={styles.galRow}>
+                <PixelText text="DEPLOY" variant="engraved" color={UI_PALETTE.outline} rimColor={UI_PALETTE.gold_light} />
+                <PixelText text="SETTINGS" variant="engraved" color={UI_PALETTE.outline} rimColor={UI_PALETTE.silver_rim} />
+              </View>
+
+              {/* ---- POPOVER (parity: SAM-MEDIC + SEND RALLY) ---- */}
+              <GLabel>POPOVER (member stats + rally)</GLabel>
+              <View style={{ paddingTop: 4 * scale, alignItems: "center", width: 132 * scale }}>
+                <Popover height={72} side="top" arrowOffset={15}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <PixelText text="SAM - MEDIC" color={UI_PALETTE.silver_rim} />
+                    <PixelText text="RESTING" color={UI_PALETTE.sky_mid} />
+                  </View>
+                  <GalStat label="STEPS TODAY" value="1,050" top={8} scale={scale} />
+                  <GalStat label="DMG WEEK" value="8,750" top={17} scale={scale} />
+                  <GalStat label="STREAK" value="0 DAYS" top={26} scale={scale} />
+                  <View style={{ position: "absolute", left: 0, top: 39 * scale }}>
+                    <Button material="silver" label="SEND RALLY 500" width={126} />
+                  </View>
+                </Popover>
+              </View>
+
+              {/* ---- SHEET + MODAL ---- */}
+              <GLabel>SHEET + MODAL (overlay the app)</GLabel>
+              <View style={styles.galRow}>
+                <Btn label="OPEN SHEET" onPress={() => setSheetOpen(true)} />
+                <Btn label="OPEN MODAL" onPress={() => setModalOpen(true)} />
+              </View>
+            </View>
+
+            <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)}>
+              <View style={{ gap: 6 * scale }}>
+                <PixelText text="GUILD BOARD" color={UI_PALETTE.gold_mid} scale={scale + 1} />
+                <PixelText text="SLIDE-UP DETAIL PANEL" color={UI_PALETTE.sky_mid} />
+                <View style={{ marginTop: 8 * scale }}>
+                  <Button material="gold" label="CLOSE" onPress={() => setSheetOpen(false)} />
+                </View>
+              </View>
+            </Sheet>
+
+            <Modal visible={modalOpen} onClose={() => setModalOpen(false)} title="HOW TO PLAY" height={86}>
+              <View style={{ gap: 3 * scale }}>
+                <PixelText text="WALK EVERY DAY." color={UI_PALETTE.silver_rim} />
+                <PixelText text="STEPS BECOME ENERGY." color={UI_PALETTE.sky_mid} />
+                <PixelText text="DEPLOY TO STRIKE THE" color={UI_PALETTE.silver_rim} />
+                <PixelText text="WEEKLY BOSS TOGETHER." color={UI_PALETTE.sky_mid} />
+                <View style={{ marginTop: 5 * scale, alignItems: "center" }}>
+                  <Button material="silver" label="OK" onPress={() => setModalOpen(false)} />
+                </View>
+              </View>
+            </Modal>
+          </UIScaleProvider>
+        </>
+      )}
+    </View>
+  );
+});
+
+// A popover stat line: dim label left, bright value right (kit statLine).
+function GalStat({
+  label,
+  value,
+  top,
+  scale,
+}: {
+  label: string;
+  value: string;
+  top: number;
+  scale: number;
+}) {
+  return (
+    <View
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: top * scale,
+        flexDirection: "row",
+        justifyContent: "space-between",
+      }}
+    >
+      <PixelText text={label} color={UI_PALETTE.sky_mid} scale={scale} />
+      <PixelText text={value} color={UI_PALETTE.silver_rim} scale={scale} />
     </View>
   );
 }
@@ -682,6 +1011,24 @@ const styles = StyleSheet.create({
   err: { color: "#ff8a8a", fontSize: 12, fontFamily: "Courier", fontWeight: "700" },
   section: { gap: 6 },
   sectionTitle: { color: PALETTE.dev, fontSize: 11, fontWeight: "700", letterSpacing: 1 },
+  // UI GALLERY (STR-64): S8 CELESTIAL SILVER background so it reads against
+  // ui-style-lab.html; loose gaps so each primitive is isolated for screenshots.
+  galStage: {
+    backgroundColor: "#1b2637",
+    borderRadius: 8,
+    padding: 12,
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  galLabel: {
+    color: "#8aa0b8",
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginTop: 8,
+    textTransform: "uppercase",
+  },
+  galRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, alignItems: "center" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   spriteStage: {
     backgroundColor: "#0c0e14",
