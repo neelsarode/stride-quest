@@ -1,7 +1,7 @@
 # STRIDE QUEST — Project Guide (CLAUDE.md)
 
 > Living doc. Keep this updated with architecture, key decisions, the data model,
-> and current status so any session has full context. Last updated: **2026-07-12**.
+> and current status so any session has full context. Last updated: **2026-07-14**.
 
 ---
 
@@ -303,8 +303,83 @@ anchor, player-activated Overdrive, Rally, auto-applied Streak Shields.
   UIs need `ConvexError` for friendly messages; activating Overdrive consumes
   ALL banked excess incl. >100% overage; dev fast-forward idle damage lands on
   the next interaction (cosmetic, dev-only).
-- Remaining M1: frontend STR-13/14/15 (fuel gauge + states, Overdrive button,
-  Rally UI) — design target: `dashboard-ui.html` + `ui-style-lab.html`.
+- ✅ **M1 frontend DONE (2026-07-14, STR-13/14/15)**: fuel gauge + hero-state
+  chip (Battling/Winded/Resting kneel framing), Overdrive meter + real ACTIVATE
+  button, Rally UI on the guild board + received-rally celebration. Friendly
+  rejections ship with it: user-facing mutations throw `ConvexError`
+  `{code, message}` → `friendlyError()` → calm toasts (the STR-53 polish note
+  is resolved; buttons also self-gate with warm inline copy so most rejections
+  never round-trip).
+
+### M1.5 — Bonus Boss / victory week ✅ built + E2E-VERIFIED (STR-59, 2026-07-14)
+Spec: `docs/superpowers/specs/2026-07-14-bonus-boss-design.md`. Built as
+STR-54…57 (schema widen + `BONUS_BOSS` config + pure tier helpers +
+`tests/bonusMath.test.mjs`; kill-write stamps the crowned form; deploy/idle
+route into `bonusDamageContributed` while `won`; `spawnBoss` stamps
+`boostMult`/`boostSourceDamage`; dashboard `bonus`/`boost` payloads; crowned
+card + accumulating `BonusMeter` + tier preview + reward banner/boost chip).
+**STR-59 all 8 scenarios PASS in the browser** (cloud dev deployment, DevPanel
+time travel, numbers checked to the digit):
+1. Day-5 kill → the SAME write spawns the crowned form (VICTORY → CROWNED
+   banners, HP bar → accumulating meter at 0, "Deal 37,500 to earn ×1.1").
+2. **STR-53 regression (headline):** bonus-week deploys run the full pipeline —
+   energy 10,000→0, streak **5→6** (not 5→0), earned shield untouched (1/2),
+   meter +40,250 exact — repeated daily through Sunday, and the streak
+   **survived the Monday rollover** (7→8 on Monday's deploy).
+3. Post-kill idle banks into the METER: 20h fast-forward → Collect = exactly
+   9,000 (OFFLINE_CAP paused at 10h × 900 dph); Resting 10h → +0 pending,
+   meter unchanged, fuel untouched.
+4. Co-op: a REAL second anonymous account (isolated browser context) joined
+   mid-victory-lap by invite code and deployed 28,250 → ONE shared meter
+   119,350 on both screens (you: 91,100 / 28,250); each tier banner fired
+   exactly once per threshold.
+5. Tier thresholds are fractions of the KILLED boss's maxHP, verified at three
+   scales: solo 150k → 37.5k/75k/150k; 2-member tier-2 420k → 105k/210k/420k;
+   4-member tier-1 600k → 150k/300k/600k.
+6. Reward stamping, shown == applied: rollover stamped `boostMult` **1.2**
+   exactly matching the preview; banner "×1.2 POWER ALL WEEK! The crew dealt
+   119,350 bonus damage last week."; next-week deploy = 44,940
+   (10,000 × 2 crit × 1.8725 streak × **1.2**) and idle collect = 1,800
+   (10h × 150 × **1.2**) — both exact; ×1.5 cap clamp unit-tested.
+7. Never-punish floor: killed tier-2, ignored the crowned form → Monday tier-3
+   boss 588,000 exact, NO boost fields/chip/banner, zero "missed it" copy.
+8. ConvexError polish: real-UI rejection renders the friendly toast ("A rally
+   costs 500 Energy — walk a little more first."); overdrive-while-resting and
+   rally-daily-limit are pre-empted client-side with calm copy; server
+   backstops are structured `ConvexError {code, message}` (captured verbatim).
+78/78 unit tests pass; zero unexpected console errors.
+**STR-61 fixed & verified in the same run:** the Monday reward banner now
+fires once EVER per boosted week via `users.boostSeenChallengeId`
+(server seen-stamp, same pattern as `firstIdleCollectedAt`): banner shown at
+rollover on both live clients, stamp confirmed in the DB, absent after reload
+AND after re-open.
+
+### M2.5 — Onboarding & first session ✅ built + E2E-VERIFIED (STR-50, 2026-07-14)
+Spec: `docs/superpowers/specs/2026-07-13-onboarding-design.md`. Built as
+STR-42…49 (schema + 8-class registry, onboarding mutations +
+bootstrap→`ensureSession`, flow shell w/ server-state resume routing,
+choose-your-hero, guild screens + invite sharing, HealthKit priming move,
+teaching layer). **STR-50 two-browser founder+joiner script PASS** (Playwright,
+two isolated anonymous accounts):
+founder full flow (Archer pick w/ blurb, pre-filled name + guild name, atomic
+create, code read from DOM) → joiner full flow (Paladin, lowercase code
+auto-uppercased, preview-confirm shows exact guild name + "1 of 8 spots") →
+same guild, reactive roster on both screens; joiner's deploy dropped the boss
+on the founder's screen live (150,000 → 121,749); **boss maxHP unchanged at
+join** (reinforcements rule); mid-flow reload resumed at the correct beat
+(server-state routing). Error paths: bad code → warm inline retry (no modal);
+full guild (7 bots + founder) → "is full — 8 heroes strong" + founder-path
+offer with state preserved, preview flipped to CODE FOUND live when a seat
+opened, boundary join 7→8 succeeded; solo-founder guild switch (join by code
+while holding an empty solo guild, staged via a second window of the same
+account) → switched into the friend's guild, orphan guild cascade-deleted
+(CLI-verified), account state survived. No monetization surface anywhere; all
+flow errors warm amber, never red. `dev.resetOnboarding` re-test loop used 3×.
+Unit tests 78/78 (incl. inviteCode generation/normalization). Notes: the
+battle-scene hero-sprite render of the roster awaits M2 (dashboard renders
+distinct classes today); the `joinGuildByCode` solo-switch branch has no
+single-window UI surface post-onboarding yet (backend verified; a guild-board
+join surface would expose it).
 
 ### Phase 3+ — Deferred (architect for, don't build)
 Other classes, recognition screens, IAP, cosmetics, guild-vs-guild / global.
