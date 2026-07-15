@@ -22,8 +22,9 @@ import {
   TEACHING,
   classAccent,
 } from "../config/assets";
-import { CLASSES, DAILY_STEP_GOAL } from "../../convex/gameConfig";
+import { DAILY_STEP_GOAL } from "../../convex/gameConfig";
 import { DEV_FLAGS } from "../devConfig";
+import { ConnectedBattleScene } from "../battle/ConnectedBattleScene";
 import { AnimatedHPBar } from "../components/AnimatedHPBar";
 import { AnimatedMeter } from "../components/AnimatedMeter";
 import { BonusMeter } from "../components/BonusMeter";
@@ -274,36 +275,27 @@ export function DashboardScreen() {
           </Pressable>
         )}
 
-      {/* Player + placeholder sprite. While Resting the box frames the
-          dignified kneel — the per-job `rest` animation lands with STR-38
-          through this same assets.ts seam (placeholder glyph until then). */}
+      {/* THE BATTLE SCENE (STR-23, plan step 7) — the screen's centerpiece,
+          replacing the old placeholder sprite box. Live party (your hero
+          front, kneeling teammates snoring) vs the shared boss; deploys,
+          collects, teammate hits, overdrive chains and the crowned week all
+          animate HERE via the real event stream (STR-22). Per the
+          dashboard-ui.html intent the scene carries the fantasy; the
+          functional cards below stay in their current style — the full
+          stone+gold pixel ui-kit HUD port is FUTURE POLISH, not this pass. */}
+      <ConnectedBattleScene style={styles.scene} />
+
+      {/* Player identity (the hero itself now lives in the scene above). */}
       <View style={styles.card}>
-        <View style={styles.playerRow}>
-          <View
-            style={[
-              styles.sprite,
-              { borderColor: resting ? hs.color : accent },
-              resting && styles.spriteResting,
-            ]}
-          >
-            <Text style={[styles.spriteLabel, { color: resting ? hs.color : accent }]}>
-              {resting ? "🧎" : CLASSES[player.classKey].displayName.toUpperCase()}
-            </Text>
-            <Text style={styles.spriteSub}>{player.jobName}</Text>
-            <Text style={styles.spriteTag}>
-              {resting ? "[rest sprite]" : "[sprite]"}
-            </Text>
-          </View>
-          <View style={styles.playerMeta}>
-            <Text style={styles.playerName}>{player.displayName}</Text>
-            <Text style={styles.dim}>
-              {player.className} · Job {player.jobLevel} — {player.jobName}
-            </Text>
-            <Text style={[styles.badge, { color: accent }]}>idle ×{player.idleMultiplier}</Text>
-            <Text style={styles.streakChip}>
-              {streak.count > 0 ? `🔥 ${streak.count}-day streak` : "🔥 no streak"}
-            </Text>
-          </View>
+        <View style={styles.playerMeta}>
+          <Text style={styles.playerName}>{player.displayName}</Text>
+          <Text style={styles.dim}>
+            {player.className} · Job {player.jobLevel} — {player.jobName}
+          </Text>
+          <Text style={[styles.badge, { color: accent }]}>idle ×{player.idleMultiplier}</Text>
+          <Text style={styles.streakChip}>
+            {streak.count > 0 ? `🔥 ${streak.count}-day streak` : "🔥 no streak"}
+          </Text>
         </View>
       </View>
 
@@ -658,19 +650,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardLabel: { color: PALETTE.textDim, fontSize: 12, fontWeight: "700", letterSpacing: 1.5 },
-  playerRow: { flexDirection: "row", gap: SIZES.gap, alignItems: "center" },
-  sprite: {
-    width: SIZES.spriteBox,
-    height: SIZES.spriteBox,
-    borderWidth: 2,
-    borderRadius: 10,
-    backgroundColor: "#0c0e14",
-    alignItems: "center",
-    justifyContent: "center",
+  // The live battle scene's window (STR-23). Height is a screen-design number
+  // (assets.ts); the scene lays itself out from whatever box it gets.
+  scene: {
+    height: SIZES.battleSceneHeight,
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    borderColor: PALETTE.panelBorder,
   },
-  spriteLabel: { fontSize: 13, fontWeight: "800", letterSpacing: 1 },
-  spriteSub: { color: PALETTE.text, fontSize: 12, marginTop: 2 },
-  spriteTag: { color: PALETTE.textDim, fontSize: 10, marginTop: 4 },
   playerMeta: { flex: 1, gap: 4 },
   playerName: { color: PALETTE.text, fontSize: 20, fontWeight: "700" },
   badge: { fontSize: 13, fontWeight: "700" },
@@ -705,8 +692,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   stateChipText: { fontSize: 11, fontWeight: "800", letterSpacing: 1 },
-  // The resting kneel framing: slightly dimmed, calm — dignified, not grayed-out.
-  spriteResting: { opacity: 0.85 },
   defeated: { color: PALETTE.good, fontSize: 14, fontWeight: "800" },
   // Bonus Boss card (STR-57): gold crowned treatment — celebration hierarchy.
   bonusBossName: { color: PALETTE.accent },

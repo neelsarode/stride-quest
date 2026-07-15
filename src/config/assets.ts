@@ -46,6 +46,10 @@ export const SIZES = {
   radius: 14,
   spriteBox: 96, // placeholder sprite square
   barHeight: 22,
+  // The live battle scene's window on the dashboard (STR-23). The scene lays
+  // itself out from whatever box it gets, so this is purely a screen-design
+  // number.
+  battleSceneHeight: 400,
 } as const;
 
 // ============================================================================

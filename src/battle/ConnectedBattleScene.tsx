@@ -48,6 +48,7 @@ import {
 } from "./BattleScene";
 import type { AttackKind } from "./Fighter";
 import { SCENE, type ClassName } from "./fxConfig";
+import { prefetchRosterStrips } from "./prefetch";
 
 // A teammate hit at/above this size renders as their SPECIAL (deploy-sized),
 // below it as a basic (idle-sized). TUNABLE display threshold: typical idle
@@ -158,6 +159,12 @@ export function ConnectedBattleScene({
   // The crowned form rises while the week's boss is beaten (status "won" —
   // the same condition that makes the bonus payload non-null).
   const bossKey = data?.boss?.defeated ? "horse_crowned_256" : "horse_256";
+
+  // Perf (plan §Perf risks, STR-23): warm exactly the on-screen roster's
+  // strips — internal memo makes re-runs on every snapshot free.
+  useEffect(() => {
+    prefetchRosterStrips(heroes, bossKey);
+  }, [heroes, bossKey]);
 
   return (
     <BattleScene
