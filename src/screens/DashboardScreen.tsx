@@ -19,6 +19,7 @@ import {
   classAccent,
 } from "../config/assets";
 import { DAILY_STEP_GOAL } from "../../convex/gameConfig";
+import { fmtFightShort, fmtFightTime, fmtMoreTime } from "../fuelCopy";
 import { DEV_FLAGS } from "../devConfig";
 import { ConnectedBattleScene } from "../battle/ConnectedBattleScene";
 import { AnimatedHPBar } from "../components/AnimatedHPBar";
@@ -364,35 +365,6 @@ function bonusPreviewLine(bonus: {
     ).toLocaleString()} damage to ×${bonus.nextTier.boostMult}.`;
   }
   return `Next week: ×${bonus.currentMult} power — top tier secured!`;
-}
-
-// Fuel time formatting (STR-13): the tank speaks in REAL fight time
-// (hoursToEmpty already stretches the winded tail). Compact form for the gauge
-// ("21h" / "9.5h" / "40m"), sentence forms for the readout copy.
-function fmtFightShort(hours: number): string {
-  if (hours >= 10) return `${Math.round(hours)}h`;
-  if (hours >= 1) return `${Math.round(hours * 10) / 10}h`;
-  return `${Math.max(1, Math.round(hours * 60))}m`;
-}
-
-function fmtFightTime(hours: number): string {
-  if (hours >= 10) return `${Math.round(hours)} hours`;
-  if (hours >= 1) {
-    const h = Math.round(hours * 10) / 10;
-    return `${h} ${h === 1 ? "hour" : "hours"}`;
-  }
-  const mins = Math.max(1, Math.round(hours * 60));
-  return `${mins} ${mins === 1 ? "minute" : "minutes"}`;
-}
-
-function fmtMoreTime(hours: number): string {
-  if (hours >= 10) return `${Math.round(hours)} more hours`;
-  if (hours >= 1) {
-    const h = Math.round(hours * 10) / 10;
-    return `${h} more ${h === 1 ? "hour" : "hours"}`;
-  }
-  const mins = Math.max(1, Math.round(hours * 60));
-  return `${mins} more ${mins === 1 ? "minute" : "minutes"}`;
 }
 
 function Stat({

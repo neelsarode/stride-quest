@@ -23,27 +23,20 @@ import { StyleSheet, View } from "react-native";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { GAME_ZONES } from "../../config/assets";
+import { fmtFightShort } from "../../fuelCopy";
 import { Bar, PixelText, UIScaleProvider } from "../../ui";
 import { STATE_COLORS } from "../../ui/theme";
 import { useGameLayout } from "../useGameLayout";
 import { zoneStyles } from "./zoneStyle";
 
-// --- local tuning (TODO consolidate into assets.ts — STR-68 owns it this round)
+// --- local layout feel (component-local by design — the slim gauge's own
+// widths/gaps; the shared fuel-time copy now lives in src/fuelCopy.ts, imported
+// above so the gauge and the classic card read byte-identical strings).
 const FUEL_BAR_ART_W = 64; // slim bar width (art px) — leaves room for label + chip
 const ROW_GAP = 6; // dp between FUEL label / bar / state chip
 const LABEL_COLOR = "#cdb98a"; // dashboard-ui #fuellabel parchment
 
 type FuelState = "battling" | "winded" | "resting";
-
-// fmtFightShort — VERBATIM copy of DashboardScreen's fuel-time formatter
-// (src/screens/DashboardScreen.tsx). Kept identical so the gauge and the classic
-// card read the same string; TODO consolidate both into one shared fuel-copy
-// helper (it currently lives as a private fn on DashboardScreen, out of my lane).
-function fmtFightShort(hours: number): string {
-  if (hours >= 10) return `${Math.round(hours)}h`;
-  if (hours >= 1) return `${Math.round(hours * 10) / 10}h`;
-  return `${Math.max(1, Math.round(hours * 60))}m`;
-}
 
 export function FuelGauge() {
   const { topPad, artScale } = useGameLayout();

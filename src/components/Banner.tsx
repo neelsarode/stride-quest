@@ -9,7 +9,7 @@
 // `variant` stays in the props for the event-API contract (FeedbackProvider
 // spreads it) but no longer selects colours.
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { Animated, StyleSheet, View, useWindowDimensions } from "react-native";
 import { ANIM } from "../config/assets";
 import type { BannerVariant } from "../config/assets";
 import { Frame, PixelText, measurePixelText, useUIScale } from "../ui";
@@ -20,6 +20,21 @@ import { atlasText } from "./atlasText";
 const BANNER_CAP = 12; // capW → min length = 2*capW + 1
 const BANNER_PAD = 14; // art px each side of the engraved title (chunky face)
 const SUBTITLE_GAP = 3; // art px between the gold face and the outlined subtitle
+const BANNER_SIDE_MARGIN = 12; // dp kept clear on each edge when a line is clamped
+const MIN_BANNER_SCALE = 1; // never shrink past the atlas's native 1 art px = 1 dp
+
+/** Shrink-to-fit width (same technique as the STR-71 Toast fix): if a line at the
+ *  base art scale would overrun the viewport, scale it down uniformly so it stays
+ *  on one readable line on-screen. The banner subtitles are outlined full
+ *  sentences (e.g. the resting "any walk rejoins the fight." copy) that overran a
+ *  390dp screen; the gold title frame is guarded too so a long title can't clip.
+ *  Short lines (the common case) keep the crisp base scale. */
+function fitScale(lineArtW: number, screenW: number, base: number): number {
+  const available = Math.max(1, screenW - 2 * BANNER_SIDE_MARGIN);
+  return lineArtW * base <= available
+    ? base
+    : Math.max(MIN_BANNER_SCALE, available / lineArtW);
+}
 
 export function Banner({
   variant: _variant,
@@ -35,6 +50,7 @@ export function Banner({
   onDone: (id: number) => void;
 }) {
   const s = useUIScale();
+  const { width: screenW } = useWindowDimensions();
   const t = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.sequence([
@@ -50,11 +66,15 @@ export function Banner({
   // Engraved width == the white-atlas advance; pad + floor to the min 3-slice.
   const titleW = measurePixelText(label, "engraved");
   const bannerW = Math.max(2 * BANNER_CAP + 1, titleW + 2 * BANNER_PAD);
+  // Clamp each line to the viewport (STR-71): the gold title frame + the outlined
+  // subtitle both shrink only when they'd otherwise run off-screen.
+  const titleScale = fitScale(bannerW, screenW, s);
+  const subScale = sub ? fitScale(measurePixelText(sub, "outlined"), screenW, s) : s;
 
   const translateY = t.interpolate({ inputRange: [0, 1], outputRange: [-30, 0] });
   return (
     <Animated.View style={[styles.wrap, { opacity: t, transform: [{ translateY }] }]}>
-      <Frame slice="banner_gold" length={bannerW}>
+      <Frame slice="banner_gold" length={bannerW} scale={titleScale}>
         <View style={styles.face}>
           {/* Gold engrave: dark ink on top, lit gold ledge one art px below. */}
           <PixelText
@@ -62,12 +82,13 @@ export function Banner({
             variant="engraved"
             color={UI_PALETTE.outline}
             rimColor={UI_PALETTE.gold_light}
+            scale={titleScale}
           />
         </View>
       </Frame>
       {sub ? (
         <View style={{ marginTop: SUBTITLE_GAP * s }}>
-          <PixelText text={sub} variant="outlined" />
+          <PixelText text={sub} variant="outlined" scale={subScale} />
         </View>
       ) : null}
     </Animated.View>

@@ -30,15 +30,12 @@ import { UI_PALETTE, WELL_INSETS } from "../../ui/theme";
 import { useGameLayout } from "../useGameLayout";
 import { zoneStyles } from "./zoneStyle";
 
-// --- local tuning (TODO consolidate into assets.ts — STR-68 owns it this round)
+// --- local layout feel (component-local by design; the shared VERTICAL rhythm
+// lives in GAME_ZONES, reconciled in STR-71 — the plate's own row gaps / gutter
+// stay here where they're read).
 const PLATE_GAP = 2; // dp between plate text rows
 const OUTER_PAD = 18; // total side gutter (9 dp each) — battlefield-ui BOSS_BAR_W math
 const GHOST_HOLD_MS = 300; // how long the red chip lingers before catching down
-// Push the plate below the fuel gauge: GAME_ZONES stacks boss (+56) essentially
-// on top of fuel (+52); the mock (dashboard-ui) has the boss name BELOW the fuel
-// widget, so nudge it down. Tuned side-by-side at 390 dp (name clears fuel, bar
-// bottom stays above the party rail). TODO fold into GAME_ZONES in STR-71.
-const BOSS_EXTRA_TOP = 26;
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
@@ -190,7 +187,7 @@ export function BossPlate() {
       style={[
         zoneStyles.zone,
         zoneStyles.centeredRow,
-        { top: topPad + GAME_ZONES.bossPlateTop + BOSS_EXTRA_TOP },
+        { top: topPad + GAME_ZONES.bossPlateTop },
       ]}
     >
       <UIScaleProvider value={artScale}>

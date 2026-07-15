@@ -9,7 +9,7 @@
 // (+) opens the invite popover (both hosted by ../Overlays).
 // =============================================================================
 import { useRef } from "react";
-import { Pressable, View, type ImageSourcePropType } from "react-native";
+import { Pressable, View } from "react-native";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
@@ -22,79 +22,14 @@ import {
 import { BakedImage } from "../../ui/Baked";
 import { UI_FILLS, UI_PALETTE } from "../../ui/theme";
 import { GUILD } from "../../../convex/gameConfig";
-import { GAME_ZONES } from "../../config/assets";
+import { GAME_ZONES, portraitSpriteFor } from "../../config/assets";
 import { useGameLayout } from "../useGameLayout";
 import { toggleInvite, toggleMember, type AnchorRect } from "../Overlays";
 import { zoneStyles } from "./zoneStyle";
 
-// Full-body portrait sprites per class × job level (south.png). RN-web has no
-// Image.resolveAssetSource, so each carries its intrinsic square pixel size for
-// the Portrait crop math (sizes measured from the art; sizes vary per job).
-// TODO consolidate into a generated shared map (assets.ts is STR-68-owned this
-// milestone) — same shape as src/battle/spriteMap.ts.
-const PORTRAIT_SPRITES: Record<string, { src: ImageSourcePropType; size: number }[]> = {
-  archer: [
-    { src: require("../../../characters/archer/1_greenhorn/south.png"), size: 120 },
-    { src: require("../../../characters/archer/2_scout/south.png"), size: 124 },
-    { src: require("../../../characters/archer/3_hunter/south.png"), size: 128 },
-    { src: require("../../../characters/archer/4_ranger/south.png"), size: 124 },
-    { src: require("../../../characters/archer/5_sentinel/south.png"), size: 128 },
-  ],
-  assassin: [
-    { src: require("../../../characters/assassin/1_footpad/south.png"), size: 116 },
-    { src: require("../../../characters/assassin/2_prowler/south.png"), size: 128 },
-    { src: require("../../../characters/assassin/3_nightblade/south.png"), size: 124 },
-    { src: require("../../../characters/assassin/4_assassin/south.png"), size: 124 },
-    { src: require("../../../characters/assassin/5_shadowlord/south.png"), size: 128 },
-  ],
-  bard: [
-    { src: require("../../../characters/bard/1_busker/south.png"), size: 124 },
-    { src: require("../../../characters/bard/2_minstrel/south.png"), size: 120 },
-    { src: require("../../../characters/bard/3_troubadour/south.png"), size: 120 },
-    { src: require("../../../characters/bard/4_bard/south.png"), size: 124 },
-    { src: require("../../../characters/bard/5_maestro/south.png"), size: 128 },
-  ],
-  mage: [
-    { src: require("../../../characters/mage/1_apprentice/south.png"), size: 124 },
-    { src: require("../../../characters/mage/2_adept/south.png"), size: 124 },
-    { src: require("../../../characters/mage/3_conjurer/south.png"), size: 124 },
-    { src: require("../../../characters/mage/4_sorcerer/south.png"), size: 128 },
-    { src: require("../../../characters/mage/5_archmage/south.png"), size: 120 },
-  ],
-  medic: [
-    { src: require("../../../characters/medic/1_acolyte/south.png"), size: 124 },
-    { src: require("../../../characters/medic/2_healer/south.png"), size: 128 },
-    { src: require("../../../characters/medic/3_cleric/south.png"), size: 120 },
-    { src: require("../../../characters/medic/4_priest/south.png"), size: 124 },
-    { src: require("../../../characters/medic/5_hierophant/south.png"), size: 128 },
-  ],
-  paladin: [
-    { src: require("../../../characters/paladin/1_squire/south.png"), size: 124 },
-    { src: require("../../../characters/paladin/2_knight/south.png"), size: 120 },
-    { src: require("../../../characters/paladin/3_crusader/south.png"), size: 120 },
-    { src: require("../../../characters/paladin/4_paladin/south.png"), size: 124 },
-    { src: require("../../../characters/paladin/5_lightbringer/south.png"), size: 128 },
-  ],
-  warlock: [
-    { src: require("../../../characters/warlock/1_initiate/south.png"), size: 120 },
-    { src: require("../../../characters/warlock/2_cultist/south.png"), size: 120 },
-    { src: require("../../../characters/warlock/3_hexer/south.png"), size: 120 },
-    { src: require("../../../characters/warlock/4_warlock/south.png"), size: 120 },
-    { src: require("../../../characters/warlock/5_dreadlord/south.png"), size: 128 },
-  ],
-  warrior: [
-    { src: require("../../../characters/warrior/1_rookie/south.png"), size: 124 },
-    { src: require("../../../characters/warrior/2_strider/south.png"), size: 124 },
-    { src: require("../../../characters/warrior/3_vanguard/south.png"), size: 124 },
-    { src: require("../../../characters/warrior/4_champion/south.png"), size: 128 },
-    { src: require("../../../characters/warrior/5_warlord/south.png"), size: 128 },
-  ],
-};
-
-function portraitFor(cls: string, jobLevel: number) {
-  const jobs = PORTRAIT_SPRITES[cls] ?? PORTRAIT_SPRITES.warrior;
-  return jobs[Math.min(Math.max(jobLevel, 1), 5) - 1];
-}
+// Full-body portrait sprites (class × job south.png) now live in the shared
+// visual config (src/config/assets.ts PORTRAIT_SPRITES / portraitSpriteFor),
+// consolidated in STR-71 out of this zone's former local map.
 
 // Fuel-sliver proxy per hero state — overview carries heroState, not a raw fuel
 // value for teammates, so the sliver reads the state (battling = a full green
@@ -147,7 +82,7 @@ function PartyTile({ member, scale }: { member: Member; scale: number }) {
   const ref = useRef<View>(null);
   const restingMate = member.heroState === "resting" && !member.isMe;
   const dotState: HeroState = restingMate ? "rally" : member.heroState;
-  const sprite = portraitFor(member.class, member.jobLevel);
+  const sprite = portraitSpriteFor(member.class, member.jobLevel);
 
   const onPress = () => {
     ref.current?.measureInWindow((x, y, width, height) => {

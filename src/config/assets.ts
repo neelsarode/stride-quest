@@ -7,6 +7,7 @@
 // already exist under /characters — see spriteRelPath() for the mapping.
 // =============================================================================
 
+import type { ImageSourcePropType } from "react-native";
 import { CLASSES, type ClassKey } from "../../convex/gameConfig";
 
 /** Colors. Dark, pixel-art-friendly placeholder palette. */
@@ -62,23 +63,29 @@ export const SIZES = {
 export const ART_SCALE_BREAKPOINT_DP = 430;
 
 /** Zone offsets (dp) for the game-screen HUD, transcribed from spec §6's zone
- *  table (dashboard-ui comp + battlefield-ui media query). TUNABLE STARTING
- *  VALUES — the zone tickets (STR-67/68/69) tune each side-by-side against the
- *  mock. Top offsets add to `topPad = max(14, insets.top)`; bottom offsets add
- *  to `bottomPad = max(12, insets.bottom)` — so every zone always clears the
- *  device safe area. The shell (STR-66) only places EMPTY containers here. */
+ *  table (dashboard-ui comp + battlefield-ui media query). Top offsets add to
+ *  `topPad = max(14, insets.top)`; bottom offsets add to `bottomPad =
+ *  max(12, insets.bottom)` — so every zone always clears the device safe area.
+ *  RECONCILED in STR-71 (M2.75 integration): the STR-67 starting values packed
+ *  the top band too tight (boss bottom kissed the party rail). Retuned
+ *  side-by-side against dashboard-ui.html at 390dp so identity → fuel → boss
+ *  plate → party rail stack with clean gaps and no overlap. With web's topPad=14
+ *  the effective y's land on the mock's rhythm (fuel 66 / boss 104 / rail 210).
+ *  STR-67's BOSS_EXTRA_TOP local hack is folded into `bossPlateTop` here. */
 export const GAME_ZONES = {
   /** Top bar: identity + week/day + countdown. Full width at the top pad. */
   topBarTop: 0,
-  /** Fuel gauge: below identity, left-aligned. */
+  /** Fuel gauge: below identity, left-aligned (effective y≈66, mock #fuelwrap). */
   fuelTop: 52,
   fuelLeft: 14,
-  /** Boss plate: centered gold HP bar. */
-  bossPlateTop: 56,
-  /** Party rail: horizontal portrait row, centered. */
-  partyRailTop: 146,
-  /** Right nav: guild / stats / help column. */
-  rightNavTop: 146,
+  /** Boss plate: centered gold HP bar (effective y≈104, mock #bossbar). Was 56 +
+   *  a local BOSS_EXTRA_TOP=26; reconciled to a single offset in STR-71. */
+  bossPlateTop: 90,
+  /** Party rail: horizontal portrait row, centered (effective y≈210 — below the
+   *  boss bar's bottom ≈168 with a clean gap, near the mock's 216 column start). */
+  partyRailTop: 196,
+  /** Right nav: guild / stats / help column (top-aligned with the party rail). */
+  rightNavTop: 196,
   rightNavRight: 9,
   /** Command dock (DEPLOY / COLLECT / steps ring), above the job strip. Raised
    *  from the spec's starting 46 so the COLLECT caption / GOAL chip / first-crit
@@ -295,4 +302,82 @@ export const CLASS_ACCENTS: Partial<Record<ClassKey, string>> = {
 /** Class accent color (gold fallback for classes without one yet). */
 export function classAccent(classKey: ClassKey): string {
   return CLASS_ACCENTS[classKey] ?? PALETTE.accent;
+}
+
+// ============================================================================
+// FULL-BODY PORTRAIT SPRITES (M2.75) — per class × job level (south.png), the
+// static full-body art the party rail crops into a portrait well. RN-web has no
+// Image.resolveAssetSource, so each entry carries its intrinsic square pixel
+// size for the Portrait crop math (sizes measured from the art; they vary per
+// job). Consolidated here in STR-71 out of PartyRail's local map so any surface
+// that needs a member portrait reads ONE shared config (same "one place all
+// visuals live" rule as SPRITES in src/battle/spriteMap.ts).
+// ============================================================================
+export const PORTRAIT_SPRITES: Record<
+  string,
+  { src: ImageSourcePropType; size: number }[]
+> = {
+  archer: [
+    { src: require("../../characters/archer/1_greenhorn/south.png"), size: 120 },
+    { src: require("../../characters/archer/2_scout/south.png"), size: 124 },
+    { src: require("../../characters/archer/3_hunter/south.png"), size: 128 },
+    { src: require("../../characters/archer/4_ranger/south.png"), size: 124 },
+    { src: require("../../characters/archer/5_sentinel/south.png"), size: 128 },
+  ],
+  assassin: [
+    { src: require("../../characters/assassin/1_footpad/south.png"), size: 116 },
+    { src: require("../../characters/assassin/2_prowler/south.png"), size: 128 },
+    { src: require("../../characters/assassin/3_nightblade/south.png"), size: 124 },
+    { src: require("../../characters/assassin/4_assassin/south.png"), size: 124 },
+    { src: require("../../characters/assassin/5_shadowlord/south.png"), size: 128 },
+  ],
+  bard: [
+    { src: require("../../characters/bard/1_busker/south.png"), size: 124 },
+    { src: require("../../characters/bard/2_minstrel/south.png"), size: 120 },
+    { src: require("../../characters/bard/3_troubadour/south.png"), size: 120 },
+    { src: require("../../characters/bard/4_bard/south.png"), size: 124 },
+    { src: require("../../characters/bard/5_maestro/south.png"), size: 128 },
+  ],
+  mage: [
+    { src: require("../../characters/mage/1_apprentice/south.png"), size: 124 },
+    { src: require("../../characters/mage/2_adept/south.png"), size: 124 },
+    { src: require("../../characters/mage/3_conjurer/south.png"), size: 124 },
+    { src: require("../../characters/mage/4_sorcerer/south.png"), size: 128 },
+    { src: require("../../characters/mage/5_archmage/south.png"), size: 120 },
+  ],
+  medic: [
+    { src: require("../../characters/medic/1_acolyte/south.png"), size: 124 },
+    { src: require("../../characters/medic/2_healer/south.png"), size: 128 },
+    { src: require("../../characters/medic/3_cleric/south.png"), size: 120 },
+    { src: require("../../characters/medic/4_priest/south.png"), size: 124 },
+    { src: require("../../characters/medic/5_hierophant/south.png"), size: 128 },
+  ],
+  paladin: [
+    { src: require("../../characters/paladin/1_squire/south.png"), size: 124 },
+    { src: require("../../characters/paladin/2_knight/south.png"), size: 120 },
+    { src: require("../../characters/paladin/3_crusader/south.png"), size: 120 },
+    { src: require("../../characters/paladin/4_paladin/south.png"), size: 124 },
+    { src: require("../../characters/paladin/5_lightbringer/south.png"), size: 128 },
+  ],
+  warlock: [
+    { src: require("../../characters/warlock/1_initiate/south.png"), size: 120 },
+    { src: require("../../characters/warlock/2_cultist/south.png"), size: 120 },
+    { src: require("../../characters/warlock/3_hexer/south.png"), size: 120 },
+    { src: require("../../characters/warlock/4_warlock/south.png"), size: 120 },
+    { src: require("../../characters/warlock/5_dreadlord/south.png"), size: 128 },
+  ],
+  warrior: [
+    { src: require("../../characters/warrior/1_rookie/south.png"), size: 124 },
+    { src: require("../../characters/warrior/2_strider/south.png"), size: 124 },
+    { src: require("../../characters/warrior/3_vanguard/south.png"), size: 124 },
+    { src: require("../../characters/warrior/4_champion/south.png"), size: 128 },
+    { src: require("../../characters/warrior/5_warlord/south.png"), size: 128 },
+  ],
+};
+
+/** The full-body portrait sprite for a class + job level (1..5), warrior as the
+ *  fallback for an unmapped class (clamped to the ladder ends). */
+export function portraitSpriteFor(cls: string, jobLevel: number) {
+  const jobs = PORTRAIT_SPRITES[cls] ?? PORTRAIT_SPRITES.warrior;
+  return jobs[Math.min(Math.max(jobLevel, 1), 5) - 1];
 }
