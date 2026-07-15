@@ -3,7 +3,15 @@
 // this — it stays a pure description of events.
 
 export type FeedbackEvent =
-  | { type: "damageDealt"; amount: number; source: "deploy" | "idle" | "teammate"; crit?: boolean }
+  // userId attributes a teammate's hit to its member (the battle scene fires
+  // THAT fighter's attack — STR-22); absent for your own deploy/idle hits.
+  | {
+      type: "damageDealt";
+      amount: number;
+      source: "deploy" | "idle" | "teammate";
+      crit?: boolean;
+      userId?: string;
+    }
   | { type: "jobUp"; from: number; to: number; jobName: string }
   // firstTime (STR-49 teaching layer): the account's FIRST idle collect that
   // banked damage — the toast gains the one-time "Your hero never stops."

@@ -55,10 +55,12 @@ import {
   Fighter,
   type AttackKind,
   type FighterHandle,
+  type FighterMode,
   type ReleaseEvent,
 } from "./Fighter";
 import { SCENE, type ClassName } from "./fxConfig";
 import { computeShotGeometry, Projectile, type Rect } from "./Projectile";
+import { RestZzz } from "./RestZzz";
 import type { SpriteKey } from "./spriteMap";
 import manifestJson from "./sprites/manifest.json";
 
@@ -197,6 +199,11 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
   ) {
     const [stage, setStage] = useState<{ w: number; h: number } | null>(null);
     const [shots, setShots] = useState<Shot[]>([]);
+    // Heroes whose Fighter MODE is "rest" (not the resting PROP: a mid-swing
+    // fighter finishes first) — drives the scene-level z-particle overlay.
+    const [restingIds, setRestingIds] = useState<ReadonlySet<string>>(
+      () => new Set(),
+    );
     const shotId = useRef(0);
     const bossRef = useRef<BossHandle>(null);
     const fighters = useRef<(FighterHandle | null)[]>([]);
@@ -234,6 +241,26 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
     // the ref callback below; this covers every later change).
     useEffect(() => {
       heroes.forEach((h, i) => fighters.current[i]?.setResting(!!h.resting));
+    }, [heroes]);
+
+    // Z-overlay bookkeeping: track rest MODE per hero id, and prune ids that
+    // left the roster.
+    const handleModeChange = useCallback((heroId: string, mode: FighterMode) => {
+      setRestingIds((prev) => {
+        const isRest = mode === "rest";
+        if (prev.has(heroId) === isRest) return prev;
+        const next = new Set(prev);
+        if (isRest) next.add(heroId);
+        else next.delete(heroId);
+        return next;
+      });
+    }, []);
+    useEffect(() => {
+      setRestingIds((prev) => {
+        const alive = new Set(heroes.map((h) => h.id));
+        const next = new Set([...prev].filter((id) => alive.has(id)));
+        return next.size === prev.size ? prev : next;
+      });
     }, [heroes]);
 
     // --- release → projectile (the full choreography, D3 geometry) ----------
@@ -375,9 +402,26 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
                     job={hero.job}
                     displayHeight={layout.heroPx}
                     onRelease={(e) => handleRelease(i, e)}
+                    onModeChange={(m) => handleModeChange(hero.id, m)}
                     style={styles.fighter}
                   />
                 </Pressable>
+              );
+            })}
+            {/* Scene-level z-particles over every KNEELING fighter (STR-22 —
+                the overlay effect deferred from the Fighter ticket). */}
+            {heroes.map((hero, i) => {
+              if (!restingIds.has(hero.id)) return null;
+              const pos = layout.heroes[i];
+              if (!pos) return null;
+              return (
+                <RestZzz
+                  key={`zzz-${hero.id}`}
+                  left={pos.left}
+                  top={layout.stageH - pos.bottom - layout.heroPx}
+                  width={layout.heroPx}
+                  height={layout.heroPx}
+                />
               );
             })}
             {shots.map((s) => (

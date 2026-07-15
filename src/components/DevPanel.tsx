@@ -10,6 +10,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { FX_ANCHORS } from "../battle/anchors";
 import { BattleScene, type SceneHero } from "../battle/BattleScene";
+import { ConnectedBattleScene } from "../battle/ConnectedBattleScene";
 import { Boss, type BossHandle } from "../battle/Boss";
 import {
   Fighter,
@@ -164,6 +165,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
           <FighterDemo />
           <BattleDemo />
           <BattleSceneDemo />
+          <LiveSceneDemo />
 
           <Section title="TIME">
             <Btn label="Advance day +1" onPress={run(() => advanceDay({ days: 1 }))} busy={busy} />
@@ -612,6 +614,26 @@ function BattleSceneDemo() {
           </View>
         </>
       )}
+    </View>
+  );
+}
+
+// STR-22 verification vehicle for src/battle/ConnectedBattleScene.tsx (plan
+// step 6 / D5): the scene on REAL Convex state — roster from guild.overview,
+// attacks from the live game-event stream. Drive it with the panel's own
+// tools: inject → DEPLOY (screen button) → your hero ults with the real
+// number; teammate ⚔ Deploy → their fighter fires; 💤 Drain → they kneel with
+// z's; ⚡ Activate ×3 → your specials chain; kill the boss → crowned form.
+function LiveSceneDemo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.section}>
+      <Pressable onPress={() => setOpen((o) => !o)}>
+        <Text style={styles.sectionTitle}>
+          LIVE SCENE · real events {open ? "▲" : "▼"}
+        </Text>
+      </Pressable>
+      {open && <ConnectedBattleScene style={styles.sceneStage} />}
     </View>
   );
 }

@@ -19,7 +19,14 @@ export function useTeammateDamage(members: Member[] | undefined) {
       if (m.isMe) continue;
       const was = before.get(m.userId);
       if (was !== undefined && m.damage > was) {
-        emit({ type: "damageDealt", amount: m.damage - was, source: "teammate" });
+        emit({
+          type: "damageDealt",
+          amount: m.damage - was,
+          source: "teammate",
+          // Attribution for the battle scene (STR-22): THIS member's fighter
+          // plays the hit. Overlay treatments ignore it.
+          userId: m.userId,
+        });
       }
     }
   }, [members, prev, emit]);

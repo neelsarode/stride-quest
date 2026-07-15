@@ -8,6 +8,8 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -24,10 +26,29 @@ type FloatInst = { id: number; text: string; color: string; size: number };
 type BannerInst = { id: number; variant: BannerVariant; title: string; subtitle?: string };
 type ToastInst = { id: number; message: string; tone: "info" | "good" };
 
-const Ctx = createContext<{ emit: (e: FeedbackEvent) => void }>({ emit: () => {} });
+type Listener = (e: FeedbackEvent) => void;
+
+const Ctx = createContext<{
+  emit: (e: FeedbackEvent) => void;
+  /** Low-level stream tap — prefer useFeedbackEvent(). */
+  subscribe: (fn: Listener) => () => void;
+}>({ emit: () => {}, subscribe: () => () => {} });
 
 export function useFeedback() {
   return useContext(Ctx);
+}
+
+/**
+ * Subscribe to the raw event stream (STR-22): every emit() reaches the
+ * handler AFTER the overlay treatments run, so richer consumers (the battle
+ * scene) react to the same semantic events without the overlay changing.
+ * The latest handler is always called — no re-subscription churn.
+ */
+export function useFeedbackEvent(handler: Listener) {
+  const { subscribe } = useContext(Ctx);
+  const ref = useRef(handler);
+  ref.current = handler;
+  useEffect(() => subscribe((e) => ref.current(e)), [subscribe]);
 }
 
 export function FeedbackProvider({ children }: { children: ReactNode }) {
@@ -35,6 +56,14 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   const [floats, setFloats] = useState<FloatInst[]>([]);
   const [banners, setBanners] = useState<BannerInst[]>([]);
   const [toasts, setToasts] = useState<ToastInst[]>([]);
+  const listeners = useRef(new Set<Listener>());
+
+  const subscribe = useCallback((fn: Listener) => {
+    listeners.current.add(fn);
+    return () => {
+      listeners.current.delete(fn);
+    };
+  }, []);
 
   const emit = useCallback((e: FeedbackEvent) => {
     const t = treatmentFor(e);
@@ -50,14 +79,18 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
       const id = idRef.current++;
       setToasts((s) => [...s, { id, ...t.toast! }]);
     }
+    // Stream tap (STR-22): the battle scene consumes the same events.
+    listeners.current.forEach((fn) => fn(e));
   }, []);
 
   const rmFloat = useCallback((id: number) => setFloats((f) => f.filter((x) => x.id !== id)), []);
   const rmBanner = useCallback((id: number) => setBanners((b) => b.filter((x) => x.id !== id)), []);
   const rmToast = useCallback((id: number) => setToasts((s) => s.filter((x) => x.id !== id)), []);
 
+  const ctxValue = useMemo(() => ({ emit, subscribe }), [emit, subscribe]);
+
   return (
-    <Ctx.Provider value={{ emit }}>
+    <Ctx.Provider value={ctxValue}>
       {children}
       <View style={styles.overlay} pointerEvents="none">
         <View style={styles.bannerZone}>
