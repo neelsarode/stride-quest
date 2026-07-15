@@ -12,6 +12,7 @@
 import { useEffect } from "react";
 import { usePrevious } from "./usePrevious";
 import { useFeedback } from "./FeedbackProvider";
+import { FEEDBACK } from "../config/assets";
 import type { HeroState } from "./events";
 
 // Loosely typed on purpose — the dashboard shape grows chunk by chunk.
@@ -23,6 +24,12 @@ type Snapshot =
       steps?: { today: number };
       fuel?: { state: HeroState };
       overdrive?: { active: boolean; durationHours: number; idleDamageMult: number };
+      bonus?: {
+        bossName: string;
+        currentTier: number;
+        currentMult: number;
+        nextTier: { damageToGo: number; boostMult: number } | null;
+      } | null;
     }
   | null
   | undefined;
@@ -89,6 +96,35 @@ export function useGameEvents(data: Snapshot) {
       } else if (!data.overdrive.active && prev.overdrive.active) {
         emit({ type: "overdriveEnded" });
       }
+    }
+
+    // The crowned form rises (STR-57): the bonus payload appearing IS the kill
+    // (status flipped to "won" in the same write). Sequenced a beat after the
+    // FALLS banner above so the two read as victory → escalation. Fire-and-
+    // forget timer on purpose: this effect re-runs on every snapshot, and a
+    // cleanup would cancel the entrance whenever another update lands early.
+    if (data.bonus && !prev.bonus) {
+      const bossName = data.bonus.bossName;
+      setTimeout(
+        () => emit({ type: "bonusBossRises", bossName }),
+        FEEDBACK.bonusRiseDelayMs,
+      );
+    }
+
+    // Bonus tier crossed (STR-57) — the victory week's "kill moment". The
+    // payload rides the SAME pure helpers the rollover stamps with, so the
+    // mult announced here is exactly what Monday applies.
+    if (
+      data.bonus &&
+      prev.bonus &&
+      data.bonus.currentTier > prev.bonus.currentTier
+    ) {
+      emit({
+        type: "bonusTierReached",
+        mult: data.bonus.currentMult,
+        damageToGo: data.bonus.nextTier?.damageToGo ?? null,
+        nextMult: data.bonus.nextTier?.boostMult ?? null,
+      });
     }
   }, [data, prev, emit]);
 }

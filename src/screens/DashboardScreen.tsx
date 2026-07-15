@@ -26,6 +26,7 @@ import { CLASSES, DAILY_STEP_GOAL } from "../../convex/gameConfig";
 import { DEV_FLAGS } from "../devConfig";
 import { AnimatedHPBar } from "../components/AnimatedHPBar";
 import { AnimatedMeter } from "../components/AnimatedMeter";
+import { BonusMeter } from "../components/BonusMeter";
 import { DeployButton } from "../components/DeployButton";
 import { OverdriveMeter } from "../components/OverdriveMeter";
 import { GuildBoard } from "../components/GuildBoard";
@@ -105,6 +106,24 @@ export function DashboardScreen() {
     }
     if (sawNew) markRalliesSeenMut({}).catch(() => {});
   }, [unseenRallies, emit, markRalliesSeenMut]);
+
+  // Reward banner (STR-57): "the crew dealt X bonus damage — ×N power all this
+  // week!" — fires once per challenge per app session, whether the boost
+  // arrived on a cold open (first open after rollover) or live (weekly reset
+  // while the app is up). Keyed by boss id so a second dev rollover in the
+  // same session announces its own reward; a tier-0 rollover has boost = null
+  // and shows NOTHING extra (never-punish guardrail).
+  const boostBannerFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data?.boost || !data.boss) return;
+    if (boostBannerFor.current === data.boss.id) return;
+    boostBannerFor.current = data.boss.id;
+    emit({
+      type: "boostActive",
+      mult: data.boost.mult,
+      sourceDamage: data.boost.sourceDamage,
+    });
+  }, [data, emit]);
 
   // Teaching layer (STR-49): the boss-arrival banner frames the week on the
   // FIRST post-onboarding render — keyed off the onboardedAt stamp's
@@ -215,9 +234,14 @@ export function DashboardScreen() {
     return <HealthPermissionScreen onDone={() => setShowHealthScreen(false)} />;
   }
 
-  const { player, guild, boss, steps, streak, dailyGoal, fuel } = data;
+  const { player, guild, boss, steps, streak, dailyGoal, fuel, bonus, boost } = data;
   const m = data.meters;
   const bossActive = !!boss && !boss.defeated;
+  // Bonus phase (STR-57): the crowned week. Deploys/collects stay LIVE — the
+  // backend runs the identical pipeline and banks damage on the bonus meter
+  // (the visible face of the STR-53 fix).
+  const bonusPhase = bonus != null;
+  const canFight = bossActive || bonusPhase;
   // Hero fuel state (STR-13): chip styling + copy per state. Resting is
   // DIGNIFIED (spec §3): calm neutrals, never red, never shame language.
   const hs = HERO_STATE_STYLE[fuel.state];
@@ -333,23 +357,56 @@ export function DashboardScreen() {
         />
       </View>
 
-      {/* Boss */}
+      {/* Boss. During the bonus phase (STR-57) the card swaps to the crowned
+          form: gold name (placeholder tint — the crowned art lands through the
+          assets.ts seam with the M1.5 art ticket) and the ACCUMULATING meter
+          in place of the red HP bar. */}
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>WEEKLY BOSS</Text>
-        {boss ? (
+        <View style={styles.fuelHeader}>
+          <Text style={styles.cardLabel}>
+            {bonus ? "BONUS BOSS · VICTORY WEEK" : "WEEKLY BOSS"}
+          </Text>
+          {/* Persistent active-boost chip (STR-57): last week's earned reward,
+              visible on the boss card all week. Absent when no boost — the
+              ×1.0 floor is never rendered as a badge. */}
+          {boost ? (
+            <View style={styles.boostChip}>
+              <Text style={styles.boostChipText}>⚡ ×{boost.mult} CREW POWER</Text>
+            </View>
+          ) : null}
+        </View>
+        {boss && bonus ? (
+          <>
+            <Text style={[styles.bossName, styles.bonusBossName]}>👑 {bonus.bossName}</Text>
+            <Text style={styles.dimSmall}>
+              The boss fell — its crowned form rose for the rest of the week.
+              Every hit feeds next week's power.
+            </Text>
+            <BonusMeter total={bonus.totalDamage} tiers={bonus.tiers} />
+            <View style={styles.bonusTotalsRow}>
+              <Text style={styles.bonusTotal}>
+                {Math.round(bonus.totalDamage).toLocaleString()} bonus damage
+              </Text>
+              <Text style={styles.dimSmall}>
+                you: {Math.round(bonus.myDamage).toLocaleString()}
+              </Text>
+            </View>
+            {/* Tier preview (STR-57): shares the server's pure tier helpers via
+                the dashboard payload, so shown == what Monday stamps. Tier 0 is
+                an invitation, never a loss ("Deal X to earn ×1.1"). */}
+            <Text style={styles.bonusPreview}>{bonusPreviewLine(bonus)}</Text>
+          </>
+        ) : boss ? (
           <>
             <Text style={styles.bossName}>
               {boss.name} <Text style={styles.dim}>· tier {boss.tier}</Text>
-              {boss.defeated ? <Text style={styles.defeated}>  ☠ DEFEATED</Text> : null}
             </Text>
             <AnimatedHPBar current={boss.currentHP} max={boss.maxHP} />
             <Text style={styles.dim}>
               {Math.round(boss.currentHP).toLocaleString()} / {boss.maxHP.toLocaleString()} HP
             </Text>
             <Text style={styles.dimSmall}>
-              {boss.defeated
-                ? "Victory! Next boss arrives Monday."
-                : `${boss.startDate} → ${boss.endDate}`}
+              {boss.startDate} → {boss.endDate}
             </Text>
           </>
         ) : (
@@ -357,21 +414,25 @@ export function DashboardScreen() {
         )}
       </View>
 
-      {/* Deploy — the dopamine action */}
+      {/* Deploy — the dopamine action. STAYS LIVE in the bonus phase (STR-57,
+          the STR-53 fix made visible): same full-juice pipeline, the damage
+          just flows into the crowned meter. */}
       <View style={styles.card}>
         <Text style={styles.cardLabel}>DEPLOY</Text>
         <Text style={styles.dimSmall}>
-          Unleash your whole Energy bank as a burst hit on the boss.
+          {bonusPhase
+            ? "Unleash your whole Energy bank — every point feeds the bonus meter."
+            : "Unleash your whole Energy bank as a burst hit on the boss."}
         </Text>
         <DeployButton
           energy={m.energy}
           streakCount={streak.count}
           streakMult={streak.multiplier}
-          disabled={busy || m.energy <= 0 || !bossActive}
+          disabled={busy || m.energy <= 0 || !canFight}
           // First-deploy hint (STR-49): pulses while there's something to
           // deploy and this account has NEVER deployed. lastDeployDate is
           // server truth, so one deploy silences it forever, on every device.
-          firstDeployHint={m.energy > 0 && !data.hasEverDeployed && bossActive}
+          firstDeployHint={m.energy > 0 && !data.hasEverDeployed && canFight}
           onDeploy={onDeploy}
         />
       </View>
@@ -407,14 +468,19 @@ export function DashboardScreen() {
           <Btn
             label="Collect"
             onPress={onCollectIdle}
-            disabled={busy || pendingIdle <= 0 || !bossActive}
+            // Live through the bonus phase too (STR-57): the settle banks
+            // idle damage into the crowned meter instead of discarding it.
+            disabled={busy || pendingIdle <= 0 || !canFight}
             kind="ghost"
           />
         </View>
       </View>
 
-      {/* Guild (co-op roster + recognition + the STR-15 rally surface) */}
-      {overview ? <GuildBoard overview={overview} rally={data.rally} /> : null}
+      {/* Guild (co-op roster + recognition + the STR-15 rally surface +
+          per-member bonus damage / shared boost chip, STR-57) */}
+      {overview ? (
+        <GuildBoard overview={overview} rally={data.rally} boost={boost} />
+      ) : null}
 
       {/* Steps */}
       <View style={styles.card}>
@@ -442,6 +508,32 @@ export function DashboardScreen() {
 }
 
 // --- small presentational helpers --------------------------------------------
+
+/** Tier-preview readout (STR-57, spec §6) — mirrors the streak "×N.NN power"
+ *  preview. Data comes straight from the dashboard's bonus payload, which runs
+ *  the SAME pure helpers Monday's rollover stamps with (bonusTierFor /
+ *  nextBonusTierTarget), so the number shown here is BY CONSTRUCTION the
+ *  number applied. Tier 0 is an invitation ("Deal X to earn ×1.1") — never
+ *  "you're losing X" (loss-framing only ever applies to bonuses, and even
+ *  then softly). */
+function bonusPreviewLine(bonus: {
+  currentTier: number;
+  currentMult: number;
+  nextTier: { damageToGo: number; boostMult: number } | null;
+  tiers: { threshold: number; boostMult: number }[];
+}): string {
+  if (bonus.currentTier === 0) {
+    const first = bonus.tiers[0];
+    if (!first) return "";
+    return `Deal ${Math.ceil(first.threshold).toLocaleString()} to earn ×${first.boostMult} power next week.`;
+  }
+  if (bonus.nextTier) {
+    return `Next week: ×${bonus.currentMult} power — ${Math.ceil(
+      bonus.nextTier.damageToGo,
+    ).toLocaleString()} damage to ×${bonus.nextTier.boostMult}.`;
+  }
+  return `Next week: ×${bonus.currentMult} power — top tier secured!`;
+}
 
 // Fuel time formatting (STR-13): the tank speaks in REAL fight time
 // (hoursToEmpty already stretches the winded tail). Compact form for the gauge
@@ -614,6 +706,29 @@ const styles = StyleSheet.create({
   // The resting kneel framing: slightly dimmed, calm — dignified, not grayed-out.
   spriteResting: { opacity: 0.85 },
   defeated: { color: PALETTE.good, fontSize: 14, fontWeight: "800" },
+  // Bonus Boss card (STR-57): gold crowned treatment — celebration hierarchy.
+  bonusBossName: { color: PALETTE.accent },
+  bonusTotalsRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  bonusTotal: { color: PALETTE.accent, fontSize: 18, fontWeight: "900" },
+  bonusPreview: { color: PALETTE.accent, fontSize: 13, fontWeight: "700" },
+  boostChip: {
+    backgroundColor: "#241a04",
+    borderColor: PALETTE.accent,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+  },
+  boostChipText: {
+    color: PALETTE.accent,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
   idleRow: {
     flexDirection: "row",
     alignItems: "center",

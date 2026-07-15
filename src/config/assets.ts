@@ -80,6 +80,9 @@ export const FEEDBACK = {
   streakColor: PALETTE.crit,
   floatNumberSize: 26,
   critNumberSize: 40,
+  /** STR-57: the crowned form rises AFTER the "FALLS" victory banner finishes
+   *  (bannerIn + hold + out ≈ 2.1s) — the two moments read as a sequence. */
+  bonusRiseDelayMs: 2200,
 } as const;
 
 /** Per-variant banner presets. `icon` is a placeholder glyph today, a sprite later. */
@@ -100,6 +103,12 @@ export const BANNER = {
   // A friend's rally arrived (STR-15): the welcome-back celebration — warm
   // energy cyan, named after the SENDER (peer nudge > app nudge, spec §5).
   rallyReceived: { bg: "#0a2c38", fg: PALETTE.energy, icon: "📣" },
+  // Bonus Boss moments (STR-57, M1.5 spec §6): all GOLD — the victory week is
+  // pure celebration. Rises = the crowned form's entrance; tier = a threshold
+  // crossed (the phase's "kill moment"); boost = the reward banner at rollover.
+  bonusRises: { bg: "#241a04", fg: PALETTE.accent, icon: "👑" },
+  bonusTier: { bg: "#2b2140", fg: PALETTE.accent, icon: "✦" },
+  boostActive: { bg: "#241a04", fg: PALETTE.accent, icon: "⚡" },
 } as const;
 
 /** Teaching-layer tuning (STR-49). Contextual first-session moments — all

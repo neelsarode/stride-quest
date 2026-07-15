@@ -31,6 +31,7 @@ type Member = {
   jobLevel: number;
   jobName: string;
   heroState: keyof typeof HERO_STATE_STYLE;
+  bonusDamage: number;
   displayStreak: number;
   improvementPct: number;
 };
@@ -58,9 +59,13 @@ type Overview = {
 export function GuildBoard({
   overview,
   rally,
+  boost,
 }: {
   overview: Overview;
   rally?: RallyInfo;
+  /** This week's guild-wide reward (STR-57) — the shared payoff is visible on
+   *  the crew view too. null/absent = ×1.0 floor, no chip, ever. */
+  boost?: { mult: number } | null;
 }) {
   const { members, recognition, inviteCode, maxMembers } = overview;
   const [shareNote, setShareNote] = useState<string | null>(null);
@@ -91,9 +96,16 @@ export function GuildBoard({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardLabel}>
-        GUILD · {members.length} {members.length === 1 ? "member" : "members"}
-      </Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.cardLabel}>
+          GUILD · {members.length} {members.length === 1 ? "member" : "members"}
+        </Text>
+        {boost ? (
+          <View style={styles.boostChip}>
+            <Text style={styles.boostChipText}>⚡ ×{boost.mult} CREW POWER</Text>
+          </View>
+        ) : null}
+      </View>
       {members.map((m) => {
         const badges: string[] = [];
         if (recognition.mvpUserId === m.userId) badges.push("👑 MVP");
@@ -120,6 +132,10 @@ export function GuildBoard({
               {m.todaySteps.toLocaleString()} today · Job {m.jobLevel} · 🔥{m.displayStreak} ·{" "}
               {m.improvementPct >= 0 ? "+" : ""}
               {m.improvementPct}% vs avg
+              {/* Bonus contribution (STR-57): shown ALONGSIDE weekly damage —
+                  recognition badges stay improvement-based, so this never
+                  becomes a raw-output leaderboard. */}
+              {m.bonusDamage > 0 ? ` · 👑 ${m.bonusDamage.toLocaleString()} bonus` : ""}
             </Text>
             {badges.length > 0 ? <Text style={styles.badges}>{badges.join("   ")}</Text> : null}
             {/* Rally action (STR-15): only on server-eligible teammates. One
@@ -187,6 +203,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   cardLabel: { color: PALETTE.textDim, fontSize: 12, fontWeight: "700", letterSpacing: 1.5 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  // Shared boost chip (STR-57) — same gold treatment as the boss card's.
+  boostChip: {
+    backgroundColor: "#241a04",
+    borderColor: PALETTE.accent,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+  },
+  boostChipText: { color: PALETTE.accent, fontSize: 11, fontWeight: "900", letterSpacing: 0.5 },
   row: { gap: 2, paddingVertical: 6, borderBottomColor: PALETTE.panelBorder, borderBottomWidth: 1 },
   meRow: { backgroundColor: "#12161f", borderRadius: 8, paddingHorizontal: 8 },
   rowTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },

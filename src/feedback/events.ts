@@ -37,7 +37,23 @@ export type FeedbackEvent =
   | { type: "rallyReceived"; senderName: string; hours: number }
   // You sent one — make the giver feel generous (toast, quieter than the
   // receiver's banner).
-  | { type: "rallySent"; receiverName: string; hours: number };
+  | { type: "rallySent"; receiverName: string; hours: number }
+  // --- M1.5 Bonus Boss / victory week (STR-57) ---
+  // The crowned form rises the moment the weekly boss falls (sequenced after
+  // the FALLS banner). bossName is already the crowned name.
+  | { type: "bonusBossRises"; bossName: string }
+  // The party's accumulating meter crossed a tier threshold — the phase's
+  // "kill moment". A crossed tier can never be un-crossed (the meter only
+  // counts up), so "secured" is honest. nextMult/damageToGo null at max tier.
+  | {
+      type: "bonusTierReached";
+      mult: number;
+      damageToGo: number | null;
+      nextMult: number | null;
+    }
+  // The Monday reward is in force: last week's bonus damage became this
+  // week's guild-wide power. Fires once per challenge per app session.
+  | { type: "boostActive"; mult: number; sourceDamage: number };
 
 /** Mirror of the server's FuelState (convex/fuelMath.ts) — duplicated here so
  *  the feedback contract stays free of backend imports. */

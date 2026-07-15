@@ -157,5 +157,41 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
           tone: "good",
         },
       };
+    // --- M1.5 Bonus Boss / victory week (STR-57) ---
+    case "bonusBossRises":
+      juice.haptic("heavy");
+      juice.screenShake(12);
+      return {
+        banner: {
+          variant: "bonusRises",
+          title: `THE ${e.bossName.toUpperCase()} RISES`,
+          subtitle: "Every hit counts toward next week's power.",
+        },
+      };
+    case "bonusTierReached":
+      // A tier can never be lost once crossed (the meter only counts up), so
+      // "secured" is honest — and the chase line points at the next one.
+      juice.haptic("success");
+      juice.screenShake();
+      return {
+        banner: {
+          variant: "bonusTier",
+          title: `×${e.mult} POWER SECURED`,
+          subtitle:
+            e.nextMult != null && e.damageToGo != null
+              ? `${n(e.damageToGo)} more damage reaches ×${e.nextMult}.`
+              : "Top tier — the crown has no more to give.",
+        },
+      };
+    case "boostActive":
+      // The Monday payoff, shared by the whole crew (spec §6 reward banner).
+      juice.haptic("success");
+      return {
+        banner: {
+          variant: "boostActive",
+          title: `×${e.mult} POWER ALL WEEK!`,
+          subtitle: `The crew dealt ${n(e.sourceDamage)} bonus damage last week.`,
+        },
+      };
   }
 }
