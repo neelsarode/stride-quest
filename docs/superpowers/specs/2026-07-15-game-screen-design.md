@@ -234,20 +234,28 @@ presentational components swap chrome:
    flips the default. DashboardScreen stays behind the flag for one milestone
    as the fallback; deletion is an M4 cleanup line.
 
-## 10. Open questions for Neel
+## 10. Open questions for Neel — RESOLVED 2026-07-15
 
-1. **Sheet vs. full HUD for the guild board:** the sheet keeps recognition
-   badges + rally in one place (recommended); alternative is splitting rally
-   into the rail popovers only. OK to ship sheet-first?
-2. **Party rail names:** horizontal portrait rail hides names until tap
-   (battlefield-ui pattern, scales to 8). Want a name label under each tile at
-   the cost of rail height?
-3. **Per-class HUD themes:** style-lab has a kit per class; M2.75 ships S8
-   CELESTIAL SILVER for everyone (one asset set). Theme-follows-your-class is
-   a pure pipeline rerun (8× assets) later — want it on the roadmap?
-4. **Onboarding re-skin: recommended OUT of M2.75** (§11). Agree?
-5. **Steps ring goal-hit celebration:** mock shows a glow; v1 ships the GOAL ✓
-   chip + existing banner. Glow pass now or in juice-later?
+1. **Guild board → SLIDE-UP SHEET.** Roster + recognition badges + rally live in
+   one panel behind the guild nav button (recommended path). §7 already reflects
+   this.
+2. **Party rail → NAMES HIDDEN UNTIL TAP** (battlefield-ui pattern). Portrait +
+   status dot + rally beacon carry the at-a-glance signal; names/stats live in
+   the tap popover. §6 already reflects this.
+3. **Per-class HUD themes → SHIP S8 CELESTIAL SILVER FOR ALL now; theme-follows-
+   your-class deferred to the roadmap** (Neel's confirm pending but not blocking
+   — build S8 only; per-class is a pure pipeline rerun later, no code change).
+4. **Onboarding re-skin → OUT of M2.75** (own follow-up milestone; §11). The
+   verify ticket (STR-71) must re-run the onboarding smoke path to confirm no
+   regression.
+5. **Steps-ring goal-hit glow → BUILD IT NOW** (departure from the original
+   "defer to juice-later" recommendation — owner decision 2026-07-15). The
+   glow is IN SCOPE for STR-68 (command dock / steps ring): when today's steps
+   ≥ the daily goal, the ring gets a celebratory glow treatment (in addition to
+   the GOAL ✓ chip + existing banner). Keep it Reanimated-driven (no per-frame
+   React re-renders, per §12) — a pulsing outer-glow / bloom on the ring, tuned
+   against the dashboard-ui mock. Timings/colors go in `src/config/assets.ts`
+   so it's a one-place tune.
 
 ## 11. Onboarding re-skin scope — OUT (recommendation)
 
