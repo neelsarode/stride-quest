@@ -98,8 +98,8 @@
     the small grey numbers on each card point there.
   </div>
   <div class="progress">
-    <div class="row"><span>The game itself is done — what's left is mostly packaging</span><span>~56%</span></div>
-    <div class="bar"><div style="width:56%"></div></div>
+    <div class="row"><span>Game built &amp; verified, app playable end-to-end — what's left: the beauty pass and Apple</span><span>~78%</span></div>
+    <div class="bar"><div style="width:78%"></div></div>
   </div>
 </header>
 
@@ -132,56 +132,26 @@
 
   <!-- ============ UP NEXT ============ -->
   <div class="col">
-    <div class="colhead"><span class="dot next"></span><span class="name">Up Next — Claude builds</span><span class="count">8</span></div>
+    <div class="colhead"><span class="dot next"></span><span class="name">Up Next — Claude builds</span><span class="count">3</span></div>
     <div class="colnote">The build queue. Say the word on any of these and an agent takes it.</div>
 
     <div class="card">
-      <h3>Show fuel &amp; tired heroes in the real app</h3>
-      <p>The "your hero can fight 9 more hours" gauge, plus the kneeling-and-catching-breath state. The math and the kneel art both exist — this puts them on screen.</p>
-      <div class="meta"><span class="pill app">App</span><span class="ref">STR-13</span></div>
-    </div>
-
-    <div class="card">
-      <h3>The Overdrive button</h3>
-      <p>Walk past your daily goal → the meter charges → a big satisfying button unleashes 4 hours of triple damage. Backend done; needs its button.</p>
-      <div class="meta"><span class="pill app">App</span><span class="ref">STR-14</span></div>
-    </div>
-
-    <div class="card">
-      <h3>The "send a friend fuel" button</h3>
-      <p>When a friend's hero is out of energy, you tap their portrait and send them 6 hours of fight time. The social heart of the game — working behind the scenes, needs its UI.</p>
-      <div class="meta"><span class="pill app">App</span><span class="pill social">Friends</span><span class="ref">STR-15</span></div>
-    </div>
-
-    <div class="card">
-      <h3>The crowned-boss week on screen</h3>
-      <p>Beat the boss early and the app should show it: the crowned monster rises, a gold meter counts your bonus damage up, and next week's power-up gets announced. (Also un-greys the attack button after a kill.)</p>
-      <div class="meta"><span class="pill app">App</span><span class="pill game">Game</span><span class="ref">STR-57</span></div>
-    </div>
-
-    <div class="card">
-      <h3>Build the real onboarding</h3>
-      <p>Turn the comp you're reviewing into actual app screens: pick your hero, name them, start or join a guild with a code, connect Apple Health.</p>
-      <div class="meta"><span class="pill app">App</span><span class="ref">STR-45–50</span></div>
-    </div>
-
-    <div class="card">
-      <h3>Put the battle scene in the app</h3>
-      <p>The full fight you've been previewing in the browser — 8 heroes, projectiles, ultimates, the crowned boss — moved into the real app, driven by real game events.</p>
-      <div class="meta"><span class="pill app">App</span><span class="pill art">Art</span><span class="ref">STR-17–23</span></div>
+      <h3>Finish the battle scene in the app</h3>
+      <p>4 of 7 steps done (sprites, animation engine, fighters, projectiles — all proven). Left: compose the full scene, wire it to real game events, and swap it into the dashboard. Plus one small dev-server tune-up first.</p>
+      <div class="meta"><span class="pill app">App</span><span class="pill art">Art</span><span class="ref">STR-21–23 · 62</span></div>
     </div>
 
     <div class="card">
       <h3>Count real steps from Apple Health</h3>
-      <p>Swap the test button for your actual steps. The plumbing is built and waiting — but real step data only exists on a physical iPhone.</p>
-      <div class="blocked">Waits on: Apple developer account</div>
+      <p>Swap the test button for your actual steps. The plumbing is built and the permission flow already ships in onboarding — but real step data only exists on a physical iPhone. (Free 7-day signing can test this before the paid account.)</p>
+      <div class="blocked">Waits on: your iPhone plugged in (or Apple account)</div>
       <div class="meta"><span class="pill app">App</span><span class="pill apple">Apple</span><span class="ref">STR-26</span></div>
     </div>
 
     <div class="card">
-      <h3>Set up the "real" server + final test-drive</h3>
-      <p>A production copy of the backend for friends to play on (separate from our testing one), plus one full scripted play-through of the crowned-boss week to certify everything.</p>
-      <div class="meta"><span class="pill game">Game</span><span class="ref">STR-27 · STR-59</span></div>
+      <h3>Set up the "real" server</h3>
+      <p>A production copy of the backend for friends to play on, separate from our testing one, with its own security keys. Quick, and it unblocks TestFlight later.</p>
+      <div class="meta"><span class="pill game">Game</span><span class="ref">STR-27</span></div>
     </div>
   </div>
 
@@ -229,8 +199,32 @@
 
   <!-- ============ DONE ============ -->
   <div class="col">
-    <div class="colhead"><span class="dot done"></span><span class="name">Done</span><span class="count">10</span></div>
+    <div class="colhead"><span class="dot done"></span><span class="name">Done</span><span class="count">14</span></div>
     <div class="colnote">The hard, novel part. All of this is built, math-checked, and running in the cloud.</div>
+
+    <div class="card">
+      <h3>Every game control, on screen</h3>
+      <p>Fuel gauge with the kneeling-rest state, the Overdrive ACTIVATE button, sending friends fuel from the guild board, and the whole crowned week: gold counting meter, tier celebrations, Monday's reward banner. Every mechanic is now playable.</p>
+      <div class="meta"><span class="pill app">App</span><span class="ref">STR-13–15 · 57</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Onboarding — built &amp; proven with two real accounts</h3>
+      <p>Pick your hero (live on stage), name them, start or join a guild by code, Health permission with a payoff moment, and a first session that teaches itself. Verified founder + joiner, every error path, mid-flow resume.</p>
+      <div class="meta"><span class="pill app">App</span><span class="pill social">Friends</span><span class="ref">STR-43–50</span></div>
+    </div>
+
+    <div class="card">
+      <h3>The crowned week — proven end to end</h3>
+      <p>All 8 test scenarios passed with numbers predicted in advance and matched to the digit — including the big one: your streak now survives a boss-kill week. The bug that started it all is officially dead.</p>
+      <div class="meta"><span class="pill game">Game</span><span class="ref">STR-59 · 53</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Battle scene foundations</h3>
+      <p>All 4,300 art frames packed for the app, animation running off the render thread (zero-lag proof), fighters with millisecond-accurate attack timing, and projectiles spawning within a tenth of a pixel of the weapon tip.</p>
+      <div class="meta"><span class="pill art">Art</span><span class="pill app">App</span><span class="ref">STR-17–20</span></div>
+    </div>
 
     <div class="card">
       <h3>Runs as a real iPhone app</h3>
@@ -296,7 +290,7 @@
 </div>
 
 <footer>
-  Snapshot refreshed 2026-07-14 (post first native build) — this board is a plain-language mirror, not live-synced.
+  Snapshot refreshed 2026-07-15 (M1, M1.5 &amp; M2.5 all verified-closed) — this board is a plain-language mirror, not live-synced.
   When it drifts from reality, ask Claude to refresh it.
 </footer>
 
