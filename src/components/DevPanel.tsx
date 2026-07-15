@@ -9,13 +9,20 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { FX_ANCHORS } from "../battle/anchors";
+import { Boss, type BossHandle } from "../battle/Boss";
 import {
   Fighter,
+  type AttackKind,
   type FighterHandle,
   type FighterMode,
   type ReleaseEvent,
 } from "../battle/Fighter";
-import { CLASS_NAMES, FX } from "../battle/fxConfig";
+import { CLASS_NAMES, FX, type ClassName } from "../battle/fxConfig";
+import {
+  computeShotGeometry,
+  Projectile,
+  type Rect,
+} from "../battle/Projectile";
 import { Sprite } from "../battle/Sprite";
 import { PALETTE, SIZES } from "../config/assets";
 import { INJECTOR_AMOUNTS, TEAMMATE_STEP_AMOUNTS } from "../devConfig";
@@ -154,6 +161,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
         <>
           <SpriteDemo />
           <FighterDemo />
+          <BattleDemo />
 
           <Section title="TIME">
             <Btn label="Advance day +1" onPress={run(() => advanceDay({ days: 1 }))} busy={busy} />
@@ -403,6 +411,131 @@ function FighterDemo() {
   );
 }
 
+// One in-flight shot for the BattleDemo effect layer (keyed Projectile mount).
+interface Shot {
+  id: number;
+  cls: ClassName;
+  kind: AttackKind;
+  from: { x: number; y: number };
+  toX: number;
+  damage: number;
+}
+
+// Boss display height in the mini-stage. The real never-shorter-than-the-party
+// auto-scale rule lands with the scene ticket (plan step 5).
+const DEMO_BOSS_HEIGHT = 140;
+
+// STR-20 verification vehicle for Projectile.tsx + Boss.tsx (plan step 4): a
+// mini-stage mounting one Fighter and the Boss in correct relative layout
+// (hero left, boss right, shared ground). FIRE wires the full basic-attack
+// choreography: Fighter.onRelease → computeShotGeometry (onLayout rects × the
+// measured tipX/tipY anchor fractions — decision D3, never view bounds) →
+// Projectile flight → onImpact → Boss.hit (white flash + bump) + damage
+// number. CROWNED swaps the boss form. Throwaway once BattleScene lands
+// (plan step 5+).
+function BattleDemo() {
+  const fighter = useRef<FighterHandle>(null);
+  const boss = useRef<BossHandle>(null);
+  // Rects captured via onLayout, both relative to the SAME stage view — the
+  // coordinate space the projectiles are positioned in (D3 requirement).
+  const heroRect = useRef<Rect | null>(null);
+  const bossRect = useRef<Rect | null>(null);
+
+  const [open, setOpen] = useState(false);
+  const [clsIdx, setClsIdx] = useState(0);
+  const [jobIdx, setJobIdx] = useState(4); // job 5 by default (best anchors demo)
+  const [crowned, setCrowned] = useState(false);
+  const [shots, setShots] = useState<Shot[]>([]);
+  const shotId = useRef(0);
+
+  const cls = CLASS_NAMES[clsIdx];
+  const jobs = JOBS_BY_CLASS[cls] ?? [];
+  const job = jobs[Math.min(jobIdx, jobs.length - 1)];
+
+  // The release moment: spawn the shot at the measured weapon tip. Geometry
+  // uses the anchor CARRIED BY THE EVENT (basic vs special anchors differ).
+  const onRelease = useCallback((e: ReleaseEvent) => {
+    if (!heroRect.current || !bossRect.current) return; // not measured yet
+    const geo = computeShotGeometry(heroRect.current, e.anchor, bossRect.current);
+    const big = e.kind === "special";
+    // fx-engine impactAt parity damage roll — real damage arrives with the
+    // event wiring (plan step 6); the demo only needs a plausible number.
+    const damage = big
+      ? 9000 + Math.floor(Math.random() * 3000)
+      : 1800 + Math.floor(Math.random() * 900);
+    setShots((s) => [
+      ...s,
+      { id: shotId.current++, cls: e.cls, kind: e.kind, ...geo, damage },
+    ]);
+  }, []);
+
+  return (
+    <View style={styles.section}>
+      <Pressable onPress={() => setOpen((o) => !o)}>
+        <Text style={styles.sectionTitle}>BATTLE DEMO {open ? "▲" : "▼"}</Text>
+      </Pressable>
+      {open && (
+        <>
+          <Text style={styles.readout}>
+            {cls}/{job} vs {crowned ? "CROWNED " : ""}HORSE · chest@
+            {FX.bossChestX} · {FX.speedPxMs}px/ms
+          </Text>
+          <View style={styles.battleStage} testID="battle-stage">
+            <View
+              style={styles.battleHero}
+              testID="battle-hero"
+              onLayout={(e) => {
+                heroRect.current = e.nativeEvent.layout;
+              }}
+            >
+              <Fighter ref={fighter} cls={cls} job={job} onRelease={onRelease} />
+            </View>
+            <Boss
+              ref={boss}
+              bossKey={crowned ? "horse_crowned_256" : "horse_256"}
+              heightPx={DEMO_BOSS_HEIGHT}
+              style={styles.battleBoss}
+              onLayout={(e) => {
+                bossRect.current = e.nativeEvent.layout;
+              }}
+            />
+            {shots.map((s) => (
+              <Projectile
+                key={s.id}
+                cls={s.cls}
+                kind={s.kind}
+                from={s.from}
+                toX={s.toX}
+                damage={s.damage}
+                onImpact={() => boss.current?.hit(s.kind === "special")}
+                onDone={() =>
+                  setShots((prev) => prev.filter((x) => x.id !== s.id))
+                }
+              />
+            ))}
+          </View>
+          <View style={styles.row}>
+            <Btn
+              label={`CLASS ${cls} ▸`}
+              onPress={() => setClsIdx((i) => (i + 1) % CLASS_NAMES.length)}
+            />
+            <Btn
+              label={`JOB ${jobIdx + 1} ▸`}
+              onPress={() => setJobIdx((i) => (i + 1) % jobs.length)}
+            />
+            <Btn label="⚔ FIRE" onPress={() => fighter.current?.basic()} />
+            <Btn label="✦ SPECIAL" onPress={() => fighter.current?.special()} />
+            <Btn
+              label={crowned ? "👑 CROWNED ✓" : "👑 CROWNED"}
+              onPress={() => setCrowned((c) => !c)}
+            />
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={styles.section}>
@@ -454,6 +587,17 @@ const styles = StyleSheet.create({
     padding: 8,
     alignItems: "center",
   },
+  // BattleDemo mini-stage: hero + boss + projectiles share THIS view's
+  // coordinate space (onLayout rects and absolute effect positions must agree
+  // — D3). No padding, so layout coords and absolute positions line up 1:1.
+  battleStage: {
+    height: 200,
+    backgroundColor: "#0c0e14",
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  battleHero: { position: "absolute", left: 10, bottom: 10 },
+  battleBoss: { position: "absolute", right: 10, bottom: 10 },
   teammate: { gap: 6, marginTop: 2 },
   teammateName: { color: PALETTE.text, fontSize: 13, fontWeight: "600" },
   btn: {

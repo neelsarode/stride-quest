@@ -117,7 +117,12 @@ export function Sprite({
     // frames, which must show frame frames−1, not slide past the strip end.
     const frameIndex = Math.min(frames - 1, Math.floor(progress.value));
     return { transform: [{ translateX: -frameIndex * w }] };
-  }, [frames, w]);
+    // `progress` MUST be in the deps: on web without the worklets Babel plugin
+    // (this Expo web bundle), Reanimated subscribes the style updater to the
+    // shared values found in the DEPS ARRAY (updater.__closure is empty) —
+    // omit it and the strip renders frame 0 forever while the clock still
+    // runs. Harmless on native (stable identity). Found during STR-20 verify.
+  }, [progress, frames, w]);
 
   return (
     <View style={[{ width: w, height: h, overflow: "hidden" }, style]}>
