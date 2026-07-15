@@ -9,6 +9,7 @@
 // =============================================================================
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery } from "convex/react";
@@ -16,7 +17,9 @@ import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "./convex/_generated/api";
 import { convex } from "./src/convex";
 import { secureStorage } from "./src/secureStorage";
+import { DEV_FLAGS } from "./src/devConfig";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
+import { GameScreen } from "./src/game/GameScreen";
 import { BackendSetupScreen } from "./src/screens/BackendSetupScreen";
 import { FeedbackProvider } from "./src/feedback/FeedbackProvider";
 import { TitleCard } from "./src/screens/onboarding/TitleCard";
@@ -35,10 +38,14 @@ export default function App() {
 
   return (
     <ConvexAuthProvider client={convex} storage={secureStorage}>
-      <FeedbackProvider>
-        <AuthGate />
-      </FeedbackProvider>
-      <StatusBar style="light" />
+      {/* SafeAreaProvider feeds the game screen's scale/safe-area hook
+          (STR-66). Harmless to the classic dashboard, which ignores insets. */}
+      <SafeAreaProvider>
+        <FeedbackProvider>
+          <AuthGate />
+        </FeedbackProvider>
+        <StatusBar style="light" />
+      </SafeAreaProvider>
     </ConvexAuthProvider>
   );
 }
@@ -77,5 +84,8 @@ function AuthGate() {
     return <OnboardingFlow viewer={viewer} />;
   }
 
-  return <DashboardScreen />;
+  // The home screen: classic DashboardScreen, or the new full-screen GameScreen
+  // behind DEV_FLAGS.useGameScreen (STR-66 / M2.75). Both share useGameEngine,
+  // so flipping the flag re-skins the presentation without forking behavior.
+  return DEV_FLAGS.useGameScreen ? <GameScreen /> : <DashboardScreen />;
 }

@@ -53,6 +53,44 @@ export const SIZES = {
 } as const;
 
 // ============================================================================
+// GAME SCREEN LAYOUT (M2.75 / STR-66) — the full-screen pixel HUD.
+// ============================================================================
+
+/** ART scale rule (spec §6): 1 art px = ART_SCALE dp. 2 below this width
+ *  (phone), 3 at/above (tablet / web desktop). Hierarchy comes from ART size,
+ *  never mixed scales. Consumed by the game-screen scale/safe-area hook. */
+export const ART_SCALE_BREAKPOINT_DP = 430;
+
+/** Zone offsets (dp) for the game-screen HUD, transcribed from spec §6's zone
+ *  table (dashboard-ui comp + battlefield-ui media query). TUNABLE STARTING
+ *  VALUES — the zone tickets (STR-67/68/69) tune each side-by-side against the
+ *  mock. Top offsets add to `topPad = max(14, insets.top)`; bottom offsets add
+ *  to `bottomPad = max(12, insets.bottom)` — so every zone always clears the
+ *  device safe area. The shell (STR-66) only places EMPTY containers here. */
+export const GAME_ZONES = {
+  /** Top bar: identity + week/day + countdown. Full width at the top pad. */
+  topBarTop: 0,
+  /** Fuel gauge: below identity, left-aligned. */
+  fuelTop: 52,
+  fuelLeft: 14,
+  /** Boss plate: centered gold HP bar. */
+  bossPlateTop: 56,
+  /** Party rail: horizontal portrait row, centered. */
+  partyRailTop: 146,
+  /** Right nav: guild / stats / help column. */
+  rightNavTop: 146,
+  rightNavRight: 9,
+  /** Command dock (DEPLOY / COLLECT / steps ring), above the job strip. */
+  dockBottom: 46,
+  /** COLLECT + steps-ring cluster, riding just above the dock line. */
+  collectRingBottom: 62,
+  /** Overdrive slim bar, above center. */
+  overdriveBottom: 152,
+  /** Job strip: badge + full-width XP bar, at the very bottom pad. */
+  jobStripBottom: 0,
+} as const;
+
+// ============================================================================
 // FEEL LAYER config — animation timings, feedback colors, banners, juice flags.
 // Centralized so the legible placeholder feedback ships now and real juice
 // (particles, screen shake, haptics) drops in later by editing only this block
