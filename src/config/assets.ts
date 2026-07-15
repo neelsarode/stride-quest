@@ -80,14 +80,67 @@ export const GAME_ZONES = {
   /** Right nav: guild / stats / help column. */
   rightNavTop: 146,
   rightNavRight: 9,
-  /** Command dock (DEPLOY / COLLECT / steps ring), above the job strip. */
-  dockBottom: 46,
+  /** Command dock (DEPLOY / COLLECT / steps ring), above the job strip. Raised
+   *  from the spec's starting 46 so the COLLECT caption / GOAL chip / first-crit
+   *  hint that overflow below the dock baseline clear the XP strip (STR-68 tune). */
+  dockBottom: 60,
   /** COLLECT + steps-ring cluster, riding just above the dock line. */
   collectRingBottom: 62,
   /** Overdrive slim bar, above center. */
   overdriveBottom: 152,
   /** Job strip: badge + full-width XP bar, at the very bottom pad. */
   jobStripBottom: 0,
+} as const;
+
+// ============================================================================
+// COMMAND DOCK + JOB STRIP (M2.75 / STR-68) — tunable feel constants for the
+// bottom action cluster (DEPLOY / COLLECT / steps ring / Overdrive / XP). Values
+// are ART px unless noted (1 art px = artScale dp). Tuned side-by-side against
+// dashboard-ui.html at 390dp. This block is pure data (the "re-balance = edit
+// data" rule extends to the dock's feel); no React/runtime imports.
+// ============================================================================
+export const DOCK = {
+  /** Horizontal inset (art px) of the COLLECT / steps-ring clusters from the
+   *  screen edges (mirrors dashboard-ui's left/right 16px on a ~320 comp). */
+  sidePad: 6,
+  /** Dim applied to a disabled baked face — the kit bakes no separate disabled
+   *  art, so a disabled DEPLOY/COLLECT/ACTIVATE fades (matches the old 0.4). */
+  disabledOpacity: 0.4,
+  /** Overdrive slim bar width (art px), centered above the dock. */
+  overdriveBarWidth: 104,
+  /** Job-strip XP bar: min art px kept for the badge + gaps on the left. */
+  jobStripBadgeGap: 6,
+  /** First-deploy teaching PULSE (gentle breathe) — same feel as TEACHING but
+   *  on the Reanimated clock so the baked gold face never re-renders per frame. */
+  deployPulseScale: 1.045,
+  deployPulseMs: 700,
+  /** ACTIVATE glow pulse while Overdrive is charged & ready (loud purple beat). */
+  activatePulseScale: 1.06,
+  activatePulseMs: 600,
+} as const;
+
+/** Steps-ring GOAL-HIT GLOW (owner decision, spec §10-Q5 + STR-68 comment): a
+ *  celebratory bloom on the ring when today's steps ≥ the daily goal, ON TOP of
+ *  the GOAL ✓ chip + banner. Reanimated-driven (opacity + scale on the UI
+ *  thread → ZERO per-frame React re-renders, spec §12). One-place tunable; the
+ *  colour is transcribed from dashboard-ui.html's goal-hit ring
+ *  (box-shadow rgba(155,227,122,·) — the celebratory green). */
+export const GOAL_GLOW = {
+  /** Bloom colour (mock #9be37a). */
+  color: "#9be37a",
+  /** Halo opacity breathes between these (Reanimated withRepeat mirror). */
+  minOpacity: 0.26,
+  maxOpacity: 0.62,
+  /** Halo scale breathes between these — the visible bloom/pulse. */
+  minScale: 1.0,
+  maxScale: 1.16,
+  /** Half-cycle (ms) of one breathe. */
+  pulseMs: 900,
+  /** Art px the halo extends beyond the ring on every side (bloom radius). */
+  haloInset: 5,
+  /** Extra soft web box-shadow blur (dp) layered under the animated halo — a
+   *  no-op on native (RN maps shadow* differently); the halo carries native. */
+  webBlurPx: 12,
 } as const;
 
 // ============================================================================
