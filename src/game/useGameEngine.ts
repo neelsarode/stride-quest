@@ -36,7 +36,9 @@ export function useGameEngine() {
   const recordSteps = useMutation(api.steps.recordSteps);
   const ensureSession = useMutation(api.users.ensureSession);
   const deployMut = useMutation(api.combat.deploy);
-  const collectIdleMut = useMutation(api.combat.collectIdle);
+  // Auto-apply-on-open only (Core Loop v2 §5.2, STR-75): the manual COLLECT entry
+  // point is gone; this is the once-per-open settle the didCollect effect drives.
+  const applyIdleOnOpenMut = useMutation(api.combat.applyIdleOnOpen);
   // Overdrive is auto-armed on a goal-hit now (Core Loop v2 §5.4, STR-74): the
   // manual activateOverdrive mutation is retired, so there is no activate handler.
   const markRalliesSeenMut = useMutation(api.rally.markRalliesSeen);
@@ -68,13 +70,13 @@ export function useGameEngine() {
     if (didCollect.current || !data) return;
     didCollect.current = true;
     const firstTime = !data.hasEverCollectedIdle;
-    collectIdleMut({})
+    applyIdleOnOpenMut({})
       .then((r) => {
         if (r && r.collected > 0)
           emit({ type: "idleCollected", amount: r.collected, firstTime });
       })
       .catch(() => {});
-  }, [collectIdleMut, emit, data]);
+  }, [applyIdleOnOpenMut, emit, data]);
 
   // Received-rally celebration (STR-15): every unseen rally plays ONCE — a
   // banner naming the SENDER (the nudge comes from a friend, not the app) —
@@ -145,15 +147,9 @@ export function useGameEngine() {
     }
   }
 
-  async function onCollectIdle() {
-    setBusy(true);
-    try {
-      const r = await collectIdleMut({});
-      if (r && r.collected > 0) emit({ type: "damageDealt", amount: r.collected, source: "idle" });
-    } finally {
-      setBusy(false);
-    }
-  }
+  // Manual COLLECT removed (Core Loop v2 §5.2, STR-75): idle now auto-applies on
+  // open via the didCollect effect above — there is no user-triggered collect
+  // handler anymore (the dock/DashboardScreen COLLECT buttons are gone with it).
 
   // One-time per-launch session maintenance (STR-44: formerly bootstrap — it
   // no longer creates a guild; the onboarding fork owns that). Tells the server
@@ -197,7 +193,6 @@ export function useGameEngine() {
     showHealthScreen,
     setShowHealthScreen,
     onDeploy,
-    onCollectIdle,
   };
 }
 

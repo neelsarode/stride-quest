@@ -48,7 +48,6 @@ export function DashboardScreen() {
     showHealthScreen,
     setShowHealthScreen,
     onDeploy,
-    onCollectIdle,
   } = useGameEngine();
 
   if (data === undefined) {
@@ -281,25 +280,20 @@ export function DashboardScreen() {
         />
       </View>
 
-      {/* Idle combat */}
+      {/* Idle combat. Manual COLLECT is gone (Core Loop v2 §5.2, STR-75): idle
+          auto-applies on open (the "while you were away…" volley from
+          useGameEngine's didCollect effect), so the pending line below is now a
+          pure ambient readout — nothing to tap. */}
       <View style={styles.card}>
         <Text style={styles.cardLabel}>IDLE COMBAT</Text>
         <Text style={styles.dimSmall}>
           Your hero auto-attacks at ×{player.idleMultiplier}
           {data.overdrive.active ? ` · ⚡ OVERDRIVE ×${data.overdrive.mult}` : ""} —{" "}
           {Math.round(data.idle.dph).toLocaleString()} damage/hour right now. Accrues up to{" "}
-          {Math.round(data.idle.capMs / 3_600_000)}h offline, then pauses.
+          {Math.round(data.idle.capMs / 3_600_000)}h offline, then applies automatically next open.
         </Text>
         <View style={styles.idleRow}>
           <Text style={styles.idlePending}>+{pendingIdle.toLocaleString()} pending</Text>
-          <Btn
-            label="Collect"
-            onPress={onCollectIdle}
-            // Live through the bonus phase too (STR-57): the settle banks
-            // idle damage into the crowned meter instead of discarding it.
-            disabled={busy || pendingIdle <= 0 || !canFight}
-            kind="ghost"
-          />
         </View>
       </View>
 
@@ -382,32 +376,6 @@ function Stat({
         {value.toLocaleString()}
       </Text>
     </View>
-  );
-}
-
-function Btn({
-  label,
-  onPress,
-  disabled,
-  kind,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  kind: "primary" | "ghost";
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.btn,
-        kind === "primary" ? styles.btnPrimary : styles.btnGhost,
-        (disabled || pressed) && styles.btnPressed,
-      ]}
-    >
-      <Text style={[styles.btnText, kind === "ghost" && styles.btnTextGhost]}>{label}</Text>
-    </Pressable>
   );
 }
 
