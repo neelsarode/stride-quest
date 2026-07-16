@@ -32,6 +32,7 @@ import { DevPanel } from "../components/DevPanel";
 // The shared brain (STR-66): all data/effects/actions live here now, consumed
 // identically by GameScreen. This screen is a pure render of its return value.
 import { useGameEngine } from "../game/useGameEngine";
+import { usePendingIdle } from "../usePendingIdle";
 import { HealthPermissionScreen } from "./onboarding/HealthPermissionScreen";
 import { isAvailable as healthKitAvailable } from "../health/healthkit";
 
@@ -42,13 +43,18 @@ export function DashboardScreen() {
   const {
     data,
     overview,
-    pendingIdle,
     busy,
     note,
     showHealthScreen,
     setShowHealthScreen,
     onDeploy,
   } = useGameEngine();
+
+  // Live "pending idle" ticker — called HERE, not in the engine (STR-86): this
+  // classic screen is the only surface that displays it, and its 1/sec setState
+  // was re-rendering the GameScreen tree for nothing. (Called before the early
+  // returns so the hook order stays unconditional.)
+  const pendingIdle = usePendingIdle(data?.idle, data?.now);
 
   if (data === undefined) {
     return (

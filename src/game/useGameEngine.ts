@@ -20,11 +20,16 @@ import { useGameEvents } from "../feedback/useGameEvents";
 import { useTeammateDamage } from "../feedback/useTeammateDamage";
 import { useFeedback } from "../feedback/FeedbackProvider";
 import { friendlyError } from "../feedback/errors";
-import { usePendingIdle } from "../usePendingIdle";
+import { useAppVisible } from "../useAppVisible";
 import {
   isAvailable as healthKitAvailable,
   readTodaySteps,
 } from "../health/healthkit";
+
+// Foreground refresh debounce (STR-86): a background stint shorter than this
+// (app-switcher peek, notification shade) is NOT a "reopen" — the once-per-open
+// effects only re-run after the app was away at least this long.
+const FOREGROUND_REFRESH_MS = 30_000;
 
 /**
  * Runs all of the home screen's data/effects/actions and returns exactly what
@@ -51,8 +56,9 @@ export function useGameEngine() {
   // The calm CONNECT HEALTH chip (STR-48) reopens the Beat-3 priming screen.
   const [showHealthScreen, setShowHealthScreen] = useState(false);
 
-  // Live "pending idle" ticker (display-only; server is authoritative on collect).
-  const pendingIdle = usePendingIdle(data?.idle, data?.now);
+  // (usePendingIdle moved OUT of the engine in STR-86: only DashboardScreen
+  // displays the pending readout, and its 1/sec setState was re-rendering the
+  // whole GameScreen tree — the classic screen now calls it directly.)
 
   // Reactive-state changes → feedback animations (job-up, goal, boss defeated).
   useGameEvents(data);
@@ -61,6 +67,33 @@ export function useGameEngine() {
   // animate on this screen via the damage diff.
   const overview = useQuery(api.guild.overview, {});
   useTeammateDamage(overview?.members);
+
+  // Foreground refresh (STR-86): iOS keeps the app resident for DAYS, so the
+  // "once per open" refs below (didCollect idle auto-apply + didHealthSync)
+  // would otherwise never re-run on a real reopen. When the app returns to the
+  // foreground after being away ≥ FOREGROUND_REFRESH_MS, reset both refs and
+  // bump refreshNonce (a dep of both effects) so they re-run. The initial
+  // mount never fires (lastVisible starts equal to the current signal), and
+  // rapid flip-flops are debounced by the away-time check. The refs are
+  // declared below; the effect body runs post-render, so that's safe.
+  const appVisible = useAppVisible();
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const lastVisible = useRef(appVisible);
+  const hiddenAt = useRef<number | null>(null);
+  useEffect(() => {
+    if (appVisible === lastVisible.current) return;
+    lastVisible.current = appVisible;
+    if (!appVisible) {
+      hiddenAt.current = Date.now();
+      return;
+    }
+    const awayMs = hiddenAt.current == null ? 0 : Date.now() - hiddenAt.current;
+    hiddenAt.current = null;
+    if (awayMs < FOREGROUND_REFRESH_MS) return;
+    didCollect.current = false;
+    didHealthSync.current = false;
+    setRefreshNonce((n) => n + 1);
+  }, [appVisible]);
 
   // Auto-collect idle once on open ("while you were away…"). The snapshot in
   // this closure is the PRE-collect one, so hasEverCollectedIdle still says
@@ -77,7 +110,7 @@ export function useGameEngine() {
           emit({ type: "idleCollected", amount: r.collected, firstTime });
       })
       .catch(() => {});
-  }, [applyIdleOnOpenMut, emit, data]);
+  }, [applyIdleOnOpenMut, emit, data, refreshNonce]);
 
   // Received-rally celebration (STR-15): every unseen rally plays ONCE — a
   // banner naming the SENDER (the nudge comes from a friend, not the app) —
@@ -204,12 +237,11 @@ export function useGameEngine() {
         }
       })
       .catch(() => {});
-  }, [healthConnected, recordSteps]);
+  }, [healthConnected, recordSteps, refreshNonce]);
 
   return {
     data,
     overview,
-    pendingIdle,
     busy,
     note,
     showHealthScreen,

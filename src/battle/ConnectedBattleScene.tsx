@@ -51,14 +51,8 @@
 // the next tick comes around shortly), while the flurry POLLS fire() until the
 // single fighter is free so every number lands (see runFlurry).
 // =============================================================================
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import {
-  AppState,
-  Platform,
-  type AppStateStatus,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { memo, useEffect, useMemo, useRef } from "react";
+import { type StyleProp, type ViewStyle } from "react-native";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { CLASSES, type ClassKey } from "../../convex/gameConfig";
@@ -73,6 +67,7 @@ import {
 import type { AttackKind } from "./Fighter";
 import { SCENE, type ClassName } from "./fxConfig";
 import { prefetchRosterStrips } from "./prefetch";
+import { useAppVisible } from "../useAppVisible";
 
 // A teammate hit at/above this size renders as their SPECIAL (deploy-sized),
 // below it as a basic (idle-sized). TUNABLE display threshold: typical idle
@@ -109,31 +104,11 @@ function jobFolderFor(cls: ClassKey, jobLevel: number): string {
   return folders[Math.max(0, Math.min(folders.length - 1, jobLevel - 1))];
 }
 
-/**
- * Background pause signal (STR-85): true while the app is foregrounded
- * (native AppState "active") / the tab visible (web document.visibilityState).
- * The continuous ambient loop keys off this — timers cleared on background,
- * rebuilt on return — so a backgrounded app burns zero timer/animation work.
- */
-function useAppVisible(): boolean {
-  const [visible, setVisible] = useState(true);
-  useEffect(() => {
-    if (Platform.OS === "web") {
-      // react-native-web ships an AppState shim, but the DOM API is the exact
-      // signal we mean on web — use it directly (SSR-guarded).
-      if (typeof document === "undefined") return;
-      const onChange = () => setVisible(document.visibilityState !== "hidden");
-      onChange();
-      document.addEventListener("visibilitychange", onChange);
-      return () => document.removeEventListener("visibilitychange", onChange);
-    }
-    const onChange = (s: AppStateStatus) => setVisible(s === "active");
-    onChange(AppState.currentState);
-    const sub = AppState.addEventListener("change", onChange);
-    return () => sub.remove();
-  }, []);
-  return visible;
-}
+// Background pause signal (STR-85): the continuous ambient loop keys off
+// useAppVisible — timers cleared on background, rebuilt on return — so a
+// backgrounded app burns zero timer/animation work. (The hook itself moved to
+// src/useAppVisible.ts in STR-86, shared with useGameEngine's foreground
+// refresh; imported below, behavior unchanged.)
 
 // memo (STR-85): the only prop is `style`, and every call site (GameScreen,
 // DashboardScreen, DevPanel) passes a module-constant StyleSheet value, so a

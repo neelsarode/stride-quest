@@ -7,7 +7,14 @@
 // next, so the flow is resume-safe by construction. If the backend URL isn't
 // configured yet we show a setup screen instead of crashing.
 // =============================================================================
-import { useEffect } from "react";
+import {
+  Component,
+  Fragment,
+  useEffect,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
@@ -41,9 +48,16 @@ export default function App() {
       {/* SafeAreaProvider feeds the game screen's scale/safe-area hook
           (STR-66). Harmless to the classic dashboard, which ignores insets. */}
       <SafeAreaProvider>
-        <FeedbackProvider>
-          <AuthGate />
-        </FeedbackProvider>
+        {/* Root ErrorBoundary (STR-86): INSIDE the Convex provider — a retry
+            remounts the screen tree against the SAME live client/auth session —
+            and OUTSIDE FeedbackProvider, so a crash anywhere in the screen tree
+            (a query-throwing screen, a feedback overlay bug) shows the calm
+            retry surface instead of a white screen. */}
+        <RootErrorBoundary>
+          <FeedbackProvider>
+            <AuthGate />
+          </FeedbackProvider>
+        </RootErrorBoundary>
         <StatusBar style="light" />
       </SafeAreaProvider>
     </ConvexAuthProvider>
@@ -89,3 +103,94 @@ function AuthGate() {
   // so flipping the flag re-skins the presentation without forking behavior.
   return DEV_FLAGS.useGameScreen ? <GameScreen /> : <DashboardScreen />;
 }
+
+// =============================================================================
+// RootErrorBoundary (STR-86) — catches RENDER errors anywhere in the screen
+// tree and shows a calm full-screen fallback in the app's voice instead of a
+// white screen. TAP TO RETRY clears the error and remounts the children fresh
+// (the `attempt` key). Deliberately plain <Text> on a dark background — NOT
+// PixelText: the pixel font works outside UIScaleProvider (it defaults to
+// scale 2), but it depends on the baked-asset pipeline, and if THAT is what
+// threw, a PixelText fallback would crash the boundary's own render (which no
+// boundary can catch) — the fallback must be the most boring tree in the app.
+// =============================================================================
+class RootErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null; attempt: number }
+> {
+  state: { error: Error | null; attempt: number } = { error: null, attempt: 0 };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[RootErrorBoundary] render error:", error, info.componentStack);
+  }
+
+  private retry = () => {
+    this.setState((s) => ({ error: null, attempt: s.attempt + 1 }));
+  };
+
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={boundaryStyles.root}>
+          <Text style={boundaryStyles.title}>THE BATTLE HIT A SNAG</Text>
+          <Text style={boundaryStyles.sub}>
+            Your steps and progress are safe on the server.
+          </Text>
+          <Pressable
+            onPress={this.retry}
+            style={({ pressed }) => [
+              boundaryStyles.btn,
+              pressed && boundaryStyles.btnPressed,
+            ]}
+          >
+            <Text style={boundaryStyles.btnText}>TAP TO RETRY</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    // Keyed by attempt so a retry remounts the whole screen tree fresh; a
+    // Fragment adds no layout node (the tree renders exactly as before).
+    return <Fragment key={this.state.attempt}>{this.props.children}</Fragment>;
+  }
+}
+
+const boundaryStyles = StyleSheet.create({
+  // Palette mirrors src/config/assets.ts PALETTE (bg/text/dim/accent) without
+  // importing app modules — the boundary must not depend on anything that can
+  // itself fail to load.
+  root: {
+    flex: 1,
+    backgroundColor: "#11131a",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+    padding: 32,
+  },
+  title: {
+    color: "#e8ecf4",
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: 2,
+    textAlign: "center",
+  },
+  sub: { color: "#8a93a6", fontSize: 13, textAlign: "center", lineHeight: 19 },
+  btn: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#ffd166",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+  },
+  btnPressed: { opacity: 0.55 },
+  btnText: {
+    color: "#ffd166",
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
+});
