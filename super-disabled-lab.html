@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stride Quest — SUPER disabled-state lab</title>
+<!--
+  super-disabled-lab.html — DESIGN LAB (2026-07-16): a pixel-native DISABLED
+  state for the SUPER ATTACK plate (the shipped variant A, STR-89). The current
+  disabled = opacity 0.4, and flat transparency reads wrong on pixel art.
+  Each concept must compose with BOTH plate materials (gold charging AND the
+  amethyst Overdrive-active state — you can be spent while X2 is armed), so
+  every card shows the treatment on both. TAP any plate to toggle
+  disabled <-> enabled and feel the flip. Drawn with assets/ui-kit.js.
+-->
+<style>
+  html,body { margin:0; background:#14161c; color:#cfd6e2;
+    font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #wrap { max-width: 480px; margin: 0 auto; padding: 18px 14px 60px; }
+  h1 { font-size:16px; color:#ffe9a0; letter-spacing:.5px; margin:0 0 4px; }
+  .sub { color:#8b93a3; font-size:12px; margin:0 0 16px; }
+  .card { background:#191c24; border:1px solid #262b36; border-radius:8px;
+    padding:12px 12px 10px; margin-bottom:16px; }
+  .card h2 { font-size:13px; color:#f7f3e7; margin:0 0 2px; letter-spacing:.4px; }
+  .card h2 .tag { color:#b985ec; }
+  .card p { font-size:11.5px; color:#8b93a3; margin:0 0 8px; }
+  .card canvas { display:block; width:100%; image-rendering: pixelated;
+    border-radius:4px; cursor:pointer; }
+  .card .pro { font-size:11px; color:#6f7889; margin:7px 0 0; }
+  .card .pro b { color:#9ae06b; font-weight:600; }
+  .card .con b { color:#ff9a78; font-weight:600; }
+  .foot { color:#6f7889; font-size:11.5px; border-top:1px solid #262b36; padding-top:12px; }
+  .foot b { color:#ffe9a0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>SUPER ATTACK — disabled-state concepts</h1>
+  <p class="sub">The current disabled state is 40% transparency — un-pixel-like.
+  Four material-language alternatives below. Top plate = disabled while GOLD
+  (walked to 0 energy, goal not hit); bottom plate = disabled while PURPLE
+  (spent right after arming Overdrive). <b>Tap a plate to toggle
+  disabled&nbsp;&harr;&nbsp;enabled.</b></p>
+
+  <div class="card" data-v="S">
+    <h2><span class="tag">S</span> — STONE SLEEP</h2>
+    <p>The classic: a spent button is carved from slate. The whole plate swaps
+    material; the meter and text stay legible but cold. Overdrive status
+    survives as the white text row.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> the most game-native read — every pixel-RPG player knows grey = not now.</p>
+    <p class="pro con"><b>−</b> while Overdrive is armed the purple identity hides until you re-earn energy.</p>
+  </div>
+
+  <div class="card" data-v="N">
+    <h2><span class="tag">N</span> — NIGHT RAMP</h2>
+    <p>Same button, lights off: the gold (or amethyst) ramp is re-baked ~45%
+    darker. Keeps each state's identity — a dark gold button and a dark purple
+    button — just dormant.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> keeps the gold/purple identity readable while clearly asleep; feels like the fuel "Resting" tone.</p>
+  </div>
+
+  <div class="card" data-v="D">
+    <h2><span class="tag">D</span> — DITHER VEIL</h2>
+    <p>A 50% pixel-checkerboard shadow over the normal plate — the retro
+    "ghosted" treatment (Game&nbsp;Boy menus). Composes over ANY material
+    unchanged.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> maximum retro authenticity; one overlay works on gold, purple, and anything future.</p>
+    <p class="pro con"><b>−</b> at 2x phone scale the checker is fine-grained — squint and it reads like… transparency.</p>
+  </div>
+
+  <div class="card" data-v="K">
+    <h2><span class="tag">K</span> — EMPTY SOCKET</h2>
+    <p>The plate becomes a dark recessed well with only the material's rim
+    left glowing — an empty power socket waiting to be refilled. The word dims
+    to stone; the gem shows 0.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> the strongest "drained tank, walk to refill" story; the rim keeps the gold/purple identity.</p>
+  </div>
+
+  <div class="foot">
+    All four keep the OVERDRIVE meter visible (your step progress isn't lost
+    when energy hits 0 — walking is still doing something). Pick a letter —
+    S / N / K need one extra bake each through the normal pipeline; D bakes a
+    tiny repeating dither tile. We can also swap the "&#9670;&nbsp;0" for a
+    "WALK TO RECHARGE" hint on whichever wins.
+  </div>
+</div>
+
+<script src="assets/ui-kit.js"></script>
+<script>
+/* ---------- shared geometry (art px; 1 art px = 2 css px) ----------------- */
+const S = 2;
+const DOCK_W = 195, PAD = 6, RING_R = 15, GAP = 12;
+const BTN_X = PAD, BTN_W = DOCK_W - PAD*2 - RING_R*2 - GAP; // 141
+const AU = M('gold'), AM = M('amethyst');
+Object.assign(PALETTE, { od_well:'#241329', od_welld:'#180b1d' });
+
+/* Darkened "night" ramps for concept N — same 7-stop shape, lights off. */
+function darken(hex, k){
+  const n = parseInt(hex.slice(1), 16);
+  const f = c => Math.round(c * k);
+  return '#' + [f(n>>16 & 255), f(n>>8 & 255), f(n & 255)]
+    .map(c => c.toString(16).padStart(2, '0')).join('');
+}
+MATERIALS.nightgold = MATERIALS.gold.map(h => darken(h, .55));
+MATERIALS.nightamethyst = MATERIALS.amethyst.map(h => darken(h, .55));
+['nightgold','nightamethyst'].forEach(name =>
+  MATERIALS[name].forEach((hex, i) => { PALETTE[name + i] = hex; }));
+const NG = M('nightgold'), NA = M('nightamethyst');
+const SL = M('slate');
+
+/* ---------- shared plate painter (the shipped variant A face) ------------- */
+const FACE_H = 34, WORD = 'SUPER ATTACK';
+function popText(ctx, str, x, y, sc){
+  drawText(ctx, str, x, y + (sc||1), 'outline', sc||1);
+  drawText(ctx, str, x, y, 'white', sc||1);
+}
+function energyGem(ctx, x, y, cost, costKey, dim){
+  px(ctx, x+2, y, 1, 1, dim ? 'stone_mid' : 'blue_light');
+  px(ctx, x+1, y+1, 3, 1, dim ? 'stone_dark' : 'blue_mid');
+  px(ctx, x, y+2, 5, 1, dim ? 'stone_dark' : 'blue_mid');
+  px(ctx, x+1, y+3, 3, 1, dim ? 'stone_deep' : 'blue_dark');
+  px(ctx, x+2, y+4, 1, 1, dim ? 'stone_deep' : 'blue_dark');
+  drawText(ctx, cost, x + 8, y, costKey, 1);
+}
+/* opts: { mat, odActive, frac, cost, wordKey (flat color key or null=auto),
+           dimContent, socket } */
+function drawPlate(ctx, x, y, o){
+  const m = o.mat;
+  if (o.socket){
+    // dark recessed well, material rim retained (m.d = the dimmer rim stop)
+    fillRounded(ctx, x, y, BTN_W, FACE_H, 6, m.d);
+    fillRounded(ctx, x+1, y+1, BTN_W-2, FACE_H-2, 5, 'outline');
+    fillRounded(ctx, x+2, y+2, BTN_W-4, FACE_H-4, 4, 'night_socket');
+    px(ctx, x+4, y+3, BTN_W-8, 1, 'night_socket_d'); // inner top shadow
+  } else {
+    hifiFace(ctx, x, y, BTN_W, FACE_H, 6, m);
+  }
+  // row 1 — big flat word
+  const wordW = textWidth(WORD, 2), rowW = spriteW(CROSSED_SWORDS) + 5 + wordW;
+  let cx = x + Math.round((BTN_W - rowW)/2);
+  const dimSprite = o.dimContent || o.socket
+    ? { W:'stone_light', G:'stone_mid', D:'stone_dark' } : null;
+  drawSprite(ctx, CROSSED_SWORDS, cx, y + 6, dimSprite);
+  cx += spriteW(CROSSED_SWORDS) + 5;
+  const wordKey = o.wordKey
+    || (o.socket ? 'stone_mid' : o.odActive ? 'white' : m.out);
+  drawText(ctx, WORD, cx, y + 7, wordKey, 2);
+  // row 2 — the embedded OVERDRIVE meter
+  const ry = y + 21;
+  const costKey = o.socket ? 'stone_mid'
+    : o.dimContent ? (o.odActive ? 'stone_light' : m.dp)
+    : o.odActive ? 'white' : 'outline';
+  if (o.odActive){
+    const t = 'X2 UNTIL RESET';
+    const gemW = 5 + 3 + textWidth(o.cost, 1);
+    const grpW = textWidth(t,1) + 8 + gemW;
+    const gx = x + Math.round((BTN_W - grpW)/2);
+    if (o.socket || o.dimContent) drawText(ctx, t, gx, ry + 1, costKey, 1);
+    else popText(ctx, t, gx, ry + 1, 1);
+    energyGem(ctx, gx + textWidth(t,1) + 8, ry + 1, o.cost, costKey, o.socket || o.dimContent);
+  } else {
+    const labelKey = o.socket ? 'stone_dark' : o.dimContent ? m.dp : m.dp;
+    drawText(ctx, 'OVERDRIVE', x + 7, ry + 1, labelKey, 1);
+    const gemW = 5 + 3 + textWidth(o.cost, 1);
+    const lx = x + 7 + textWidth('OVERDRIVE',1) + 5;
+    const barW = x + BTN_W - 7 - gemW - 5 - lx;
+    // meter well + fill (kept visible in EVERY disabled concept — steps still count)
+    px(ctx, lx, ry, barW, 7, 'od_well');
+    const fw = Math.max(2, Math.round((barW - 2) * o.frac));
+    px(ctx, lx+1, ry+1, fw, 1, o.dimContent || o.socket ? 'amethyst4' : 'amethyst1');
+    px(ctx, lx+1, ry+2, fw, 4, o.dimContent || o.socket ? 'amethyst5' : 'amethyst3');
+    energyGem(ctx, x + BTN_W - 7 - gemW, ry + 1, o.cost, costKey, o.socket || o.dimContent);
+  }
+}
+Object.assign(PALETTE, { night_socket:'#1c1720', night_socket_d:'#120e15' });
+
+function ditherVeil(ctx, x, y){
+  ctx.fillStyle = 'rgba(15,12,18,.62)';
+  for (let j = 0; j < FACE_H; j++)
+    for (let i = (j % 2); i < BTN_W; i += 2)
+      ctx.fillRect(x + i, y + j, 1, 1);
+}
+function sceneBg(ctx, w, h){
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#1b1a22'); g.addColorStop(1, '#0f0e13');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+}
+function rowLabel(ctx, x, y, txt){ drawText(ctx, txt, x, y, 'stone_mid', 1); }
+
+/* ---------- variants ------------------------------------------------------ */
+/* Each draws TWO stacked plates: gold-context and purple-context.
+   `disabled` per card toggles the treatment vs the normal enabled plate. */
+const GOLD_STATE = { odActive:false, frac: .38, cost:'0' };
+const PURP_STATE = { odActive:true, frac: 1, cost:'0' };
+const GOLD_ON = { odActive:false, frac: .38, cost:'2,350' };
+const PURP_ON = { odActive:true, frac: 1, cost:'2,350' };
+
+const VARIANTS = {
+  S: (ctx, dis) => {
+    drawPlate(ctx, BTN_X, 12, dis
+      ? { mat: SL, dimContent:true, ...GOLD_STATE }
+      : { mat: AU, ...GOLD_ON });
+    drawPlate(ctx, BTN_X, 58, dis
+      ? { mat: SL, dimContent:true, ...PURP_STATE, wordKey:'slate1' }
+      : { mat: AM, ...PURP_ON });
+  },
+  N: (ctx, dis) => {
+    drawPlate(ctx, BTN_X, 12, dis
+      ? { mat: NG, dimContent:true, ...GOLD_STATE }
+      : { mat: AU, ...GOLD_ON });
+    drawPlate(ctx, BTN_X, 58, dis
+      ? { mat: NA, dimContent:true, ...PURP_STATE, wordKey:'nightamethyst1' }
+      : { mat: AM, ...PURP_ON });
+  },
+  D: (ctx, dis) => {
+    drawPlate(ctx, BTN_X, 12, { mat: AU, ...(dis ? GOLD_STATE : GOLD_ON) });
+    if (dis) ditherVeil(ctx, BTN_X, 12);
+    drawPlate(ctx, BTN_X, 58, { mat: AM, ...(dis ? PURP_STATE : PURP_ON) });
+    if (dis) ditherVeil(ctx, BTN_X, 58);
+  },
+  K: (ctx, dis) => {
+    drawPlate(ctx, BTN_X, 12, dis
+      ? { mat: AU, socket:true, ...GOLD_STATE }
+      : { mat: AU, ...GOLD_ON });
+    drawPlate(ctx, BTN_X, 58, dis
+      ? { mat: AM, socket:true, ...PURP_STATE }
+      : { mat: AM, ...PURP_ON });
+  },
+};
+
+/* ---------- mount --------------------------------------------------------- */
+const H = 104; // two plates + labels
+const state = {};
+for (const el of document.querySelectorAll('.card')){
+  const id = el.dataset.v, cv = el.querySelector('canvas');
+  cv.width = DOCK_W * S; cv.height = H * S;
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  state[id] = true; // start DISABLED (the state being designed)
+  const render = () => {
+    ctx.setTransform(S, 0, 0, S, 0, 0);
+    ctx.clearRect(0, 0, DOCK_W, H);
+    sceneBg(ctx, DOCK_W, H);
+    VARIANTS[id](ctx, state[id]);
+    rowLabel(ctx, BTN_X, 3, state[id] ? 'DISABLED - 0 ENERGY' : 'ENABLED');
+    rowLabel(ctx, BTN_X, 49, state[id] ? 'DISABLED WHILE OVERDRIVE ARMED' : 'ENABLED + OVERDRIVE');
+  };
+  cv.addEventListener('pointerdown', () => { state[id] = !state[id]; render(); });
+  render();
+}
+</script>
+</body>
+</html>
