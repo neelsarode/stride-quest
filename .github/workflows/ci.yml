@@ -1,0 +1,46 @@
+# CI (STR-87): the same gate every session runs locally before pushing —
+# typecheck both TS projects + the pure-function test suite. No secrets needed.
+#
+# --legacy-peer-deps: the pinned beta @convex-dev/auth declares a peer range
+# (@auth/core ^0.41) ahead of the project's deliberate @auth/core ^0.37 pin,
+# so a strict `npm ci` refuses the tree. The app was built and verified on
+# legacy peer resolution — CI installs the same way.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npx tsc --noEmit
+      - run: npx tsc --noEmit -p convex
+      - run: npm test
+
+  # Non-blocking canary: regenerate the baked assets (pack-sprites from the
+  # tracked characters/ + assets/ frames, pack-ui from the tracked
+  # ui-export.json via sharp) and diff against the committed outputs. PNG
+  # encoding may not be byte-identical across platforms/libvips builds, so a
+  # failure here is a heads-up to re-run the pack scripts locally, never a red X.
+  generated-drift:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm run pack-sprites && npm run pack-ui
+      - run: git diff --exit-code -- src/battle/sprites src/battle/spriteMap.ts src/battle/anchors.ts src/ui/assets src/ui/uiMap.ts src/ui/theme.ts
