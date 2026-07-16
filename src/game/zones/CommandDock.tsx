@@ -48,18 +48,16 @@ import {
   PixelText,
   Ring,
   UIScaleProvider,
-  measurePixelText,
 } from "../../ui";
 import { UI_PALETTE } from "../../ui/theme";
 import { useGameLayout } from "../useGameLayout";
 import { zoneStyles } from "./zoneStyle";
 
 const RING_ART = 30; // steps_ring frame is 30×30 art px
-const DEPLOY_W = 56; // btn_deploy_gold art width
-const DEPLOY_H = 37; // btn_deploy_gold art height
+const BAR_H = 16; // btn_gold 3-slice frame height (art px) — the wide SUPER bar
 
 export function CommandDock() {
-  const { bottomPad, artScale: s } = useGameLayout();
+  const { bottomPad, artScale: s, width } = useGameLayout();
   const data = useQuery(api.game.dashboard, {});
   const { emit } = useFeedback();
   const deployMut = useMutation(api.combat.deploy);
@@ -118,35 +116,46 @@ export function CommandDock() {
   const goalHit = dailyGoal.hit;
   const ringFrac = dailyGoal.goal > 0 ? dailyGoal.steps / dailyGoal.goal : 0;
 
+  // Core Loop v2 dock geometry: the SUPER ATTACK button is now a full-width gold
+  // action BAR pinned to the left that stretches to fill the row up to the steps
+  // ring on the right (a wide bar + a circular gauge). Cap the content width on
+  // desktop so the bar doesn't sprawl (phones fill edge-to-edge). Width is
+  // computed in art px because the 3-slice frame needs an explicit length.
+  const contentDp = Math.min(width, DOCK.superBarMaxDp);
+  const contentArt = Math.floor(contentDp / s);
+  const barArtW = Math.max(
+    64,
+    contentArt - DOCK.sidePad * 2 - RING_ART - DOCK.superBarGap,
+  );
+
   return (
     <View testID="zone-command-dock" style={outer}>
       <UIScaleProvider value={s}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-end",
-            // Core Loop v2 (STR-78): COLLECT is gone, so the dock is now just the
-            // SUPER ATTACK hero button + the steps ring. Centre the pair (SUPER
-            // stays the dominant, biggest thing) with a comfortable gap that
-            // clears the streak chip's / ring numbers' overflow at 390dp.
-            justifyContent: "center",
-            gap: DOCK.superRingGap * s,
-            paddingHorizontal: DOCK.sidePad * s,
-          }}
-        >
-          {/* ---- SUPER ATTACK (the gold hero button) ---- */}
-          <DeployColumn
-            s={s}
-            energy={energy}
-            streakMult={streak.multiplier}
-            disabled={deployDisabled}
-            firstDeployHint={firstDeployHint}
-            firstStrikeCrit={firstStrikeCrit}
-            onDeploy={onDeploy}
-          />
+        {/* centre the (capped) dock content in the full-width zone */}
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <View
+            style={{
+              width: contentDp,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: DOCK.sidePad * s,
+            }}
+          >
+            {/* ---- SUPER ATTACK — the full-width gold action bar (left) ---- */}
+            <DeployColumn
+              s={s}
+              barArtW={barArtW}
+              energy={energy}
+              streakMult={streak.multiplier}
+              disabled={deployDisabled}
+              firstDeployHint={firstDeployHint}
+              firstStrikeCrit={firstStrikeCrit}
+              onDeploy={onDeploy}
+            />
 
-          {/* ---- steps RING (33-frame) + inside numbers + GOAL glow/chip ---- */}
-          <View style={{ alignItems: "center" }}>
+            {/* ---- steps RING (30-frame) + inside numbers + GOAL glow/chip ---- */}
+            <View style={{ alignItems: "center" }}>
             <View style={{ width: RING_ART * s, height: RING_ART * s, overflow: "visible" }}>
               {goalHit && <GoalGlow s={s} />}
               <Ring value={ringFrac} style={{ position: "absolute", left: 0, top: 0 }} />
@@ -187,6 +196,7 @@ export function CommandDock() {
                 </View>
               )}
             </View>
+            </View>
           </View>
         </View>
       </UIScaleProvider>
@@ -195,13 +205,15 @@ export function CommandDock() {
 }
 
 // -----------------------------------------------------------------------------
-// SUPER ATTACK column — the hero button with the teaching pulse, energy cost
-// inside the face, the streak XN.NN chip riding the corner, and the
-// first-strike-crit hint. (Internally still "DeployColumn"/btn_deploy_gold — the
-// mutation + plate keep their names; only the user-facing word changed, §5.3.)
+// SUPER ATTACK bar — the full-width gold action bar with the teaching pulse, the
+// horizontal swords+word+cost content, the streak XN.NN chip riding the corner,
+// and the first-strike-crit hint. (Internally still "DeployColumn" — the
+// mutation keeps its name; only the user-facing word/shape changed, §5.3.)
+// The bar is a 3-slice btn_gold frame stretched to `barArtW` (16 art px tall).
 // -----------------------------------------------------------------------------
 function DeployColumn({
   s,
+  barArtW,
   energy,
   streakMult,
   disabled,
@@ -210,6 +222,7 @@ function DeployColumn({
   onDeploy,
 }: {
   s: number;
+  barArtW: number;
   energy: number;
   streakMult: number;
   disabled: boolean;
@@ -219,72 +232,62 @@ function DeployColumn({
 }) {
   const pulse = usePulse(firstDeployHint, DOCK.deployPulseScale, DOCK.deployPulseMs);
   return (
-    <View style={{ alignItems: "center" }}>
-      <Animated.View style={pulse}>
-        {/* relative wrapper so the streak chip + crit hint can overflow the face */}
-        <View style={{ width: DEPLOY_W * s, height: DEPLOY_H * s }}>
-          <View style={{ opacity: disabled ? DOCK.disabledOpacity : 1 }}>
-            <Button asset="btn_deploy_gold" disabled={disabled} onPress={onDeploy}>
-              <DeployFace s={s} energy={energy} />
-            </Button>
-          </View>
-          {/* streak power chip riding the top-right corner */}
-          <Chip
-            color="gold"
-            label={`X${streakMult.toFixed(2)}`}
-            style={{ position: "absolute", top: -4 * s, right: -6 * s }}
-          />
-          {/* first-strike-crit nudge, under the face (mock #deploycrit) */}
-          {firstStrikeCrit && (
-            <Caption
-              text="FIRST STRIKE TODAY CRITS"
-              color={PALETTE.accent}
-              s={s}
-              top={(DEPLOY_H + 2) * s}
-            />
-          )}
+    <Animated.View style={pulse}>
+      {/* relative wrapper so the streak chip + crit hint can overflow the bar */}
+      <View style={{ width: barArtW * s, height: BAR_H * s }}>
+        <View style={{ opacity: disabled ? DOCK.disabledOpacity : 1 }}>
+          <Button material="gold" width={barArtW} disabled={disabled} onPress={onDeploy}>
+            <DeployFace s={s} energy={energy} />
+          </Button>
         </View>
-      </Animated.View>
-    </View>
+        {/* streak power chip riding the top-right corner of the bar */}
+        <Chip
+          color="gold"
+          label={`X${streakMult.toFixed(2)}`}
+          style={{ position: "absolute", top: -5 * s, right: 2 * s }}
+        />
+        {/* first-strike-crit nudge, under the bar (mock #deploycrit) */}
+        {firstStrikeCrit && (
+          <Caption
+            text="FIRST STRIKE TODAY CRITS"
+            color={PALETTE.accent}
+            s={s}
+            top={(BAR_H + 3) * s}
+          />
+        )}
+      </View>
+    </Animated.View>
   );
 }
 
-// The engraved SUPER ATTACK face: crossed swords emblem, the "SUPER" word (the
-// spoken name is SUPER ATTACK; "SUPER" is what fits the 56-wide face), and the
-// live Energy cost (gem + number) — all inside the baked 56×37 gold plate.
+// The SUPER ATTACK bar content, laid out HORIZONTALLY (Core Loop v2 dock): the
+// crossed-swords emblem, the "SUPER" word next to it, then the blue energy gem +
+// the live Energy cost next to that. The Button centres this row in the
+// full-width gold frame. All children resolve the art scale from context.
 function DeployFace({ s, energy }: { s: number; energy: number }) {
-  const word = "SUPER";
-  const wordW = measurePixelText(word);
   const cost = energy.toLocaleString();
-  const costW = measurePixelText(cost);
-  const gemW = 7;
-  const groupW = gemW + 2 + costW;
   return (
-    <View style={{ width: DEPLOY_W * s, height: DEPLOY_H * s }}>
-      <BakedImage
-        name="icon_swords"
-        style={{ position: "absolute", left: Math.round((DEPLOY_W - 11) / 2) * s, top: 3 * s }}
+    // width 100% + flex-start pins the group to the LEFT of the wide bar (the
+    // Button's child slot is absolute-filled, so 100% == the bar width); a small
+    // left inset keeps the swords clear of the frame's left cap.
+    <View
+      style={{
+        width: "100%",
+        flexDirection: "row",
+        alignItems: "center",
+        paddingLeft: 7 * s,
+      }}
+    >
+      <BakedImage name="icon_swords" />
+      <PixelText
+        text="SUPER"
+        variant="engraved"
+        color={UI_PALETTE.outline}
+        rimColor={UI_PALETTE.gold_light}
+        style={{ marginLeft: 5 * s }}
       />
-      <View style={{ position: "absolute", left: Math.round((DEPLOY_W - wordW) / 2) * s, top: 16 * s }}>
-        <PixelText
-          text={word}
-          variant="engraved"
-          color={UI_PALETTE.outline}
-          rimColor={UI_PALETTE.gold_light}
-        />
-      </View>
-      <View
-        style={{
-          position: "absolute",
-          left: Math.round((DEPLOY_W - groupW) / 2) * s,
-          top: 25 * s,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <BakedImage name="icon_gem" style={{ marginRight: 2 * s }} />
-        <PixelText text={cost} color={UI_PALETTE.outline} />
-      </View>
+      <BakedImage name="icon_gem" style={{ marginLeft: 8 * s }} />
+      <PixelText text={cost} color={UI_PALETTE.outline} style={{ marginLeft: 3 * s }} />
     </View>
   );
 }

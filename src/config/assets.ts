@@ -111,10 +111,14 @@ export const DOCK = {
   /** Horizontal inset (art px) of the steps-ring cluster from the screen edges
    *  (mirrors dashboard-ui's left/right 16px on a ~320 comp). */
   sidePad: 6,
-  /** Gap (art px) between the SUPER ATTACK hero button and the steps ring once
-   *  COLLECT is gone (Core Loop v2, STR-78). Wide enough to clear the streak
-   *  chip's + ring numbers' absolute overflow while keeping the pair centred. */
-  superRingGap: 44,
+  /** Gap (art px) between the full-width SUPER ATTACK bar and the steps ring.
+   *  The bar is left-aligned and stretches to fill the row up to this gap before
+   *  the ring (Core Loop v2 dock: wide gold action bar + circular steps gauge). */
+  superBarGap: 12,
+  /** Max dock content width (dp) so the wide SUPER bar fills a phone edge-to-edge
+   *  but doesn't sprawl absurdly on wide desktop web (the content centres above
+   *  this width). Phones (<460dp) always fill full width. */
+  superBarMaxDp: 460,
   /** Dim applied to a disabled baked face — the kit bakes no separate disabled
    *  art, so a disabled DEPLOY/COLLECT/ACTIVATE fades (matches the old 0.4). */
   disabledOpacity: 0.4,
