@@ -92,20 +92,16 @@ export const GAME_ZONES = {
    *  from the spec's starting 46 so the COLLECT caption / GOAL chip / first-crit
    *  hint that overflow below the dock baseline clear the XP strip (STR-68 tune). */
   dockBottom: 60,
-  /** COLLECT + steps-ring cluster, riding just above the dock line. */
-  collectRingBottom: 62,
-  /** Overdrive slim bar, above center. */
-  overdriveBottom: 152,
   /** Job strip: badge + full-width XP bar, at the very bottom pad. */
   jobStripBottom: 0,
 } as const;
 
 // ============================================================================
-// COMMAND DOCK + JOB STRIP (M2.75 / STR-68) — tunable feel constants for the
-// bottom action cluster (DEPLOY / COLLECT / steps ring / Overdrive / XP). Values
-// are ART px unless noted (1 art px = artScale dp). Tuned side-by-side against
-// dashboard-ui.html at 390dp. This block is pure data (the "re-balance = edit
-// data" rule extends to the dock's feel); no React/runtime imports.
+// COMMAND DOCK + JOB STRIP (M2.75 / STR-68; Core Loop v2 dock) — tunable feel
+// constants for the bottom action cluster (SUPER ATTACK plate w/ embedded
+// Overdrive meter / steps ring / XP). Values are ART px unless noted (1 art px
+// = artScale dp). This block is pure data (the "re-balance = edit data" rule
+// extends to the dock's feel); no React/runtime imports.
 // ============================================================================
 export const DOCK = {
   /** Horizontal inset (art px) of the steps-ring cluster from the screen edges
@@ -120,17 +116,16 @@ export const DOCK = {
    *  this width). Phones (<460dp) always fill full width. */
   superBarMaxDp: 460,
   /** Dim applied to a disabled baked face — the kit bakes no separate disabled
-   *  art, so a disabled DEPLOY/COLLECT/ACTIVATE fades (matches the old 0.4). */
+   *  art, so a disabled SUPER ATTACK fades (matches the old 0.4). */
   disabledOpacity: 0.4,
-  /** Overdrive slim bar width (art px), centered above the dock. */
-  overdriveBarWidth: 104,
   /** Job-strip XP bar: min art px kept for the badge + gaps on the left. */
   jobStripBadgeGap: 6,
   /** First-deploy teaching PULSE (gentle breathe) — same feel as TEACHING but
    *  on the Reanimated clock so the baked gold face never re-renders per frame. */
   deployPulseScale: 1.045,
   deployPulseMs: 700,
-  /** ACTIVATE glow pulse while Overdrive is charged & ready (loud purple beat). */
+  /** Overdrive-ACTIVE bloom breathe on the amethyst SUPER plate (was the old
+   *  ACTIVATE-button pulse; repurposed for the embedded-meter dock, variant A). */
   activatePulseScale: 1.06,
   activatePulseMs: 600,
 } as const;

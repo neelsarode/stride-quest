@@ -17,7 +17,9 @@
 // ZONE OWNERSHIP (each is a self-positioning component; fill its OWN file, not
 // this one — that's what keeps STR-67/68/69 parallel-safe):
 //   TopBar / FuelGauge / BossPlate ................ STR-67 (top HUD)
-//   OverdriveBar / CommandDock / JobStrip ......... STR-68 (bottom dock)
+//   CommandDock / JobStrip ........................ STR-68 (bottom dock; the
+//     Overdrive status now lives INSIDE the SUPER plate — the floating
+//     OverdriveBar strip was retired 2026-07-16, approved od-super-lab.html A)
 //   PartyRail / RightNav / Overlays / sheets/* .... STR-69 (rail + nav + sheets)
 // =============================================================================
 import { StyleSheet, View } from "react-native";
@@ -28,7 +30,6 @@ import { FuelGauge } from "./zones/FuelGauge";
 import { BossPlate } from "./zones/BossPlate";
 import { PartyRail } from "./zones/PartyRail";
 import { RightNav } from "./zones/RightNav";
-import { OverdriveBar } from "./zones/OverdriveBar";
 import { CommandDock } from "./zones/CommandDock";
 import { JobStrip } from "./zones/JobStrip";
 import { Overlays } from "./Overlays";
@@ -52,7 +53,6 @@ export function GameScreen() {
       <BossPlate />
       <PartyRail />
       <RightNav />
-      <OverdriveBar />
       <CommandDock />
       <JobStrip />
 

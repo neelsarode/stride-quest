@@ -48,13 +48,26 @@ import {
   PixelText,
   Ring,
   UIScaleProvider,
+  measurePixelText,
 } from "../../ui";
 import { UI_PALETTE } from "../../ui/theme";
 import { useGameLayout } from "../useGameLayout";
 import { zoneStyles } from "./zoneStyle";
 
 const RING_ART = 30; // steps_ring frame is 30×30 art px
-const BAR_H = 26; // btn_super_gold 3-slice frame height (art px) — the tall SUPER button
+const BAR_H = 35; // btn_super_gold/amethyst 3-slice height (art px, face 34 + shadow row)
+const FACE_H = 34; // the visible plate face the two rows lay out against
+// Approved variant A (od-super-lab.html, 2026-07-16): row 1 = swords + a BIG
+// scale-2 SUPER ATTACK word (FLAT color — the engrave/drop shadow doubled the
+// letterforms at scale 2 and muddied it); row 2, low in the plate = the
+// embedded OVERDRIVE meter (label + purple fill + energy gem/cost) while
+// charging, or "X{mult} UNTIL RESET" + gem/cost in white while Overdrive is
+// armed — when the ENTIRE plate flips to the amethyst twin. This replaces the
+// old floating OverdriveBar strip (it covered the bottom party member).
+const WORD = "SUPER ATTACK";
+const OD_LABEL_DIM = "#6f4d1d"; // kit gold_deep — dim label on the gold face
+const OD_WELL = "#241329"; // dark purple meter well (kit amethyst-family)
+const OD_LIGHT = "#e6c9ff"; // lit top row of the fill (matches old ODGauge)
 
 export function CommandDock() {
   const { bottomPad, artScale: s, width } = useGameLayout();
@@ -115,6 +128,13 @@ export function CommandDock() {
   const firstStrikeCrit = canFight && energy > 0 && !streak.deployedToday;
   const goalHit = dailyGoal.hit;
   const ringFrac = dailyGoal.goal > 0 ? dailyGoal.steps / dailyGoal.goal : 0;
+  // Overdrive rides INSIDE the SUPER plate now (approved variant A) — the same
+  // goal fraction the ring shows fills the embedded meter; `active` flips the
+  // whole plate to the amethyst twin.
+  const od = data.overdrive;
+  const odFrac = od.active
+    ? 1
+    : Math.max(0, Math.min(1, od.goal > 0 ? od.stepsToday / od.goal : 0));
 
   // Core Loop v2 dock geometry: the SUPER ATTACK button is now a full-width gold
   // action BAR pinned to the left that stretches to fill the row up to the steps
@@ -142,7 +162,7 @@ export function CommandDock() {
               paddingHorizontal: DOCK.sidePad * s,
             }}
           >
-            {/* ---- SUPER ATTACK — the full-width gold action bar (left) ---- */}
+            {/* ---- SUPER ATTACK — the two-row plate w/ embedded OVERDRIVE ---- */}
             <DeployColumn
               s={s}
               barArtW={barArtW}
@@ -151,6 +171,9 @@ export function CommandDock() {
               disabled={deployDisabled}
               firstDeployHint={firstDeployHint}
               firstStrikeCrit={firstStrikeCrit}
+              odActive={od.active}
+              odMult={od.mult}
+              odFrac={odFrac}
               onDeploy={onDeploy}
             />
 
@@ -205,12 +228,11 @@ export function CommandDock() {
 }
 
 // -----------------------------------------------------------------------------
-// SUPER ATTACK bar — the full-width gold action bar with the teaching pulse, the
-// horizontal swords+word+cost content, the streak XN.NN chip riding the corner,
-// and the first-strike-crit hint. (Internally still "DeployColumn" — the
-// mutation keeps its name; only the user-facing word/shape changed, §5.3.)
-// The button is a 3-slice btn_super_gold frame stretched to `barArtW`, 26 art
-// px tall — a chunky rectangular button (not a thin bar) with centred content.
+// SUPER ATTACK plate — the two-row hero button (approved variant A) with the
+// teaching pulse, the streak XN.NN chip riding the corner, the first-strike-crit
+// hint, and the EMBEDDED Overdrive meter. While Overdrive is armed the whole
+// plate swaps to the baked amethyst twin + a breathing purple bloom.
+// (Internally still "DeployColumn" — the mutation keeps its name, §5.3.)
 // -----------------------------------------------------------------------------
 function DeployColumn({
   s,
@@ -220,6 +242,9 @@ function DeployColumn({
   disabled,
   firstDeployHint,
   firstStrikeCrit,
+  odActive,
+  odMult,
+  odFrac,
   onDeploy,
 }: {
   s: number;
@@ -229,31 +254,47 @@ function DeployColumn({
   disabled: boolean;
   firstDeployHint: boolean;
   firstStrikeCrit: boolean;
+  odActive: boolean;
+  odMult: number;
+  odFrac: number;
   onDeploy: () => void;
 }) {
   const pulse = usePulse(firstDeployHint, DOCK.deployPulseScale, DOCK.deployPulseMs);
   return (
     <Animated.View style={pulse}>
-      {/* relative wrapper so the streak chip + crit hint can overflow the bar */}
+      {/* relative wrapper so the streak chip + crit hint can overflow the plate */}
       <View style={{ width: barArtW * s, height: BAR_H * s }}>
+        {odActive && <ActiveGlow s={s} w={barArtW} h={FACE_H} />}
         <View style={{ opacity: disabled ? DOCK.disabledOpacity : 1 }}>
-          <Button material="supergold" width={barArtW} disabled={disabled} onPress={onDeploy}>
-            <DeployFace s={s} energy={energy} />
+          <Button
+            material={odActive ? "superamethyst" : "supergold"}
+            width={barArtW}
+            disabled={disabled}
+            onPress={onDeploy}
+          >
+            <DeployFace
+              s={s}
+              barArtW={barArtW}
+              energy={energy}
+              odActive={odActive}
+              odMult={odMult}
+              odFrac={odFrac}
+            />
           </Button>
         </View>
-        {/* streak power chip riding the top-right corner of the bar */}
+        {/* streak power chip riding the top-right corner of the plate */}
         <Chip
           color="gold"
           label={`X${streakMult.toFixed(2)}`}
           style={{ position: "absolute", top: -5 * s, right: 2 * s }}
         />
-        {/* first-strike-crit nudge, under the bar (mock #deploycrit) */}
+        {/* first-strike-crit nudge, under the plate (mock #deploycrit) */}
         {firstStrikeCrit && (
           <Caption
             text="FIRST STRIKE TODAY CRITS"
             color={PALETTE.accent}
             s={s}
-            top={(BAR_H + 3) * s}
+            top={(BAR_H + 2) * s}
           />
         )}
       </View>
@@ -261,26 +302,172 @@ function DeployColumn({
   );
 }
 
-// The SUPER ATTACK bar content, laid out HORIZONTALLY (Core Loop v2 dock): the
-// crossed-swords emblem, the "SUPER" word next to it, then the blue energy gem +
-// the live Energy cost next to that. The Button centres this row in the
-// full-width gold frame. All children resolve the art scale from context.
-function DeployFace({ s, energy }: { s: number; energy: number }) {
+// The plate face (variant A): two absolutely-positioned rows against the 34-px
+// face. Row 1 (y≈7): swords + BIG flat scale-2 SUPER ATTACK. Row 2 (y=21, low
+// in the plate): OVERDRIVE label + purple fill + energy gem/cost while
+// charging; "X{mult} UNTIL RESET" + gem/cost in WHITE while armed. Sized
+// explicitly (the Button centres it, same size = fills), so the press shift
+// moves both rows together.
+function DeployFace({
+  s,
+  barArtW,
+  energy,
+  odActive,
+  odMult,
+  odFrac,
+}: {
+  s: number;
+  barArtW: number;
+  energy: number;
+  odActive: boolean;
+  odMult: number;
+  odFrac: number;
+}) {
   const cost = energy.toLocaleString();
+  const wordW = measurePixelText(WORD) * 2; // scale-2 glyphs
+  const rowW = 11 + 5 + wordW; // swords + gap + word
+  const wordX = Math.round((barArtW - rowW) / 2);
   return (
-    // A tight horizontal group; the Button centres it in the full-width bar.
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      <BakedImage name="icon_swords" />
-      <PixelText
-        text="SUPER"
-        variant="engraved"
-        color={UI_PALETTE.outline}
-        rimColor={UI_PALETTE.gold_light}
-        style={{ marginLeft: 5 * s }}
-      />
-      <BakedImage name="icon_gem" style={{ marginLeft: 8 * s }} />
-      <PixelText text={cost} color={UI_PALETTE.outline} style={{ marginLeft: 3 * s }} />
+    <View style={{ width: barArtW * s, height: FACE_H * s }}>
+      {/* ---- row 1: swords + the big word (FLAT color — no shadow layer) ---- */}
+      <View
+        style={{
+          position: "absolute",
+          left: wordX * s,
+          top: 6 * s,
+          flexDirection: "row",
+          alignItems: "flex-start",
+        }}
+      >
+        <BakedImage name="icon_swords" />
+        <PixelText
+          text={WORD}
+          color={odActive ? UI_PALETTE.white : UI_PALETTE.outline}
+          scale={s * 2}
+          style={{ marginLeft: 5 * s, marginTop: 1 * s }}
+        />
+      </View>
+      {/* ---- row 2: the embedded OVERDRIVE meter, low in the plate ---- */}
+      {odActive ? (
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 21 * s,
+            width: barArtW * s,
+            height: 7 * s,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <PixelText text={`X${odMult} UNTIL RESET`} color={UI_PALETTE.white} />
+          <BakedImage name="icon_gem" style={{ marginLeft: 8 * s, marginRight: 3 * s }} />
+          <PixelText text={cost} color={UI_PALETTE.white} />
+        </View>
+      ) : (
+        <View
+          style={{
+            position: "absolute",
+            left: 7 * s,
+            top: 21 * s,
+            width: (barArtW - 14) * s,
+            height: 7 * s,
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
+          <PixelText text="OVERDRIVE" color={OD_LABEL_DIM} />
+          <ODFill s={s} frac={odFrac} />
+          <BakedImage name="icon_gem" style={{ marginRight: 3 * s }} />
+          <PixelText text={cost} color={UI_PALETTE.outline} />
+        </View>
+      )}
     </View>
+  );
+}
+
+// The embedded meter fill: a dark purple well + a Reanimated scaleX fill with a
+// lit top row — the exact ODGauge technique from the retired OverdriveBar strip
+// (zero per-frame re-renders; re-renders only when the snapshot's frac changes).
+function ODFill({ s, frac }: { s: number; frac: number }) {
+  const fill = useSharedValue(frac);
+  useEffect(() => {
+    fill.value = withTiming(frac, { duration: 260, easing: Easing.out(Easing.cubic) });
+  }, [frac, fill]);
+  const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: fill.value }] }), [fill]);
+  return (
+    <View
+      style={{
+        flex: 1,
+        height: 7 * s,
+        marginHorizontal: 4 * s,
+        borderRadius: 3 * s,
+        backgroundColor: OD_WELL,
+        overflow: "hidden",
+      }}
+    >
+      <Animated.View
+        style={[
+          { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, transformOrigin: "left" },
+          fillStyle,
+        ]}
+      >
+        <View style={{ position: "absolute", left: 0, right: 0, top: 0, height: s, backgroundColor: OD_LIGHT }} />
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: s,
+            bottom: 0,
+            backgroundColor: PALETTE.overdrive,
+          }}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+// A breathing purple bloom behind the armed plate (the GoalGlow technique —
+// transparent rounded rect whose soft shadow pulses on a shared value; React
+// never re-renders while it breathes).
+function ActiveGlow({ s, w, h }: { s: number; w: number; h: number }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withRepeat(
+      withTiming(1, { duration: DOCK.activatePulseMs, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true,
+    );
+    return () => cancelAnimation(t);
+  }, [t]);
+  const style = useAnimatedStyle(() => ({ opacity: 0.45 + 0.35 * t.value }), [t]);
+  const shadow =
+    Platform.OS === "web"
+      ? ({ boxShadow: `0 0 10px ${PALETTE.overdrive}, 0 0 20px ${PALETTE.overdrive}` } as object)
+      : {
+          shadowColor: PALETTE.overdrive,
+          shadowOpacity: 1,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 0 },
+        };
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        {
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: w * s,
+          height: h * s,
+          borderRadius: 6 * s,
+        },
+        shadow,
+        style,
+      ]}
+    />
   );
 }
 

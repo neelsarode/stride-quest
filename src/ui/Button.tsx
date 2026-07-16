@@ -18,25 +18,31 @@ import { UI_PALETTE } from "./theme";
 import { type UiAssetKey } from "./uiMap";
 import { useResolvedScale } from "./scale";
 
-export type ButtonMaterial = "gold" | "silver" | "supergold";
+export type ButtonMaterial = "gold" | "silver" | "supergold" | "superamethyst";
 
 // Engrave colours per material: dark ink on top, lit rim beneath (kit engrave).
-// supergold = the same gold engrave on the tall Core Loop v2 SUPER ATTACK bar.
+// supergold = the tall Core Loop v2 SUPER ATTACK plate; superamethyst = its
+// Overdrive-active purple twin (labels there render WHITE, not engraved — the
+// dark engrave is unreadable on amethyst; see the od-super-lab.html decision).
 const ENGRAVE: Record<ButtonMaterial, { color: string; rim: string }> = {
   gold: { color: UI_PALETTE.outline, rim: UI_PALETTE.gold_light },
   supergold: { color: UI_PALETTE.outline, rim: UI_PALETTE.gold_light },
+  superamethyst: { color: UI_PALETTE.white, rim: UI_PALETTE.outline },
   silver: { color: UI_PALETTE.outline, rim: UI_PALETTE.silver_rim },
 };
 const SLICE = {
   gold: "btn_gold",
   supergold: "btn_super_gold",
+  superamethyst: "btn_super_amethyst",
   silver: "btn_silver",
 } as const;
 // Per-material stretch-frame height (art px). btn_gold/btn_silver are the
-// standard 16; btn_super_gold is the chunky 26-tall dock button.
+// standard 16; the super plates are the tall 35 (face 34 + shadow row) two-row
+// dock button (approved variant A, od-super-lab.html).
 const SLICE_H: Record<ButtonMaterial, number> = {
   gold: 16,
-  supergold: 26,
+  supergold: 35,
+  superamethyst: 35,
   silver: 16,
 };
 
