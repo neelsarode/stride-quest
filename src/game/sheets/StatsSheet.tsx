@@ -72,7 +72,7 @@ export function StatsSheet({
 
         {/* Energy */}
         <View style={{ marginTop: 8 * s, gap: 3 * s }}>
-          <PixelText text="ENERGY - DEPLOYABLE" color={UI_PALETTE.sky_mid} scale={s} />
+          <PixelText text="ENERGY - SUPER ATTACK FUEL" color={UI_PALETTE.sky_mid} scale={s} />
           <Bar
             variant="slim"
             width={barW}
@@ -116,7 +116,7 @@ export function StatsSheet({
         <View style={{ marginTop: 10 * s, gap: 4 * s }}>
           <PixelText text="STREAK" color={UI_PALETTE.gold_mid} scale={s} />
           <StatLine label="CURRENT" value={`${streak.count} DAYS`} scale={s} />
-          <StatLine label="DEPLOY POWER" value={`X${streak.multiplier.toFixed(2)}`} scale={s} />
+          <StatLine label="SUPER ATTACK POWER" value={`X${streak.multiplier.toFixed(2)}`} scale={s} />
           <StatLine label="LONGEST EVER" value={`${streak.longest} DAYS`} scale={s} />
           <StatLine
             label="AVG STEPS / DAY"

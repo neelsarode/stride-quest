@@ -19,6 +19,7 @@ import { TEACHING } from "../config/assets";
 import { useGameEvents } from "../feedback/useGameEvents";
 import { useTeammateDamage } from "../feedback/useTeammateDamage";
 import { useFeedback } from "../feedback/FeedbackProvider";
+import { friendlyError } from "../feedback/errors";
 import { usePendingIdle } from "../usePendingIdle";
 import {
   isAvailable as healthKitAvailable,
@@ -153,7 +154,9 @@ export function useGameEngine() {
           spent: r.spent,
         });
     } catch (e) {
-      setNote(`Deploy failed: ${String(e)}`);
+      // STR-86: through friendlyError (ConvexError {code,message} → player copy)
+      // — never raw server text in the dashboard's green note style.
+      setNote(friendlyError(e));
     } finally {
       setBusy(false);
     }
@@ -171,9 +174,16 @@ export function useGameEngine() {
     if (didEnsureSession.current) return;
     didEnsureSession.current = true;
     ensureSession({ tzOffsetMinutes: new Date().getTimezoneOffset() }).catch(
-      (e) => setNote(`Setup error: ${String(e)}`),
+      (e) => {
+        // STR-86: the game screen never renders `note`, so ALSO surface the
+        // failure as an actionRejected toast (friendly copy). The note stays
+        // for the classic DashboardScreen's inline line.
+        const message = friendlyError(e);
+        setNote(message);
+        emit({ type: "actionRejected", message });
+      },
     );
-  }, [ensureSession]);
+  }, [ensureSession, emit]);
 
   // Silent HealthKit re-sync on open, once Health is CONNECTED (STR-48: the
   // permission moment moved into onboarding; the buried manual sync button it

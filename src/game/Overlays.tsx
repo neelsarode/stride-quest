@@ -21,14 +21,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from "react";
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -48,6 +41,11 @@ import { friendlyError } from "../feedback/errors";
 import { DEV_FLAGS } from "../devConfig";
 import { DevPanel } from "../components/DevPanel";
 import { useGameLayout } from "./useGameLayout";
+import {
+  CODE_COPIED_TOAST,
+  COPY_FAILED_TOAST,
+  copyToClipboard,
+} from "./clipboard";
 import { GuildSheet } from "./sheets/GuildSheet";
 import { StatsSheet } from "./sheets/StatsSheet";
 
@@ -149,25 +147,7 @@ function computePopover(rect: AnchorRect, s: number, winW: number) {
   return { left, top, arrowAt };
 }
 
-// =============================================================================
-// Cross-platform clipboard for COPY CODE (no expo-clipboard dependency): web
-// uses navigator.clipboard (battlefield-ui parity), native falls back to Share.
-// =============================================================================
-async function copyToClipboard(text: string): Promise<void> {
-  try {
-    const nav =
-      typeof navigator !== "undefined"
-        ? (navigator as unknown as { clipboard?: { writeText?: (t: string) => Promise<void> } })
-        : undefined;
-    if (Platform.OS === "web" && nav?.clipboard?.writeText) {
-      await nav.clipboard.writeText(text);
-      return;
-    }
-    await Share.share({ message: text });
-  } catch {
-    // best-effort; the toast still confirms the intent
-  }
-}
+// (copyToClipboard moved to ./clipboard — shared with GuildSheet's COPY, STR-86.)
 
 // =============================================================================
 // The host.
@@ -217,7 +197,7 @@ export function Overlays() {
             rect={overlay.rect}
             scale={artScale}
             winW={width}
-            onCopied={() => showToast("CODE COPIED!")}
+            onCopied={(ok) => showToast(ok ? CODE_COPIED_TOAST : COPY_FAILED_TOAST)}
           />
         )}
 
@@ -419,13 +399,14 @@ function InvitePopover({
   rect: AnchorRect;
   scale: number;
   winW: number;
-  onCopied: () => void;
+  /** Called with whether the clipboard write actually succeeded (STR-86). */
+  onCopied: (ok: boolean) => void;
 }) {
   const { left, top, arrowAt } = computePopover(rect, scale, winW);
 
   async function onCopy() {
-    await copyToClipboard(code);
-    onCopied();
+    const ok = await copyToClipboard(code);
+    onCopied(ok);
     closeOverlay();
   }
 
@@ -454,13 +435,17 @@ function InvitePopover({
 
 // =============================================================================
 // Help modal — HOW TO PLAY (battlefield-ui lines), X + OK close.
+// Copy reflects Core Loop v2 (STR-86): DEPLOY is the SUPER ATTACK now, and
+// Overdrive is automatic on a goal-hit (no charge/activate). Pixel-font
+// conventions: caps, "X2" not "×2", short lines that fit the 134-art-px well.
 // =============================================================================
 const HELP_LINES: [string, string][] = [
   ["WALK EVERY DAY.", UI_PALETTE.silver_rim],
   ["STEPS BECOME ENERGY.", UI_PALETTE.sky_mid],
-  ["DEPLOY TO STRIKE THE", UI_PALETTE.silver_rim],
-  ["WEEKLY BOSS TOGETHER.", UI_PALETTE.sky_mid],
-  ["IDLE DAMAGE TICKS 24/7.", UI_PALETTE.sky_mid],
+  ["SUPER ATTACK SPENDS IT", UI_PALETTE.silver_rim],
+  ["ON THE WEEKLY BOSS.", UI_PALETTE.sky_mid],
+  ["YOUR CREW FIGHTS 24/7.", UI_PALETTE.sky_mid],
+  ["HIT YOUR GOAL: X2 OVERDRIVE.", UI_PALETTE.sky_mid],
   ["RALLY RESTING FRIENDS.", UI_PALETTE.sky_mid],
   ["JOBS RESET MONDAYS.", UI_PALETTE.sky_mid],
 ];

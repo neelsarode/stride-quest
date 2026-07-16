@@ -20,13 +20,17 @@ import {
   PixelText,
   Sheet,
   StatusDot,
-  type ChipColor,
   type HeroState,
 } from "../../ui";
-import { UI_PALETTE } from "../../ui/theme";
+import { STATE_COLORS, UI_PALETTE } from "../../ui/theme";
 import { useGameLayout } from "../useGameLayout";
 import { useFeedback } from "../../feedback/FeedbackProvider";
 import { friendlyError } from "../../feedback/errors";
+import {
+  CODE_COPIED_TOAST,
+  COPY_FAILED_TOAST,
+  copyToClipboard,
+} from "../clipboard";
 
 type Member = {
   userId: string;
@@ -59,13 +63,30 @@ type RallyInfo = {
   eligibleTeammates: { userId: string }[];
 };
 
-const STATE_CHIP: Record<HeroState, ChipColor> = {
-  battling: "green",
-  winded: "gold",
-  resting: "red",
-  rally: "red",
-};
 const DIVIDER = "#26324a";
+
+// Hero-state pill — FuelGauge's calm treatment reused (theme STATE_COLORS):
+// battling green, winded amber, RESTING dignified sky — NEVER red (binding
+// guardrail, assets.ts HERO_STATE_STYLE + fuel-hybrid spec §3; the old
+// resting:"red" Chip here violated it). Red stays reserved for the separate
+// rally call-to-action dot.
+function StatePill({ state, scale }: { state: HeroState; scale: number }) {
+  const color = STATE_COLORS[state];
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderRadius: 7,
+        paddingVertical: 2,
+        paddingHorizontal: 6,
+        backgroundColor: "rgba(10,14,22,0.82)",
+        borderColor: color,
+      }}
+    >
+      <PixelText text={state.toUpperCase()} color={color} scale={scale} />
+    </View>
+  );
+}
 
 export function GuildSheet({
   overview,
@@ -168,7 +189,7 @@ export function GuildSheet({
                     color={UI_PALETTE.silver_rim}
                     scale={s}
                   />
-                  <Chip label={m.heroState} color={STATE_CHIP[m.heroState]} scale={s} />
+                  <StatePill state={m.heroState} scale={s} />
                 </View>
                 <PixelText text={`${m.damage.toLocaleString()}`} color={UI_PALETTE.gold_light} scale={s} />
               </View>
@@ -218,7 +239,13 @@ export function GuildSheet({
               <Button
                 material="silver"
                 label="COPY"
-                onPress={() => onToast("CODE COPIED!")}
+                // STR-86: actually write the clipboard (shared helper), and
+                // only claim "COPIED!" when the write succeeded — otherwise a
+                // warm fallback line, never a red alarm.
+                onPress={async () => {
+                  const ok = await copyToClipboard(inviteCode);
+                  onToast(ok ? CODE_COPIED_TOAST : COPY_FAILED_TOAST);
+                }}
                 scale={s}
               />
             </View>
