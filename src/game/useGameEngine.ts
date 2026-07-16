@@ -139,7 +139,19 @@ export function useGameEngine() {
     setNote(null);
     try {
       const r = await deployMut({});
-      if (r) emit({ type: "damageDealt", amount: r.damage, source: "deploy", crit: r.crit });
+      // spent = the Energy bank size, so the battle scene sizes the Super Attack
+      // combo/flurry by how much you walked, not the damage roll (Core Loop v2
+      // §5.3, STR-76). NOTE: this covers the DashboardScreen (fallback) path;
+      // the GAME screen's DEPLOY runs through CommandDock's own onDeploy emit,
+      // which STR-78 must update with `spent` too.
+      if (r)
+        emit({
+          type: "damageDealt",
+          amount: r.damage,
+          source: "deploy",
+          crit: r.crit,
+          spent: r.spent,
+        });
     } catch (e) {
       setNote(`Deploy failed: ${String(e)}`);
     } finally {

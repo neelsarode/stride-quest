@@ -23,7 +23,10 @@ type Snapshot =
       dailyGoal?: { hit: boolean; goal: number } | null;
       steps?: { today: number };
       fuel?: { state: HeroState };
-      overdrive?: { active: boolean; durationHours: number; idleDamageMult: number };
+      // Real overdrive payload shape (convex/game.ts): the diff only needs
+      // active (opened/closed) + mult (the ×N for the banner). The transitional
+      // idleDamageMult/durationHours compat fields are gone (STR-76).
+      overdrive?: { active: boolean; mult: number };
       bonus?: {
         bossName: string;
         currentTier: number;
@@ -82,17 +85,13 @@ export function useGameEvents(data: Snapshot) {
       });
     }
 
-    // Overdrive window opened/closed (STR-14). Diffing the snapshot (instead
-    // of emitting from the button handler) means the banner also fires for a
-    // DevPanel activation, and the end toast fires whenever a refresh lands
-    // past the 4h mark.
+    // Overdrive window opened/closed (STR-14; retriggered Core Loop v2 §5.4).
+    // Diffing the snapshot means the banner fires automatically the moment a
+    // goal-cross arms Overdrive, and the end toast fires whenever a refresh
+    // lands after the daily reset (the stamp's until-reset window has passed).
     if (data.overdrive && prev.overdrive) {
       if (data.overdrive.active && !prev.overdrive.active) {
-        emit({
-          type: "overdriveStarted",
-          durationHours: data.overdrive.durationHours,
-          mult: data.overdrive.idleDamageMult,
-        });
+        emit({ type: "overdriveStarted", mult: data.overdrive.mult });
       } else if (!data.overdrive.active && prev.overdrive.active) {
         emit({ type: "overdriveEnded" });
       }

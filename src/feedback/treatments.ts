@@ -117,13 +117,15 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
     }
     // --- M1 fuel hybrid (STR-14) ---
     case "overdriveStarted":
+      // Automatic on the goal-cross now (Core Loop v2 §5.4): ×N all day, until
+      // the daily reset — no fixed-hours copy (durationHours is gone).
       juice.haptic("heavy");
       juice.screenShake();
       return {
         banner: {
           variant: "overdrive",
-          title: "OVERDRIVE!",
-          subtitle: `×${e.mult} damage for the next ${e.durationHours} hours.`,
+          title: `OVERDRIVE ×${e.mult} — ALL DAY!`,
+          subtitle: `×${e.mult} damage on idle AND your Super Attack, until the daily reset.`,
         },
       };
     case "overdriveEnded":

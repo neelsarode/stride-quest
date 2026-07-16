@@ -185,15 +185,6 @@ export const dashboard = query({
       remainingSeconds: od.remainingSeconds, // live countdown source
       stepsToday: od.stepsToday, // goal progress that arms Overdrive
       goal: od.goal, // DAILY_STEP_GOAL
-      // TRANSITIONAL COMPAT (STR-74 → STR-76): src/feedback/* is owned by STR-76
-      // and left untouched here, but its loose `Snapshot` type still reads
-      // overdrive.idleDamageMult + overdrive.durationHours off this payload.
-      // idleDamageMult duplicates `mult`; durationHours reports the real whole
-      // hours left until the daily reset ("×2 for the next N hours" — truthful)
-      // until STR-76 reworks the banner copy to "until reset" and DELETES this
-      // pair. Nothing else consumes these two fields.
-      idleDamageMult: od.mult,
-      durationHours: Math.max(0, Math.ceil(od.remainingSeconds / 3600)),
     };
 
     // Idle: fuel-driven (STR-7). `dph` is the rate at the tank's CURRENT state

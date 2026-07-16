@@ -5,12 +5,18 @@
 export type FeedbackEvent =
   // userId attributes a teammate's hit to its member (the battle scene fires
   // THAT fighter's attack — STR-22); absent for your own deploy/idle hits.
+  // source "deploy" is the INTERNAL identifier (kept to avoid churn) but MEANS
+  // Super Attack, the user-facing name (Core Loop v2 §5.3). `spent` = the Energy
+  // bank size (steps since the last Super Attack); the battle scene sizes the
+  // combo/flurry by the BANK, not the damage roll (STR-77). Only the deploy
+  // source carries it, so it's optional.
   | {
       type: "damageDealt";
       amount: number;
       source: "deploy" | "idle" | "teammate";
       crit?: boolean;
       userId?: string;
+      spent?: number;
     }
   | { type: "jobUp"; from: number; to: number; jobName: string }
   // firstTime (STR-49 teaching layer): the account's FIRST idle collect that
@@ -30,11 +36,13 @@ export type FeedbackEvent =
   // Resting is DIGNIFIED (spec §3): its treatment is calm, never red/shaming;
   // recovering to Battling is a small celebration.
   | { type: "heroStateChanged"; from: HeroState; to: HeroState }
-  // --- M1 fuel hybrid (STR-14) ---
+  // --- M1 fuel hybrid (STR-14) ; retriggered Core Loop v2 §5.4 (STR-74/76) ---
   // Overdrive window opened/closed (diffed from the reactive snapshot, so the
-  // banner also fires when a DevPanel activation lands). Ending is quiet —
-  // the reward ran its course; nothing was lost (never loss-frame a bonus).
-  | { type: "overdriveStarted"; durationHours: number; mult: number }
+  // banner also fires when a goal-cross arms it). It is automatic on hitting the
+  // daily goal now and runs UNTIL THE DAILY RESET — no fixed duration, so
+  // durationHours is gone; only `mult` (the ×N) remains. Ending is quiet — the
+  // reward ran its course; nothing was lost (never loss-frame a bonus).
+  | { type: "overdriveStarted"; mult: number }
   | { type: "overdriveEnded" }
   // A server-side rejection with a friendly ConvexError message (rally daily
   // limit, uncharged overdrive, …). Always a calm info toast, never red.
