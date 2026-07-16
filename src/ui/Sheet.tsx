@@ -18,9 +18,9 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import { SCRIM, UI_PALETTE } from "./theme";
@@ -52,9 +52,9 @@ export function Sheet({
 
   useEffect(() => {
     if (visible) {
-      // Near-critical spring — a gentle settle with almost no overshoot (the
-      // old damping:18 overshot hard on a full-panel slide; toned down ~90%).
-      ty.value = withSpring(0, { damping: 26, stiffness: 200 });
+      // Standard slide-up: a plain decelerating timing curve (ease-out) — ZERO
+      // overshoot, so the panel glides to rest with no bounce (owner request).
+      ty.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) });
       scrimO.value = withTiming(1, { duration: 180 });
     }
   }, [visible, ty, scrimO, panelH]);
