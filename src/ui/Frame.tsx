@@ -27,6 +27,7 @@ type HSliceKey =
   | "bar_full"
   | "bar_slim"
   | "btn_gold"
+  | "btn_super_gold"
   | "btn_silver"
   | "plate_silver"
   | "banner_gold"

@@ -590,6 +590,16 @@ export const UI_SLICES = {
       "btn_silver_right"
     ]
   },
+  "btn_super_gold": {
+    "axis": "h",
+    "h": 26,
+    "capW": 9,
+    "parts": [
+      "btn_super_gold_left",
+      "btn_super_gold_mid",
+      "btn_super_gold_right"
+    ]
+  },
   "plate_silver": {
     "axis": "h",
     "h": 12,
@@ -754,6 +764,18 @@ export const UI_DIMS = {
   "btn_silver_right": {
     "w": 9,
     "h": 16
+  },
+  "btn_super_gold_left": {
+    "w": 9,
+    "h": 26
+  },
+  "btn_super_gold_mid": {
+    "w": 1,
+    "h": 26
+  },
+  "btn_super_gold_right": {
+    "w": 9,
+    "h": 26
   },
   "plate_silver_left": {
     "w": 7,

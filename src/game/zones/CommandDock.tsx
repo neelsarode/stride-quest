@@ -54,7 +54,7 @@ import { useGameLayout } from "../useGameLayout";
 import { zoneStyles } from "./zoneStyle";
 
 const RING_ART = 30; // steps_ring frame is 30×30 art px
-const BAR_H = 16; // btn_gold 3-slice frame height (art px) — the wide SUPER bar
+const BAR_H = 26; // btn_super_gold 3-slice frame height (art px) — the tall SUPER button
 
 export function CommandDock() {
   const { bottomPad, artScale: s, width } = useGameLayout();
@@ -209,7 +209,8 @@ export function CommandDock() {
 // horizontal swords+word+cost content, the streak XN.NN chip riding the corner,
 // and the first-strike-crit hint. (Internally still "DeployColumn" — the
 // mutation keeps its name; only the user-facing word/shape changed, §5.3.)
-// The bar is a 3-slice btn_gold frame stretched to `barArtW` (16 art px tall).
+// The button is a 3-slice btn_super_gold frame stretched to `barArtW`, 26 art
+// px tall — a chunky rectangular button (not a thin bar) with centred content.
 // -----------------------------------------------------------------------------
 function DeployColumn({
   s,
@@ -236,7 +237,7 @@ function DeployColumn({
       {/* relative wrapper so the streak chip + crit hint can overflow the bar */}
       <View style={{ width: barArtW * s, height: BAR_H * s }}>
         <View style={{ opacity: disabled ? DOCK.disabledOpacity : 1 }}>
-          <Button material="gold" width={barArtW} disabled={disabled} onPress={onDeploy}>
+          <Button material="supergold" width={barArtW} disabled={disabled} onPress={onDeploy}>
             <DeployFace s={s} energy={energy} />
           </Button>
         </View>
@@ -267,17 +268,8 @@ function DeployColumn({
 function DeployFace({ s, energy }: { s: number; energy: number }) {
   const cost = energy.toLocaleString();
   return (
-    // width 100% + flex-start pins the group to the LEFT of the wide bar (the
-    // Button's child slot is absolute-filled, so 100% == the bar width); a small
-    // left inset keeps the swords clear of the frame's left cap.
-    <View
-      style={{
-        width: "100%",
-        flexDirection: "row",
-        alignItems: "center",
-        paddingLeft: 7 * s,
-      }}
-    >
+    // A tight horizontal group; the Button centres it in the full-width bar.
+    <View style={{ flexDirection: "row", alignItems: "center" }}>
       <BakedImage name="icon_swords" />
       <PixelText
         text="SUPER"

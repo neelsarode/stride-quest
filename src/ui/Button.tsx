@@ -18,15 +18,27 @@ import { UI_PALETTE } from "./theme";
 import { type UiAssetKey } from "./uiMap";
 import { useResolvedScale } from "./scale";
 
-export type ButtonMaterial = "gold" | "silver";
+export type ButtonMaterial = "gold" | "silver" | "supergold";
 
 // Engrave colours per material: dark ink on top, lit rim beneath (kit engrave).
+// supergold = the same gold engrave on the tall Core Loop v2 SUPER ATTACK bar.
 const ENGRAVE: Record<ButtonMaterial, { color: string; rim: string }> = {
   gold: { color: UI_PALETTE.outline, rim: UI_PALETTE.gold_light },
+  supergold: { color: UI_PALETTE.outline, rim: UI_PALETTE.gold_light },
   silver: { color: UI_PALETTE.outline, rim: UI_PALETTE.silver_rim },
 };
-const SLICE = { gold: "btn_gold", silver: "btn_silver" } as const;
-const SLICE_H = 16; // btn_gold / btn_silver frame height (art px)
+const SLICE = {
+  gold: "btn_gold",
+  supergold: "btn_super_gold",
+  silver: "btn_silver",
+} as const;
+// Per-material stretch-frame height (art px). btn_gold/btn_silver are the
+// standard 16; btn_super_gold is the chunky 26-tall dock button.
+const SLICE_H: Record<ButtonMaterial, number> = {
+  gold: 16,
+  supergold: 26,
+  silver: 16,
+};
 
 export interface ButtonProps {
   onPress?: () => void;
@@ -84,7 +96,7 @@ export function Button({
   } else {
     const labelW = label ? measurePixelText(label) * labelScale : 0;
     faceW = width ?? Math.max(2 * 9 + 1, labelW + 12); // capW=9 → min stretch
-    faceH = SLICE_H;
+    faceH = SLICE_H[material];
     face = <Frame slice={SLICE[material]} length={faceW} scale={s} />;
   }
 

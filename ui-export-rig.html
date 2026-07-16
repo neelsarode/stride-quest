@@ -211,6 +211,11 @@ const INVENTORY = [
     cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 15, 6, AU) },
   { name: 'btn_silver', type: 'slice3h', h: 16, capW: 9, bakeW: 40,
     cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 15, 6, AG) },
+  // Tall gold button (Core Loop v2 dock SUPER ATTACK) — same hifiFace bevel as
+  // btn_deploy_gold but a horizontal 3-slice so it stretches to any width while
+  // keeping a chunky, rectangular button height (face 25 + 1 shadow row = 26).
+  { name: 'btn_super_gold', type: 'slice3h', h: 26, capW: 9, bakeW: 40,
+    cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 25, 6, AU) },
   { name: 'plate_silver', type: 'slice3h', h: 12, capW: 7, bakeW: 32,
     cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 11, 5, AG) },   // modal title plate
   { name: 'banner_gold', type: 'slice3h', h: 23, capW: 12, bakeW: 48,
