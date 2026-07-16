@@ -1,3 +1,8 @@
+> ## ⚠️ HISTORICAL SNAPSHOT (2026-07-15)
+> The status/next-step sections below are **SUPERSEDED by `CLAUDE.md`**
+> (M2.75, Core Loop v2, and later all shipped). **§5 HOW WE WORK and §6
+> environment remain canonical.**
+
 # Stride Quest — Session Handoff
 
 > Written 2026-07-15. Snapshot of exactly where the project stands and how to

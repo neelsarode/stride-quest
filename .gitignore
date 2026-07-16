@@ -46,3 +46,8 @@ yarn-error.*
 
 # TypeScript
 *.tsbuildinfo
+
+# Session scratch screenshots at the repo root (targeted patterns only —
+# real art lives in assets/ and characters/, which these can never match)
+/sq-*.png
+/dock-*.png
