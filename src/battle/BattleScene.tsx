@@ -93,11 +93,15 @@ export interface BattleSceneProps {
 
 export interface BattleSceneHandle {
   /**
-   * Order a hero's attack. `damage` shows on the impact number (omit → the
-   * preview's parity roll — real numbers arrive with the event wiring).
+   * Order a hero's attack. `damage` shows on the impact number:
+   *   • a number → that exact figure rides the impact (real deploy/idle amount),
+   *   • `null`   → an AMBIENT swing (Core Loop v2 §5.1, STR-77): projectile flies
+   *                and the boss flashes, but NO floating number (the idle economy
+   *                is server-settled, not per-swing),
+   *   • omitted  → the preview's parity roll (autoPlay / tap-to-ult).
    * Returns false when ignored (unknown hero / not idle / resting).
    */
-  fire(heroId: string, kind: AttackKind, damage?: number): boolean;
+  fire(heroId: string, kind: AttackKind, damage?: number | null): boolean;
 }
 
 // --- layout math (pure port of battlefield-ui.html's constants + sizeBoss) ---
@@ -189,7 +193,9 @@ interface Shot {
   kind: AttackKind;
   from: { x: number; y: number };
   toX: number;
-  damage: number;
+  // null → ambient swing (no floating number, Core Loop v2 §5.1); a number →
+  // the exact figure; see BattleSceneHandle.fire.
+  damage: number | null;
 }
 
 export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
@@ -209,8 +215,10 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
     const fighters = useRef<(FighterHandle | null)[]>([]);
     // Damage queued by fire() for the hero's NEXT release (a fighter has at
     // most one swing in flight — attacks only arm from idle — so one slot per
-    // hero id suffices).
-    const queuedDamage = useRef(new Map<string, number>());
+    // hero id suffices). A queued value of `null` marks an ambient swing (Core
+    // Loop v2 §5.1) — distinct from "no entry" (parity roll), so the map holds
+    // number | null and we test membership with .has().
+    const queuedDamage = useRef(new Map<string, number | null>());
 
     const layout = useMemo(
       () =>
@@ -287,7 +295,12 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
       };
       const geo = computeShotGeometry(shooter, e.anchor, bossRect);
       const heroId = heroesRef.current[index]?.id;
-      const queued = heroId ? queuedDamage.current.get(heroId) : undefined;
+      // .has() distinguishes an ambient queued `null` (→ no number) from "no
+      // entry queued" (→ the preview's parity roll). A real number rides as-is.
+      const hasQueued = heroId != null && queuedDamage.current.has(heroId);
+      const queued = hasQueued
+        ? (queuedDamage.current.get(heroId!) as number | null)
+        : undefined;
       if (heroId) queuedDamage.current.delete(heroId);
       setShots((s) => {
         // Perf cap (plan §Perf risks): past the cap the swing still plays but
@@ -300,7 +313,7 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
             cls: e.cls,
             kind: e.kind,
             ...geo,
-            damage: queued ?? rollDamage(e.kind),
+            damage: hasQueued ? queued! : rollDamage(e.kind),
           },
         ];
       });
@@ -314,9 +327,21 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
           const index = heroesRef.current.findIndex((h) => h.id === heroId);
           const f = index >= 0 ? fighters.current[index] : null;
           if (!f) return false;
+          // Capture any queued damage already waiting on this hero (an armed,
+          // not-yet-released swing's number) so a REJECTED fire (fighter busy)
+          // RESTORES it instead of nuking it. Core Loop v2 (STR-77) fires the
+          // SAME hero rapidly — the continuous idle loop can collide with a real
+          // event swing, and the Super Attack flurry polls while its own swing
+          // is in flight — so a failed attempt must never corrupt the in-flight
+          // swing's number (which would surface as a parity-roll fallback).
+          const hadPrev = queuedDamage.current.has(heroId);
+          const prev = hadPrev ? queuedDamage.current.get(heroId) : undefined;
           if (damage !== undefined) queuedDamage.current.set(heroId, damage);
           const ok = kind === "special" ? f.special() : f.basic();
-          if (!ok && damage !== undefined) queuedDamage.current.delete(heroId);
+          if (!ok && damage !== undefined) {
+            if (hadPrev) queuedDamage.current.set(heroId, prev as number | null);
+            else queuedDamage.current.delete(heroId);
+          }
           return ok;
         },
       }),

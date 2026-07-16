@@ -109,8 +109,15 @@ export interface ProjectileProps {
   from: { x: number; y: number };
   /** Impact X in stage coordinates; impact Y is from.y (straight flight). */
   toX: number;
-  /** Number shown on impact (caller supplies — real damage with plan step 6). */
-  damage: number;
+  /**
+   * Number shown on impact (caller supplies — real damage with plan step 6).
+   * `null` (or ≤ 0) marks an AMBIENT swing (Core Loop v2 §5.1, STR-77): the
+   * continuous idle-attack loop's projectile still flies and the boss still
+   * flashes, but NO floating number is spawned — the idle DAMAGE economy is
+   * server-settled on interaction, not per-swing, so a per-swing number would
+   * double-count / lie.
+   */
+  damage: number | null;
   /** The moment flight ends — caller triggers Boss.hit(big), HP updates, etc. */
   onImpact?: () => void;
   /** Whole choreography finished (burst AND number) — caller unmounts. */
@@ -132,6 +139,9 @@ export function Projectile({
   onDone,
 }: ProjectileProps) {
   const special = kind === "special";
+  // Ambient swings (Core Loop v2 §5.1, STR-77) pass damage null/≤0 → the boss
+  // flash + projectile still play, but no floating number is spawned.
+  const showNumber = damage != null && damage > 0;
   const [phase, setPhase] = useState<"flight" | "impact">("flight");
   const [burstDone, setBurstDone] = useState(false);
 
@@ -161,8 +171,9 @@ export function Projectile({
 
   // The shot completes when BOTH post-impact effects finish. Today the number
   // (800ms) always outlives the burst (7f / 14fps = 500ms), but gate on both
-  // so a retimed strip can't unmount the number early.
-  const partsRemaining = useRef(2);
+  // so a retimed strip can't unmount the number early. An AMBIENT swing shows
+  // no number, so it waits on the burst alone (1 part).
+  const partsRemaining = useRef(showNumber ? 2 : 1);
   const partDone = useCallback(() => {
     partsRemaining.current -= 1;
     if (partsRemaining.current === 0) onDoneRef.current?.();
@@ -173,6 +184,8 @@ export function Projectile({
   const handleImpact = useCallback(() => {
     setPhase("impact");
     onImpactRef.current?.();
+    // Ambient swings have no number to rise — the burst alone completes the shot.
+    if (!showNumber) return;
     rise.value = withTiming(
       1,
       { duration: DMG_NUMBER.riseMs, easing: EASE_OUT },
@@ -181,7 +194,7 @@ export function Projectile({
         if (finished) scheduleOnRN(partDone);
       },
     );
-  }, [partDone, rise]);
+  }, [partDone, rise, showNumber]);
 
   useEffect(() => {
     // fx-engine: dur = clamp((cx1 − cx0) / speedPxMs, 120, 320).
@@ -296,31 +309,37 @@ export function Projectile({
           />
         </View>
       )}
-      <Animated.View
-        pointerEvents="none"
-        testID="damage-number"
-        style={[
-          styles.abs,
-          {
-            left: toX + DMG_NUMBER.offsetX,
-            top: from.y - impactPx / 2 + DMG_NUMBER.offsetY,
-            zIndex: Z.number,
-          },
-          numberStyle,
-        ]}
-      >
-        <Text
+      {showNumber && (
+        <Animated.View
+          pointerEvents="none"
+          testID="damage-number"
           style={[
-            styles.numberText,
+            styles.abs,
             {
-              fontSize: special ? DMG_NUMBER.specialSize : DMG_NUMBER.basicSize,
-              color: special ? DMG_NUMBER.specialColor : DMG_NUMBER.basicColor,
+              left: toX + DMG_NUMBER.offsetX,
+              top: from.y - impactPx / 2 + DMG_NUMBER.offsetY,
+              zIndex: Z.number,
             },
+            numberStyle,
           ]}
         >
-          -{damage}
-        </Text>
-      </Animated.View>
+          <Text
+            style={[
+              styles.numberText,
+              {
+                fontSize: special
+                  ? DMG_NUMBER.specialSize
+                  : DMG_NUMBER.basicSize,
+                color: special
+                  ? DMG_NUMBER.specialColor
+                  : DMG_NUMBER.basicColor,
+              },
+            ]}
+          >
+            -{damage}
+          </Text>
+        </Animated.View>
+      )}
     </>
   );
 }
