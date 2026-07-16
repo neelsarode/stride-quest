@@ -233,8 +233,10 @@ const VARIANTS = {
     let cx = BTN_X + Math.round((BTN_W - rowW)/2);
     drawSprite(ctx, CROSSED_SWORDS, cx, wy - 1);
     cx += spriteW(CROSSED_SWORDS) + 5;
-    if (active) popText(ctx, word, cx, wy, 2);
-    else engrave(ctx, word, cx, wy, m, 2);
+    // NO shadow layer on the big word (test: the 2px engrave/drop offset at
+    // scale 2 doubled the letterforms and muddied it) — flat single-color.
+    if (active) drawText(ctx, word, cx, wy, 'white', 2);
+    else drawText(ctx, word, cx, wy, m.out, 2);
     // -- OD row, sitting LOW in the plate; gem + cost right-aligned ---------
     const ry = by + bh - 13 + yo;
     const cost = bankText(ph.p);
