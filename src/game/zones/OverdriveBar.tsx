@@ -1,15 +1,22 @@
 // =============================================================================
 // OverdriveBar — GameScreen overdrive zone (slim status strip above the dock).
 // =============================================================================
-// Core Loop v2 (spec §5.4, STR-74) RETRIGGERED Overdrive: no more charge meter
-// or ACTIVATE button — hitting the daily step goal auto-arms Overdrive ×2 until
-// the daily reset. This is a MINIMAL, valid strip only: active → "×2 OVERDRIVE"
-// with a filled bar; inactive → stepsToday/goal progress toward the goal that
-// arms it.
+// Core Loop v2 (spec §5.4/§9, STR-79) RETRIGGERED Overdrive: there is no charge
+// meter, no ACTIVATE button, no activate-countdown — hitting the daily step goal
+// AUTO-arms Overdrive X2 until the daily reset. This zone is now a purely PASSIVE
+// status strip (non-interactive — no Pressable/activate path survives) with two
+// states read off `data.overdrive` = {active, mult, endsAt, remainingSeconds,
+// stepsToday, goal}:
+//   • inactive → a CALM slim gauge filling toward the goal (stepsToday/goal, the
+//     SAME fraction the dock's steps ring shows), captioned with the aspirational
+//     "WALK TO YOUR GOAL FOR OVERDRIVE X2". Never red/punishing (guardrail §3).
+//   • active → a CELEBRATORY full purple gauge "OVERDRIVE X2", glowing + breathing,
+//     captioned "UNTIL RESET" (or a compact "NH TO RESET" from remainingSeconds).
+//     The reset is framed as bonus time you HAVE, never a loss/countdown.
 //
-// STR-79 will redesign this into the polished status strip (the goal-progress
-// gauge + the "OVERDRIVE ×2 · UNTIL RESET" celebratory state). Do NOT invest in
-// polish here — just keep it compiling on the new dashboard payload shape.
+// The fill + glow ride Reanimated shared values (ODGauge) so the strip animates
+// with ZERO per-frame React re-renders (spec §12) — it re-renders only when the
+// reactive snapshot's frac/label/active actually change.
 // =============================================================================
 import React, { useEffect } from "react";
 import { Platform, View } from "react-native";
@@ -39,7 +46,6 @@ export function OverdriveBar() {
   const data = useQuery(api.game.dashboard, {});
 
   const od = data?.overdrive;
-  const active = od?.active ?? false;
 
   const outer = [
     zoneStyles.zone,
@@ -48,17 +54,30 @@ export function OverdriveBar() {
   ];
   if (!od) return <View testID="zone-overdrive" style={outer} />;
 
-  // New goal-driven read model (Core Loop v2): fill toward the goal, or full
-  // while armed. STR-79 owns the real visual design.
+  const active = od.active;
   const mult = od.mult;
+  // Fill mirrors the dock's steps ring: progress toward the goal that arms
+  // Overdrive; full (celebratory) while armed.
   const frac = active
     ? 1
     : Math.max(0, Math.min(1, od.goal > 0 ? od.stepsToday / od.goal : 0));
+  // On-bar label: the celebratory identity while armed; the numeric goal
+  // progress (byte-identical to the dock ring's today/goal) while walking to it.
   const label = active
-    ? `X${mult} OVERDRIVE`
+    ? `OVERDRIVE X${mult}`
     : `${od.stepsToday.toLocaleString()}/${od.goal.toLocaleString()}`;
+  // Sub-caption. Active: "UNTIL RESET" — or a compact "NH TO RESET" when the
+  // remaining window rounds to a clean hour (the font has no "×"/"·"; multipliers
+  // are "X", so no dot separator). It's framed as bonus time you STILL HAVE, never
+  // a loss/countdown (guardrail §3). Inactive: calm + aspirational.
+  const hoursToReset =
+    od.remainingSeconds != null
+      ? Math.max(1, Math.ceil(od.remainingSeconds / 3600))
+      : null;
   const hint = active
-    ? `X${mult} DAMAGE UNTIL RESET`
+    ? hoursToReset != null
+      ? `${hoursToReset}H TO RESET`
+      : "UNTIL RESET"
     : `WALK TO YOUR GOAL FOR OVERDRIVE X${mult}`;
 
   const width = DOCK.overdriveBarWidth;
@@ -70,7 +89,7 @@ export function OverdriveBar() {
           <ODGauge s={s} width={width} frac={frac} label={label} muted={!active} glow={active} />
           <PixelText
             text={hint}
-            color={PALETTE.textDim}
+            color={active ? OD_LIGHT : PALETTE.textDim}
             scale={s}
             style={{ marginTop: 3 * s }}
           />
