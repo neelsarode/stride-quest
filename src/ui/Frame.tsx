@@ -29,6 +29,8 @@ type HSliceKey =
   | "btn_gold"
   | "btn_super_gold"
   | "btn_super_amethyst"
+  | "btn_super_socket_gold"
+  | "btn_super_socket_amethyst"
   | "btn_silver"
   | "plate_silver"
   | "banner_gold"

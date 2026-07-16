@@ -18,31 +18,45 @@ import { UI_PALETTE } from "./theme";
 import { type UiAssetKey } from "./uiMap";
 import { useResolvedScale } from "./scale";
 
-export type ButtonMaterial = "gold" | "silver" | "supergold" | "superamethyst";
+export type ButtonMaterial =
+  | "gold"
+  | "silver"
+  | "supergold"
+  | "superamethyst"
+  | "socketgold"
+  | "socketamethyst";
 
 // Engrave colours per material: dark ink on top, lit rim beneath (kit engrave).
 // supergold = the tall Core Loop v2 SUPER ATTACK plate; superamethyst = its
 // Overdrive-active purple twin (labels there render WHITE, not engraved — the
 // dark engrave is unreadable on amethyst; see the od-super-lab.html decision).
+// socket* = the DISABLED empty-socket twins (super-disabled-lab.html K) —
+// labels there render dim stone, not engraved.
 const ENGRAVE: Record<ButtonMaterial, { color: string; rim: string }> = {
   gold: { color: UI_PALETTE.outline, rim: UI_PALETTE.gold_light },
   supergold: { color: UI_PALETTE.outline, rim: UI_PALETTE.gold_light },
   superamethyst: { color: UI_PALETTE.white, rim: UI_PALETTE.outline },
+  socketgold: { color: UI_PALETTE.white, rim: UI_PALETTE.outline },
+  socketamethyst: { color: UI_PALETTE.white, rim: UI_PALETTE.outline },
   silver: { color: UI_PALETTE.outline, rim: UI_PALETTE.silver_rim },
 };
 const SLICE = {
   gold: "btn_gold",
   supergold: "btn_super_gold",
   superamethyst: "btn_super_amethyst",
+  socketgold: "btn_super_socket_gold",
+  socketamethyst: "btn_super_socket_amethyst",
   silver: "btn_silver",
 } as const;
 // Per-material stretch-frame height (art px). btn_gold/btn_silver are the
-// standard 16; the super plates are the tall 35 (face 34 + shadow row) two-row
-// dock button (approved variant A, od-super-lab.html).
+// standard 16; the super plates + their socket twins are the tall 35 (face 34
+// + shadow row) two-row dock button (approved variant A, od-super-lab.html).
 const SLICE_H: Record<ButtonMaterial, number> = {
   gold: 16,
   supergold: 35,
   superamethyst: 35,
+  socketgold: 35,
+  socketamethyst: 35,
   silver: 16,
 };
 

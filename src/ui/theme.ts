@@ -610,6 +610,26 @@ export const UI_SLICES = {
       "btn_super_amethyst_right"
     ]
   },
+  "btn_super_socket_gold": {
+    "axis": "h",
+    "h": 35,
+    "capW": 9,
+    "parts": [
+      "btn_super_socket_gold_left",
+      "btn_super_socket_gold_mid",
+      "btn_super_socket_gold_right"
+    ]
+  },
+  "btn_super_socket_amethyst": {
+    "axis": "h",
+    "h": 35,
+    "capW": 9,
+    "parts": [
+      "btn_super_socket_amethyst_left",
+      "btn_super_socket_amethyst_mid",
+      "btn_super_socket_amethyst_right"
+    ]
+  },
   "plate_silver": {
     "axis": "h",
     "h": 12,
@@ -796,6 +816,30 @@ export const UI_DIMS = {
     "h": 35
   },
   "btn_super_amethyst_right": {
+    "w": 9,
+    "h": 35
+  },
+  "btn_super_socket_gold_left": {
+    "w": 9,
+    "h": 35
+  },
+  "btn_super_socket_gold_mid": {
+    "w": 1,
+    "h": 35
+  },
+  "btn_super_socket_gold_right": {
+    "w": 9,
+    "h": 35
+  },
+  "btn_super_socket_amethyst_left": {
+    "w": 9,
+    "h": 35
+  },
+  "btn_super_socket_amethyst_mid": {
+    "w": 1,
+    "h": 35
+  },
+  "btn_super_socket_amethyst_right": {
     "w": 9,
     "h": 35
   },

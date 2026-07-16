@@ -26,7 +26,7 @@
 // opacity+scale on the UI thread, ZERO per-frame React re-renders (spec §12).
 // Timings/colours live in src/config/assets.ts GOAL_GLOW (one-place tune).
 // =============================================================================
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import Animated, {
   Easing,
@@ -34,6 +34,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withTiming,
 } from "react-native-reanimated";
 import { useMutation, useQuery } from "convex/react";
@@ -68,6 +69,15 @@ const WORD = "SUPER ATTACK";
 const OD_LABEL_DIM = "#6f4d1d"; // kit gold_deep — dim label on the gold face
 const OD_WELL = "#241329"; // dark purple meter well (kit amethyst-family)
 const OD_LIGHT = "#e6c9ff"; // lit top row of the fill (matches old ODGauge)
+// DISABLED = the EMPTY-SOCKET twins (approved super-disabled-lab.html K,
+// 2026-07-16 — flat transparency reads wrong on pixel art): the plate becomes
+// a dark recessed well with only the gold/purple rim glowing; content dims to
+// stone; the meter stays visible (steps still count at 0 energy). A tap on the
+// socket plays a DENIED beat — head-shake + a dying-spark flicker + the warm
+// toast — instead of silently doing nothing.
+const SOCKET_WORD = "#5f6875"; // kit stone_mid — the dim word on the socket
+const SOCKET_DIM = "#3b414c"; // kit stone_dark — labels/gem tint on the socket
+const OD_FILL_DIM = "#66339c"; // kit amethyst4 — the meter fill while drained
 
 export function CommandDock() {
   const { bottomPad, artScale: s, width } = useGameLayout();
@@ -119,6 +129,11 @@ export function CommandDock() {
   const dailyGoal = data.dailyGoal;
 
   const deployDisabled = busy || energy <= 0 || !canFight;
+  // Warm copy for a tap on the drained socket (client-side self-gate — mirrors
+  // the server's no_energy ConvexError copy so the wording never forks).
+  const deniedMessage = !canFight
+    ? "The next boss is on its way — hold your Super."
+    : "Nothing banked yet — walk a little first.";
   // First-deploy teaching pulse (STR-49): breathe while there is Energy to
   // deploy and this account has NEVER deployed — server truth, silences forever.
   const firstDeployHint = energy > 0 && !data.hasEverDeployed && canFight;
@@ -169,12 +184,14 @@ export function CommandDock() {
               energy={energy}
               streakMult={streak.multiplier}
               disabled={deployDisabled}
+              busy={busy}
               firstDeployHint={firstDeployHint}
               firstStrikeCrit={firstStrikeCrit}
               odActive={od.active}
               odMult={od.mult}
               odFrac={odFrac}
               onDeploy={onDeploy}
+              onDenied={() => emit({ type: "actionRejected", message: deniedMessage })}
             />
 
             {/* ---- steps RING (30-frame) + inside numbers + GOAL glow/chip ---- */}
@@ -240,48 +257,111 @@ function DeployColumn({
   energy,
   streakMult,
   disabled,
+  busy,
   firstDeployHint,
   firstStrikeCrit,
   odActive,
   odMult,
   odFrac,
   onDeploy,
+  onDenied,
 }: {
   s: number;
   barArtW: number;
   energy: number;
   streakMult: number;
   disabled: boolean;
+  busy: boolean;
   firstDeployHint: boolean;
   firstStrikeCrit: boolean;
   odActive: boolean;
   odMult: number;
   odFrac: number;
   onDeploy: () => void;
+  onDenied: () => void;
 }) {
   const pulse = usePulse(firstDeployHint, DOCK.deployPulseScale, DOCK.deployPulseMs);
+
+  // DENIED beat — a tap on the drained socket answers with a quick head-shake
+  // (the universal pixel-game "nope"), a dying-spark flicker inside the socket
+  // (tapping a dead socket sputters), and the warm toast (via onDenied). The
+  // Pressable stays ENABLED so the press-shift still gives a physical "thunk";
+  // it just doesn't fire. Re-entry guarded so tap-spam can't stack shakes.
+  const shakeX = useSharedValue(0);
+  const spark = useSharedValue(0);
+  const deniedBusy = useRef(false);
+  function playDenied() {
+    if (deniedBusy.current) return;
+    deniedBusy.current = true;
+    setTimeout(() => (deniedBusy.current = false), 500);
+    shakeX.value = withSequence(
+      withTiming(-2 * s, { duration: 50 }),
+      withTiming(2 * s, { duration: 50 }),
+      withTiming(-1.5 * s, { duration: 50 }),
+      withTiming(1.5 * s, { duration: 50 }),
+      withTiming(0, { duration: 60 }),
+    );
+    spark.value = withSequence(
+      withTiming(0.35, { duration: 70 }),
+      withTiming(0.08, { duration: 60 }),
+      withTiming(0.28, { duration: 70 }),
+      withTiming(0, { duration: 200, easing: Easing.out(Easing.quad) }),
+    );
+    onDenied();
+  }
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeX.value }] }), [shakeX]);
+  const sparkStyle = useAnimatedStyle(() => ({ opacity: spark.value }), [spark]);
+
+  function onPress() {
+    if (busy) return; // in-flight — inert, no denied beat
+    if (disabled) playDenied();
+    else onDeploy();
+  }
+
   return (
-    <Animated.View style={pulse}>
+    <Animated.View style={[pulse, shakeStyle]}>
       {/* relative wrapper so the streak chip + crit hint can overflow the plate */}
       <View style={{ width: barArtW * s, height: BAR_H * s }}>
-        {odActive && <ActiveGlow s={s} w={barArtW} h={FACE_H} />}
-        <View style={{ opacity: disabled ? DOCK.disabledOpacity : 1 }}>
-          <Button
-            material={odActive ? "superamethyst" : "supergold"}
-            width={barArtW}
-            disabled={disabled}
-            onPress={onDeploy}
-          >
-            <DeployFace
-              s={s}
-              barArtW={barArtW}
-              energy={energy}
-              odActive={odActive}
-              odMult={odMult}
-              odFrac={odFrac}
-            />
-          </Button>
-        </View>
+        {odActive && !disabled && <ActiveGlow s={s} w={barArtW} h={FACE_H} />}
+        <Button
+          material={
+            disabled
+              ? odActive
+                ? "socketamethyst"
+                : "socketgold"
+              : odActive
+                ? "superamethyst"
+                : "supergold"
+          }
+          width={barArtW}
+          onPress={onPress}
+        >
+          <DeployFace
+            s={s}
+            barArtW={barArtW}
+            energy={energy}
+            odActive={odActive}
+            odMult={odMult}
+            odFrac={odFrac}
+            socket={disabled}
+          />
+        </Button>
+        {/* the dying-spark flicker over the socket (rim-coloured, denied taps) */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width: barArtW * s,
+              height: FACE_H * s,
+              borderRadius: 6 * s,
+              backgroundColor: odActive ? "#dfb8ff" : UI_PALETTE.gold_light,
+            },
+            sparkStyle,
+          ]}
+        />
         {/* streak power chip riding the top-right corner of the plate */}
         <Chip
           color="gold"
@@ -315,6 +395,7 @@ function DeployFace({
   odActive,
   odMult,
   odFrac,
+  socket,
 }: {
   s: number;
   barArtW: number;
@@ -322,11 +403,21 @@ function DeployFace({
   odActive: boolean;
   odMult: number;
   odFrac: number;
+  socket: boolean;
 }) {
   const cost = energy.toLocaleString();
   const wordW = measurePixelText(WORD) * 2; // scale-2 glyphs
   const rowW = 11 + 5 + wordW; // swords + gap + word
   const wordX = Math.round((barArtW - rowW) / 2);
+  // Socket (disabled) content dims to stone — word, labels, gem all cold; the
+  // meter stays visible with a drained fill (walking still counts at 0 energy).
+  const wordColor = socket
+    ? SOCKET_WORD
+    : odActive
+      ? UI_PALETTE.white
+      : UI_PALETTE.outline;
+  const costColor = socket ? SOCKET_WORD : odActive ? UI_PALETTE.white : UI_PALETTE.outline;
+  const gemTint = socket ? SOCKET_DIM : undefined;
   return (
     <View style={{ width: barArtW * s, height: FACE_H * s }}>
       {/* ---- row 1: swords + the big word (FLAT color — no shadow layer) ---- */}
@@ -339,10 +430,10 @@ function DeployFace({
           alignItems: "flex-start",
         }}
       >
-        <BakedImage name="icon_swords" />
+        <BakedImage name="icon_swords" tintColor={gemTint} />
         <PixelText
           text={WORD}
-          color={odActive ? UI_PALETTE.white : UI_PALETTE.outline}
+          color={wordColor}
           scale={s * 2}
           style={{ marginLeft: 5 * s, marginTop: 1 * s }}
         />
@@ -361,9 +452,9 @@ function DeployFace({
             justifyContent: "center",
           }}
         >
-          <PixelText text={`X${odMult} UNTIL RESET`} color={UI_PALETTE.white} />
-          <BakedImage name="icon_gem" style={{ marginLeft: 8 * s, marginRight: 3 * s }} />
-          <PixelText text={cost} color={UI_PALETTE.white} />
+          <PixelText text={`X${odMult} UNTIL RESET`} color={socket ? SOCKET_WORD : UI_PALETTE.white} />
+          <BakedImage name="icon_gem" tintColor={gemTint} style={{ marginLeft: 8 * s, marginRight: 3 * s }} />
+          <PixelText text={cost} color={costColor} />
         </View>
       ) : (
         <View
@@ -377,10 +468,10 @@ function DeployFace({
             alignItems: "center",
           }}
         >
-          <PixelText text="OVERDRIVE" color={OD_LABEL_DIM} />
-          <ODFill s={s} frac={odFrac} />
-          <BakedImage name="icon_gem" style={{ marginRight: 3 * s }} />
-          <PixelText text={cost} color={UI_PALETTE.outline} />
+          <PixelText text="OVERDRIVE" color={socket ? SOCKET_DIM : OD_LABEL_DIM} />
+          <ODFill s={s} frac={odFrac} dim={socket} />
+          <BakedImage name="icon_gem" tintColor={gemTint} style={{ marginRight: 3 * s }} />
+          <PixelText text={cost} color={costColor} />
         </View>
       )}
     </View>
@@ -390,7 +481,7 @@ function DeployFace({
 // The embedded meter fill: a dark purple well + a Reanimated scaleX fill with a
 // lit top row — the exact ODGauge technique from the retired OverdriveBar strip
 // (zero per-frame re-renders; re-renders only when the snapshot's frac changes).
-function ODFill({ s, frac }: { s: number; frac: number }) {
+function ODFill({ s, frac, dim }: { s: number; frac: number; dim?: boolean }) {
   const fill = useSharedValue(frac);
   useEffect(() => {
     fill.value = withTiming(frac, { duration: 260, easing: Easing.out(Easing.cubic) });
@@ -413,15 +504,17 @@ function ODFill({ s, frac }: { s: number; frac: number }) {
           fillStyle,
         ]}
       >
-        <View style={{ position: "absolute", left: 0, right: 0, top: 0, height: s, backgroundColor: OD_LIGHT }} />
+        {!dim && (
+          <View style={{ position: "absolute", left: 0, right: 0, top: 0, height: s, backgroundColor: OD_LIGHT }} />
+        )}
         <View
           style={{
             position: "absolute",
             left: 0,
             right: 0,
-            top: s,
+            top: dim ? 0 : s,
             bottom: 0,
-            backgroundColor: PALETTE.overdrive,
+            backgroundColor: dim ? OD_FILL_DIM : PALETTE.overdrive,
           }}
         />
       </Animated.View>

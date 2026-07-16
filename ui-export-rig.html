@@ -102,6 +102,20 @@ const AG = M('silver'), AU = M('gold');
 const hex = k => PALETTE[k];
 const fam3 = (l, m, d) => ({ light: hex(l), mid: hex(m), dark: hex(d) });
 
+// EMPTY-SOCKET face (approved super-disabled-lab.html K, 2026-07-16): the
+// SUPER plate's disabled state — a dark recessed well with only the parent
+// material's dim rim left glowing (a drained power socket). Horizontally
+// uniform mid → safe as a 3-slice. Face 34 + 1 shadow row = 35, like its
+// enabled twins.
+Object.assign(PALETTE, { night_socket:'#1c1720', night_socket_d:'#120e15' });
+function socketFace(ctx, w, m){
+  px(ctx, 6, 34, w - 12, 1, m.out);                    // drop shadow row
+  fillRounded(ctx, 0, 0, w, 34, 6, m.d);               // dim material rim
+  fillRounded(ctx, 1, 1, w - 2, 32, 5, 'outline');     // ink ring
+  fillRounded(ctx, 2, 2, w - 4, 30, 4, 'night_socket');// recessed interior
+  px(ctx, 4, 3, w - 8, 1, 'night_socket_d');           // inner top shadow
+}
+
 // Accent chip ramps (battlefield-ui.html:314 recipe: 6-step lerp of a family).
 const RAMP_GREEN = makeRamp('acc_green', [PALETTE.green_light, PALETTE.green_mid, PALETTE.green_dark], 6, false);
 const RAMP_RED   = makeRamp('acc_red',   [PALETTE.red_light,   PALETTE.red_mid,   PALETTE.red_dark],   6, false);
@@ -221,6 +235,12 @@ const INVENTORY = [
     cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 34, 6, AU) },
   { name: 'btn_super_amethyst', type: 'slice3h', h: 35, capW: 9, bakeW: 40,
     cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 34, 6, M('amethyst')) },
+  // Disabled (0-energy) socket twins — one per parent material (rim keeps the
+  // gold/purple identity while the face reads "drained, walk to refill").
+  { name: 'btn_super_socket_gold', type: 'slice3h', h: 35, capW: 9, bakeW: 40,
+    cat: 'buttonface', draw: (c, w) => socketFace(c, w, AU) },
+  { name: 'btn_super_socket_amethyst', type: 'slice3h', h: 35, capW: 9, bakeW: 40,
+    cat: 'buttonface', draw: (c, w) => socketFace(c, w, M('amethyst')) },
   { name: 'plate_silver', type: 'slice3h', h: 12, capW: 7, bakeW: 32,
     cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 11, 5, AG) },   // modal title plate
   { name: 'banner_gold', type: 'slice3h', h: 23, capW: 12, bakeW: 48,

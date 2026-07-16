@@ -115,9 +115,6 @@ export const DOCK = {
    *  but doesn't sprawl absurdly on wide desktop web (the content centres above
    *  this width). Phones (<460dp) always fill full width. */
   superBarMaxDp: 460,
-  /** Dim applied to a disabled baked face — the kit bakes no separate disabled
-   *  art, so a disabled SUPER ATTACK fades (matches the old 0.4). */
-  disabledOpacity: 0.4,
   /** Job-strip XP bar: min art px kept for the badge + gaps on the left. */
   jobStripBadgeGap: 6,
   /** First-deploy teaching PULSE (gentle breathe) — same feel as TEACHING but

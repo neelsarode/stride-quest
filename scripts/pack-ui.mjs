@@ -73,7 +73,7 @@ const GEN_HEADER =
 const EXPECTED = {
   bar: 6, //         bar_full + bar_slim, each a 3-slice (frames for boss/xp/fuel)
   button: 4, //      deploy 56x37, nav 18x18, collect 24x24, close 15x14 (fixed faces)
-  buttonface: 15, // btn_gold + btn_silver + plate_silver + btn_super_gold + btn_super_amethyst, each a 3-slice (dynamic labels)
+  buttonface: 21, // btn_gold + btn_silver + plate_silver + btn_super_{gold,amethyst} + btn_super_socket_{gold,amethyst} (disabled twins), each a 3-slice
   banner: 3, //      banner_gold 3-slice (JOB UP! etc.)
   chip: 9, //        chip green/red/gold, each a 3-slice
   toast: 3, //       toast_silver 3-slice
