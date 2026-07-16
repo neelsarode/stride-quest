@@ -108,9 +108,13 @@ export const GAME_ZONES = {
 // data" rule extends to the dock's feel); no React/runtime imports.
 // ============================================================================
 export const DOCK = {
-  /** Horizontal inset (art px) of the COLLECT / steps-ring clusters from the
-   *  screen edges (mirrors dashboard-ui's left/right 16px on a ~320 comp). */
+  /** Horizontal inset (art px) of the steps-ring cluster from the screen edges
+   *  (mirrors dashboard-ui's left/right 16px on a ~320 comp). */
   sidePad: 6,
+  /** Gap (art px) between the SUPER ATTACK hero button and the steps ring once
+   *  COLLECT is gone (Core Loop v2, STR-78). Wide enough to clear the streak
+   *  chip's + ring numbers' absolute overflow while keeping the pair centred. */
+  superRingGap: 44,
   /** Dim applied to a disabled baked face — the kit bakes no separate disabled
    *  art, so a disabled DEPLOY/COLLECT/ACTIVATE fades (matches the old 0.4). */
   disabledOpacity: 0.4,

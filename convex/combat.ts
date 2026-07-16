@@ -254,13 +254,6 @@ export const applyIdleOnOpen = mutation({
   },
 });
 
-// STR-78 transitional shim — DELETE with STR-78. The game screen's CommandDock
-// still calls `api.combat.collectIdle` for its (about-to-be-removed) COLLECT
-// button; STR-75 renamed the mutation, and CommandDock is owned by STR-78, so
-// this alias keeps that one consumer compiling in the meantime. Same handler,
-// zero behavior change — once STR-78 drops the dock's collect wiring, remove it.
-export const collectIdle = applyIdleOnOpen;
-
 // --- deploy ------------------------------------------------------------------
 
 export type DeployResult = {

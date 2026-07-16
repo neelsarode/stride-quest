@@ -1,19 +1,25 @@
 // =============================================================================
-// CommandDock — GameScreen bottom action zone (COLLECT / DEPLOY / steps ring).
-// STR-68. The centrepiece of the screen: DEPLOY is the gold HERO button, biggest
-// thing on the stage (56 art px vs 18 for nav — hierarchy from ART size, not a
-// bumped scale, spec §6). Re-skins DeployButton + usePendingIdle onto the baked
-// kit chrome; the reactive LOGIC is reused verbatim, only the render swaps.
+// CommandDock — GameScreen bottom action zone (SUPER ATTACK + steps ring).
+// STR-68; Core Loop v2 re-skin STR-78 (spec §5.2/§5.3/§9). The centrepiece of the
+// screen: SUPER ATTACK is the gold HERO button, biggest thing on the stage (56
+// art px vs 18 for nav — hierarchy from ART size, not a bumped scale, spec §6).
+// Re-skins DeployButton onto the baked kit chrome; the reactive LOGIC is reused
+// verbatim, only the render + word swap.
+//
+// Core Loop v2 (STR-78): the manual COLLECT column is GONE — idle damage now
+// auto-applies on open (no tap; the settle lives in useGameEngine's once-per-open
+// effect). DEPLOY is renamed SUPER ATTACK (same whole-bank spend + crit/streak/
+// boost math). Its handler emits the deploy event with `spent` (the Energy bank)
+// so the battle scene can size the STR-77 combo/flurry off how much you walked.
 //
 // DATA/ACTIONS: this zone reads the SAME reactive dashboard query and calls the
-// SAME deploy/collectIdle mutations the shared useGameEngine uses — but it does
-// NOT call useGameEngine itself, because that hook also owns the screen's
-// once-only side effects (auto-collect, rally/boost/bossAppears banners). Those
-// run exactly once from GameScreen's single useGameEngine() call; re-invoking it
+// SAME deploy mutation the shared useGameEngine uses — but it does NOT call
+// useGameEngine itself, because that hook also owns the screen's once-only side
+// effects (auto-apply-on-open idle, rally/boost/bossAppears banners). Those run
+// exactly once from GameScreen's single useGameEngine() call; re-invoking it
 // per-zone would fire duplicate banners. So we mirror only the effect-free bits:
-// useQuery (Convex dedupes identical subscriptions across zones), usePendingIdle
-// (pure display ticker), and the deploy/collect handler bodies (setBusy → mutate
-// → emit) copied from useGameEngine's onDeploy / onCollectIdle.
+// useQuery (Convex dedupes identical subscriptions across zones) and the deploy
+// handler body (setBusy → mutate → emit) copied from useGameEngine's onDeploy.
 //
 // GOAL-HIT GLOW (owner decision, spec §10-Q5 + STR-68 comment): when today's
 // steps ≥ the daily goal, the ring gets a celebratory bloom — Reanimated-driven
@@ -35,7 +41,6 @@ import { api } from "../../../convex/_generated/api";
 import { DOCK, GAME_ZONES, GOAL_GLOW, PALETTE } from "../../config/assets";
 import { friendlyError } from "../../feedback/errors";
 import { useFeedback } from "../../feedback/FeedbackProvider";
-import { usePendingIdle } from "../../usePendingIdle";
 import {
   BakedImage,
   Button,
@@ -56,33 +61,29 @@ const DEPLOY_H = 37; // btn_deploy_gold art height
 export function CommandDock() {
   const { bottomPad, artScale: s } = useGameLayout();
   const data = useQuery(api.game.dashboard, {});
-  const pendingIdle = usePendingIdle(data?.idle, data?.now);
   const { emit } = useFeedback();
   const deployMut = useMutation(api.combat.deploy);
-  const collectMut = useMutation(api.combat.collectIdle);
   const [busy, setBusy] = useState(false);
 
-  // Mirrors useGameEngine.onDeploy — spend the whole Energy bank, animate the
-  // resulting crit/streak damage. A friendly toast on server rejection (the
-  // dashboard sets a note string; the game screen has no note surface).
+  // Mirrors useGameEngine.onDeploy — the SUPER ATTACK: spend the whole Energy
+  // bank, animate the resulting crit/streak damage. Emits the deploy event with
+  // `spent` (= the Energy bank) so the battle scene sizes the STR-77 combo/flurry
+  // off how much you walked (not the crit-rolled damage). This IS the live path —
+  // the game screen is the default home and Super Attack fires from here, not
+  // useGameEngine. A friendly toast on server rejection (the dashboard sets a note
+  // string; the game screen has no note surface).
   async function onDeploy() {
     setBusy(true);
     try {
       const r = await deployMut({});
-      if (r) emit({ type: "damageDealt", amount: r.damage, source: "deploy", crit: r.crit });
-    } catch (e) {
-      emit({ type: "actionRejected", message: friendlyError(e) });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Mirrors useGameEngine.onCollectIdle — bank the live pending idle.
-  async function onCollect() {
-    setBusy(true);
-    try {
-      const r = await collectMut({});
-      if (r && r.collected > 0) emit({ type: "damageDealt", amount: r.collected, source: "idle" });
+      if (r)
+        emit({
+          type: "damageDealt",
+          amount: r.damage,
+          source: "deploy",
+          crit: r.crit,
+          spent: r.spent,
+        });
     } catch (e) {
       emit({ type: "actionRejected", message: friendlyError(e) });
     } finally {
@@ -107,7 +108,6 @@ export function CommandDock() {
   const dailyGoal = data.dailyGoal;
 
   const deployDisabled = busy || energy <= 0 || !canFight;
-  const collectDisabled = busy || pendingIdle <= 0 || !canFight;
   // First-deploy teaching pulse (STR-49): breathe while there is Energy to
   // deploy and this account has NEVER deployed — server truth, silences forever.
   const firstDeployHint = energy > 0 && !data.hasEverDeployed && canFight;
@@ -125,30 +125,16 @@ export function CommandDock() {
           style={{
             flexDirection: "row",
             alignItems: "flex-end",
-            justifyContent: "space-between",
+            // Core Loop v2 (STR-78): COLLECT is gone, so the dock is now just the
+            // SUPER ATTACK hero button + the steps ring. Centre the pair (SUPER
+            // stays the dominant, biggest thing) with a comfortable gap that
+            // clears the streak chip's / ring numbers' overflow at 390dp.
+            justifyContent: "center",
+            gap: DOCK.superRingGap * s,
             paddingHorizontal: DOCK.sidePad * s,
           }}
         >
-          {/* ---- COLLECT (silver star + live +N pending chip + caption) ---- */}
-          <View style={{ alignItems: "center" }}>
-            <View>
-              <View style={{ opacity: collectDisabled ? DOCK.disabledOpacity : 1 }}>
-                <Button asset="btn_collect_silver" disabled={collectDisabled} onPress={onCollect}>
-                  <BakedImage name="icon_star" />
-                </Button>
-              </View>
-              {pendingIdle > 0 && (
-                <Chip
-                  color="green"
-                  label={`+${pendingIdle.toLocaleString()}`}
-                  style={{ position: "absolute", top: -4 * s, right: -8 * s }}
-                />
-              )}
-              <Caption text="COLLECT" color={PALETTE.textDim} s={s} top={(24 + 2) * s} />
-            </View>
-          </View>
-
-          {/* ---- DEPLOY (the gold hero button) ---- */}
+          {/* ---- SUPER ATTACK (the gold hero button) ---- */}
           <DeployColumn
             s={s}
             energy={energy}
@@ -209,8 +195,10 @@ export function CommandDock() {
 }
 
 // -----------------------------------------------------------------------------
-// DEPLOY column — the hero button with the teaching pulse, energy cost inside the
-// face, the streak ×N.NN chip riding the corner, and the first-strike-crit hint.
+// SUPER ATTACK column — the hero button with the teaching pulse, energy cost
+// inside the face, the streak XN.NN chip riding the corner, and the
+// first-strike-crit hint. (Internally still "DeployColumn"/btn_deploy_gold — the
+// mutation + plate keep their names; only the user-facing word changed, §5.3.)
 // -----------------------------------------------------------------------------
 function DeployColumn({
   s,
@@ -261,10 +249,11 @@ function DeployColumn({
   );
 }
 
-// The engraved DEPLOY face content: crossed swords emblem, the DEPLOY word, and
-// the live Energy cost (gem + number) — all inside the baked 56×37 gold plate.
+// The engraved SUPER ATTACK face: crossed swords emblem, the "SUPER" word (the
+// spoken name is SUPER ATTACK; "SUPER" is what fits the 56-wide face), and the
+// live Energy cost (gem + number) — all inside the baked 56×37 gold plate.
 function DeployFace({ s, energy }: { s: number; energy: number }) {
-  const word = "DEPLOY";
+  const word = "SUPER";
   const wordW = measurePixelText(word);
   const cost = energy.toLocaleString();
   const costW = measurePixelText(cost);
