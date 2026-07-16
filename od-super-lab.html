@@ -62,7 +62,7 @@
     <p>Big SUPER ATTACK word, with an OVERDRIVE label + slim meter embedded along the
     bottom of the plate. At goal the whole button flips purple.</p>
     <canvas></canvas>
-    <p class="pro"><b>+</b> most literal read — label says exactly what the bar is. Tallest option (32 art px).</p>
+    <p class="pro"><b>+</b> most literal read — label says exactly what the bar is. Big scale-2 word; tallest option (34 art px).</p>
   </div>
 
   <div class="card" data-v="B">
@@ -166,6 +166,17 @@ function glowRect(ctx, x, y, w, h, r, alpha){
   ctx.restore();
 }
 function pressOffset(id){ return pressed[id] ? 1 : 0; }
+function popText(ctx, str, x, y, scale){
+  // white-on-dark pop — engrave inverted, for text ON the purple face
+  drawText(ctx, str, x, y + (scale||1), 'outline', scale||1);
+  drawText(ctx, str, x, y, 'white', scale||1);
+}
+function energyGem(ctx, x, y, cost, costKey){
+  px(ctx, x+2, y, 1, 1, 'blue_light'); px(ctx, x+1, y+1, 3, 1, 'blue_mid');
+  px(ctx, x, y+2, 5, 1, 'blue_mid');   px(ctx, x+1, y+3, 3, 1, 'blue_dark');
+  px(ctx, x+2, y+4, 1, 1, 'blue_dark');
+  drawText(ctx, cost, x + 8, y, costKey, 1);
+}
 function bankText(p, mode){
   // energy bank grows with steps walked this cycle (purely illustrative)
   const e = Math.round(p * GOAL);
@@ -177,9 +188,11 @@ function superRow(ctx, x, y, m, txt, scale, gemAndCost){
   let total = sw + 5 + textWidth(txt, sc);
   if (gemAndCost) total += 8 + 5 + 3 + textWidth(gemAndCost, 1);
   let cx = x;
+  const onPurple = m.name === 'amethyst'; // dark engrave is unreadable on amethyst
   drawSprite(ctx, CROSSED_SWORDS, cx, y - Math.round((spriteH(CROSSED_SWORDS)-5*sc)/2));
   cx += sw + 5;
-  engrave(ctx, txt, cx, y, m, sc);
+  if (onPurple) popText(ctx, txt, cx, y, sc);
+  else engrave(ctx, txt, cx, y, m, sc);
   cx += textWidth(txt, sc);
   if (gemAndCost){
     cx += 8;
@@ -188,7 +201,7 @@ function superRow(ctx, x, y, m, txt, scale, gemAndCost){
     px(ctx, cx, y+2, 5, 1, 'blue_mid');   px(ctx, cx+1, y+3, 3, 1, 'blue_dark');
     px(ctx, cx+2, y+4, 1, 1, 'blue_dark');
     cx += 5 + 3;
-    drawText(ctx, gemAndCost, cx, y, 'outline', 1);
+    drawText(ctx, gemAndCost, cx, y, onPurple ? 'white' : 'outline', 1);
   }
   return total;
 }
@@ -203,8 +216,10 @@ function centeredSuperRow(ctx, bx, bw, y, m, txt, scale, gemAndCost){
 /* ---------- the five variants -------------------------------------------- */
 const VARIANTS = {
 
-  /* A — UNDERBAR: word on top, OVERDRIVE label + slim meter inside, below. */
-  A: { h: 64, btnH: 32, draw(ctx, ph, id){
+  /* A — UNDERBAR: BIG word on top, OVERDRIVE label + slim meter low in the
+     plate. Cost gem rides the OD row (the scale-2 word owns the top row).
+     Active text pops WHITE — dark engrave is unreadable on amethyst. */
+  A: { h: 68, btnH: 34, draw(ctx, ph, id){
     const bh = this.btnH, by = 14, yo = pressOffset(id);
     const active = ph.mode !== 'charge' || ph.p >= 1;
     const m = active ? AM : AU;
@@ -212,18 +227,32 @@ const VARIANTS = {
     hifiFace(ctx, BTN_X, by, BTN_W, bh, 6, m);
     if (ph.mode === 'active') glowRect(ctx, BTN_X, by, BTN_W, bh, 6, .35 + .25*Math.sin(ph.pulse*Math.PI*6));
     if (ph.mode === 'flash'){ ctx.fillStyle='rgba(247,243,231,.55)'; ctx.beginPath(); ctx.roundRect(BTN_X,by,BTN_W,bh,6); ctx.fill(); }
-    centeredSuperRow(ctx, BTN_X, BTN_W, by + 6 + yo, m, 'SUPER ATTACK', 1, bankText(ph.p));
-    // embedded OD row
-    const ry = by + bh - 15 + yo;
+    // -- big word row (scale 2), swords + word centred as one group ---------
+    const word = 'SUPER ATTACK', wy = by + 5 + yo;
+    const rowW = spriteW(CROSSED_SWORDS) + 5 + textWidth(word, 2);
+    let cx = BTN_X + Math.round((BTN_W - rowW)/2);
+    drawSprite(ctx, CROSSED_SWORDS, cx, wy - 1);
+    cx += spriteW(CROSSED_SWORDS) + 5;
+    if (active) popText(ctx, word, cx, wy, 2);
+    else engrave(ctx, word, cx, wy, m, 2);
+    // -- OD row, sitting LOW in the plate; gem + cost right-aligned ---------
+    const ry = by + bh - 13 + yo;
+    const cost = bankText(ph.p);
+    const gemW = 5 + 3 + textWidth(cost, 1);
     if (ph.mode === 'charge' && ph.p < 1){
       drawText(ctx, 'OVERDRIVE', BTN_X + 7, ry + 1, m.dp, 1);
       const lx = BTN_X + 7 + textWidth('OVERDRIVE',1) + 5;
-      hifiBar(ctx, lx, ry, BTN_X + BTN_W - 7 - lx, 7,
+      const barW = BTN_X + BTN_W - 7 - gemW - 5 - lx;
+      hifiBar(ctx, lx, ry, barW, 7,
         { mat: m, well:'od_well', wellD:'od_welld', hp: OD_FAM },
         { value: ph.p, ghost: ph.p, slim: true });
+      energyGem(ctx, BTN_X + BTN_W - 7 - gemW, ry + 1, cost, 'outline');
     } else {
-      const t = 'OVERDRIVE X2 - UNTIL RESET';
-      engrave(ctx, t, BTN_X + Math.round((BTN_W - textWidth(t,1))/2), ry + 1, m, 1);
+      const t = 'X2 UNTIL RESET';
+      const grpW = textWidth(t,1) + 8 + gemW;
+      const gx = BTN_X + Math.round((BTN_W - grpW)/2);
+      popText(ctx, t, gx, ry + 1, 1);
+      energyGem(ctx, gx + textWidth(t,1) + 8, ry + 1, cost, 'white');
     }
     streakChip(ctx, BTN_X + BTN_W - 20, by - 5);
     stepsRing(ctx, by + bh/2, ph.p, active);
