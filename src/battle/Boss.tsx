@@ -4,8 +4,10 @@
 // Idle loop via Sprite (9-frame strip @ 9fps — parity with battlefield-ui.html
 // `BOSS`/`BOSS_CROWNED`). `bossKey` selects the form: "horse_256" (normal
 // week) or "horse_crowned_256" (bonus/victory week) — both are in the packed
-// spriteMap. The hurt/attack/idle_alt strips also exist; wiring them is
-// deferred (the hit reaction ships as flash + bump per fx-engine).
+// spriteMap. The hurt/attack/idle_alt frame dirs still exist under
+// characters/bosses/ but are NOT packed (STR-85 trim — the hit reaction ships
+// as flash + bump per fx-engine); to wire one up, add it to BOSS_SCOPE in
+// scripts/pack-sprites.mjs and re-run `npm run pack-sprites`.
 //
 // SCALE: art is 256×256 native (boss asset spec: PixelLab max, faces left,
 // upscaled for display); rendered at `heightPx`. The never-shorter-than-the-

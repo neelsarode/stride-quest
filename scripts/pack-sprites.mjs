@@ -15,11 +15,15 @@
  *     40 jobs × { idle(4f), attack(7–17f), special(13/17f), rest(6f) }
  *     + evolution(13f) on jobs 1–4 only (32 dirs). See characters/MANIFEST.md.
  *   assets/effects/<class>/{basic,special,impact}/frame_*.png   (8 classes × 3)
- *   characters/bosses/horse_256/{idle,idle_alt,hurt,attack}/    (all its anims)
- *   characters/bosses/horse_crowned_256/{idle,hurt}/ + static.png
- *     (bonus-phase crowned form; static packed as a 1-frame strip)
+ *   characters/bosses/horse_256/ + characters/bosses/horse_crowned_256/
+ *     (idle/idle_alt/hurt/attack dirs + crowned static.png)
  *   assets/fx-anchors.js + assets/fx-special-anchors.js
  *     (GENERATED anchor data from fx-test.html?scan=1 — converted, not edited)
+ *
+ * NOT EVERY INPUT SHIPS: the SHIPPED-ANIMS FILTER below (STR-85) decides what
+ * actually gets packed — currently idle/attack/special/rest per job, the 24
+ * effect strips, and boss idles only (evolution + extra boss anims stay on
+ * disk as frames but add zero bundle bytes).
  *
  * OUTPUTS (all generated — regenerate via `npm run pack-sprites`):
  *   src/battle/sprites/<key with '/'→'_'>.png   one horizontal strip per anim
@@ -61,16 +65,37 @@ const OUT_MANIFEST = path.join(OUT_SPRITES, "manifest.json");
 const OUT_SPRITEMAP = path.join(ROOT, "src", "battle", "spriteMap.ts");
 const OUT_ANCHORS = path.join(ROOT, "src", "battle", "anchors.ts");
 
+/* ==================================================================== *
+ * SHIPPED-ANIMS FILTER (STR-85 sprite trim) — THE one place to edit    *
+ * ==================================================================== *
+ * Only the animations listed here are packed into the app bundle
+ * (src/battle/sprites/ + manifest.json + spriteMap.ts). Everything else
+ * stays in the repo as loose frames (characters/, assets/effects/ — the
+ * source of truth is never touched) but ships ZERO bytes: the 2026-07-16
+ * audit found ~3.5MB of packed strips with no code path that plays them
+ * (32 `evolution` strips + 5 boss strips beyond `idle`).
+ *
+ * To RE-ENABLE an animation later, this list is the one edit:
+ *   • evolution:   add "evolution" to SHIPPED_CHARACTER_ANIMS below,
+ *   • boss anims:  add e.g. "hurt"/"attack"/"idle_alt" to a BOSS_SCOPE
+ *     anims array (or includeStatic: true for the crowned static pose),
+ * then re-run `npm run pack-sprites` (it also updates the count table's
+ * expectations — see `expected` in step 6b).
+ */
+
+/** Character anims that ship (all 40 jobs). On disk but unshipped: evolution. */
+const SHIPPED_CHARACTER_ANIMS = ["idle", "attack", "special", "rest"];
+
 /**
- * Boss packing scope (STR-17 ticket scope; extends plan step 1's "boss idle"):
- * horse_256 ships ALL its animation dirs; the crowned bonus form (used by the
- * M1.5 victory-week bonus phase) ships idle + hurt + its static frame.
+ * Boss packing scope. Boss.tsx plays `idle` only (the hit reaction is flash +
+ * bump per fx-engine, not a strip) — the other dirs (horse attack/hurt/
+ * idle_alt, crowned hurt/static) exist on disk but are unshipped (STR-85).
  * armored_cat_256 is intentionally excluded — boss variety is deferred
  * (plan "Explicitly deferred"); it was the format prototype, not a shipping boss.
  */
 const BOSS_SCOPE = {
-  horse_256: { anims: "all", includeStatic: false },
-  horse_crowned_256: { anims: ["idle", "hurt"], includeStatic: true },
+  horse_256: { anims: ["idle"], includeStatic: false },
+  horse_crowned_256: { anims: ["idle"], includeStatic: false },
 };
 
 /* ------------------------------------------------------------------ *
@@ -107,15 +132,16 @@ function framePaths(dir) {
 const animations = [];
 
 // -- Characters: characters/<class>/<job>/animations/<anim>/ ----------
-// Every anim dir present is packed (idle/attack/special/rest on all 40 jobs,
-// evolution on jobs 1–4). Packing whatever exists means a future anim type
-// lands here automatically; the count table below still pins the known set.
+// Only SHIPPED_CHARACTER_ANIMS are packed (see the filter block up top —
+// evolution exists on disk but ships zero bytes, STR-85); the count table
+// below still pins the shipped set.
 const classes = subdirs(CHAR_DIR).filter((c) => c !== "bosses");
 for (const cls of classes) {
   for (const job of subdirs(path.join(CHAR_DIR, cls))) {
     const animRoot = path.join(CHAR_DIR, cls, job, "animations");
     if (!fs.existsSync(animRoot)) continue;
     for (const anim of subdirs(animRoot)) {
+      if (!SHIPPED_CHARACTER_ANIMS.includes(anim)) continue; // unshipped (STR-85)
       animations.push({
         key: `${cls}/${job}/${anim}`,
         category: anim, // idle | attack | special | rest | evolution
@@ -388,16 +414,18 @@ for (const [name, anchors, anim] of [
   }
 }
 
-// 6b. Count table — expected values pinned from characters/MANIFEST.md +
-// the STR-17 boss scope. A count drift (deleted/added dirs) fails the run.
+// 6b. Count table — expected values pinned from characters/MANIFEST.md
+// filtered through the SHIPPED-ANIMS block up top. A count drift (deleted/
+// added dirs, or a shipped-list edit without updating this table) fails the
+// run. (evolution: 32 dirs exist on disk, jobs 1–4 only, UNSHIPPED — add it
+// back here when re-enabling in SHIPPED_CHARACTER_ANIMS.)
 const expected = {
   idle: 40, //      40 jobs × breathing idle
   attack: 40, //    40 jobs × weapon attack
   special: 40, //   40 jobs × class-themed ultimate
   rest: 40, //      40 jobs × resting fuel-state loop (added 2026-07-13)
-  evolution: 32, // jobs 1–4 only (advance to next rank)
   effects: 24, //   8 classes × basic/special/impact
-  boss: 7, //       horse_256 ×4 anims + crowned ×2 anims + crowned static
+  boss: 2, //       horse_256 idle + crowned idle (see BOSS_SCOPE)
 };
 const actual = {};
 for (const r of results) {
