@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stride Quest — SUPER × OVERDRIVE fusion lab</title>
+<!--
+  od-super-lab.html — DESIGN LAB (2026-07-16): fuse the Overdrive status strip
+  INTO the SUPER ATTACK button. The floating OD strip currently covers the
+  bottom party member on the game screen; every concept below removes it by
+  making the button itself carry the goal-progress + the X2-active state.
+  Drawn with the shipped procedural kit (assets/ui-kit.js) so every variant is
+  pixel-honest to the app's art direction. Pick a letter → it gets implemented
+  as a baked-asset zone in src/game/zones/CommandDock.tsx.
+  States per concept: CHARGING (0→100% of the 6,000-step goal) → GOAL FLASH →
+  OVERDRIVE ACTIVE (X2 until reset, purple = kit amethyst).
+-->
+<style>
+  html,body { margin:0; background:#14161c; color:#cfd6e2;
+    font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #wrap { max-width: 480px; margin: 0 auto; padding: 18px 14px 60px; }
+  h1 { font-size:16px; color:#ffe9a0; letter-spacing:.5px; margin:0 0 4px; }
+  .sub { color:#8b93a3; font-size:12px; margin:0 0 14px; }
+  .ctl { position: sticky; top:0; z-index:5; background:#14161cee; padding:10px 0 8px;
+    border-bottom:1px solid #262b36; margin-bottom:14px; }
+  .ctl .row { display:flex; align-items:center; gap:10px; }
+  .ctl input[type=range]{ flex:1; accent-color:#b985ec; }
+  .ctl button { background:#262b36; color:#ffe9a0; border:1px solid #3b414c;
+    border-radius:4px; font:inherit; font-size:11px; padding:3px 10px; cursor:pointer; }
+  .ctl button:hover { background:#2f3542; }
+  #stateLabel { font-size:11px; color:#b985ec; min-width:170px; text-align:right; }
+  .card { background:#191c24; border:1px solid #262b36; border-radius:8px;
+    padding:12px 12px 10px; margin-bottom:16px; }
+  .card h2 { font-size:13px; color:#f7f3e7; margin:0 0 2px; letter-spacing:.4px; }
+  .card h2 .tag { color:#b985ec; }
+  .card p { font-size:11.5px; color:#8b93a3; margin:0 0 8px; }
+  .card canvas { display:block; width:100%; image-rendering: pixelated; border-radius:4px; }
+  .card .pro { font-size:11px; color:#6f7889; margin:7px 0 0; }
+  .card .pro b { color:#9ae06b; font-weight:600; }
+  .foot { color:#6f7889; font-size:11.5px; border-top:1px solid #262b36; padding-top:12px; }
+  .foot b { color:#ffe9a0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>SUPER &times; OVERDRIVE — fusion concepts</h1>
+  <p class="sub">The floating OVERDRIVE strip covers the bottom party member. Each
+  concept below deletes that strip and folds goal-progress + the X2 state into the
+  SUPER button itself. Everything auto-cycles CHARGING &rarr; GOAL! &rarr; OVERDRIVE
+  ACTIVE; scrub or pause to inspect. Press any button to feel it.</p>
+
+  <div class="ctl">
+    <div class="row">
+      <button id="playBtn">PAUSE</button>
+      <input id="scrub" type="range" min="0" max="1000" value="0">
+      <span id="stateLabel"></span>
+    </div>
+  </div>
+
+  <div class="card" data-v="A">
+    <h2><span class="tag">A</span> — UNDERBAR <span style="color:#6f7889">(your sketch)</span></h2>
+    <p>Big SUPER ATTACK word, with an OVERDRIVE label + slim meter embedded along the
+    bottom of the plate. At goal the whole button flips purple.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> most literal read — label says exactly what the bar is. Tallest option (32 art px).</p>
+  </div>
+
+  <div class="card" data-v="B">
+    <h2><span class="tag">B</span> — THE BUTTON IS THE METER</h2>
+    <p>No second bar at all: a purple charge rises inside the gold face behind the
+    word as you walk. 100% = the button IS purple.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> cleanest — zero extra rows, one glance says how close X2 is. Same height as today (26).</p>
+  </div>
+
+  <div class="card" data-v="C">
+    <h2><span class="tag">C</span> — CHARGE FUSE</h2>
+    <p>A purple fuse traces around the button's rim as progress; when the loop closes,
+    the face ignites purple. Gold face stays clean while charging.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> subtlest while charging; the "loop closes &rarr; ignition" moment is a great goal celebration.</p>
+  </div>
+
+  <div class="card" data-v="D">
+    <h2><span class="tag">D</span> — POWER NOTCHES</h2>
+    <p>Ten pixel notches along the bottom edge (600 steps each) light purple one by
+    one — arcade style. All ten lit = purple button + X2 badge.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> most game-y; "3 notches left" is instantly readable as a walking target.</p>
+  </div>
+
+  <div class="card" data-v="E">
+    <h2><span class="tag">E</span> — RISING SLEEVE</h2>
+    <p>A purple power-cradle rises up from behind the button as you walk; at goal it
+    wraps the plate in a glowing purple halo and the face ignites.</p>
+    <canvas></canvas>
+    <p class="pro"><b>+</b> most dramatic charge metaphor — the button visibly "powers up" from below.</p>
+  </div>
+
+  <div class="foot">
+    Values shown: 6,000-step goal, energy bank ticking up with steps, streak chip
+    X2.04. Purple = the kit's <b>amethyst</b> ramp (the app's Overdrive color).
+    Every frame is drawn by the shipped procedural kit — whichever letter you pick
+    bakes 1:1 into the real dock. The steps ring stays as-is on the right.
+  </div>
+</div>
+
+<script src="assets/ui-kit.js"></script>
+<script>
+/* ---------- shared geometry (art px; 1 art px = 2 css px like the app) ---- */
+const S = 2;                       // css scale
+const DOCK_W = 195;                // 390dp phone / 2
+const PAD = 6, RING_R = 15, GAP = 12;
+const BTN_X = PAD, BTN_W = DOCK_W - PAD*2 - RING_R*2 - GAP;   // 141
+const RING_CX = DOCK_W - PAD - RING_R, GOAL = 6000;
+const AU = M('gold'), AM = M('amethyst');
+const OD_FAM = { light:'amethyst1', mid:'amethyst3', dark:'amethyst4' };
+Object.assign(PALETTE, { od_well:'#241329', od_welld:'#180b1d' });
+
+/* ---------- timeline ------------------------------------------------------
+   t in [0,1): phases — charge 0..0.55 (0→100%), flash 0.55..0.60,
+   active 0.60..0.97 (pulse), reset tail. */
+const CYCLE_MS = 9000;
+let playing = true, tNorm = 0, lastTs = 0;
+function phase(){
+  if (tNorm < 0.55)  return { mode:'charge', p: tNorm/0.55 };
+  if (tNorm < 0.60)  return { mode:'flash',  p: 1 };
+  if (tNorm < 0.97)  return { mode:'active', p: 1, pulse: (tNorm-0.60)/0.37 };
+  return { mode:'charge', p: 0 };
+}
+
+/* ---------- kit-side helpers ---------------------------------------------- */
+function sceneBg(ctx, w, h){
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#1b1a22'); g.addColorStop(1, '#0f0e13');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  // faint ground haze so the dock reads "over the battle scene"
+  ctx.fillStyle = 'rgba(60,50,70,.18)'; ctx.fillRect(0, h-10, w, 10);
+}
+function stepsRing(ctx, cy, p, active){
+  const cx = RING_CX, r = RING_R;
+  ctx.fillStyle = 'rgba(10,8,6,.72)';
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = PALETTE.stone_deep;
+  ctx.beginPath(); ctx.arc(cx, cy, r-1.5, 0, Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = active ? PALETTE.amethyst2 : PALETTE.gold_mid;
+  ctx.beginPath(); ctx.arc(cx, cy, r-1.5, -Math.PI/2, -Math.PI/2 + Math.PI*2*Math.min(1,p)); ctx.stroke();
+  const steps = Math.round(Math.min(1,p)*GOAL).toLocaleString('en-US');
+  drawText(ctx, steps, cx - Math.round(textWidth(steps,1)/2), cy - 5, 'white', 1);
+  drawText(ctx, '/6,000', cx - Math.round(textWidth('/6,000',1)/2), cy + 1, 'stone_light', 1);
+  if (p >= 1){
+    const lbl = 'GOAL!';
+    drawText(ctx, lbl, cx - Math.round(textWidth(lbl,1)/2), cy + r + 3, 'green_light', 1);
+  }
+}
+function streakChip(ctx, x, y){
+  hifiFace(ctx, x, y, 26, 9, 4, AU);
+  drawText(ctx, 'X2.04', x+4, y+2, 'outline', 1);
+}
+function glowRect(ctx, x, y, w, h, r, alpha){
+  ctx.save();
+  ctx.shadowColor = 'rgba(185,133,236,' + alpha.toFixed(3) + ')';
+  ctx.shadowBlur = 10; ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(185,133,236,' + (alpha*0.9).toFixed(3) + ')';
+  ctx.beginPath(); ctx.roundRect(x+.5, y+.5, w-1, h-1, r); ctx.stroke();
+  ctx.restore();
+}
+function pressOffset(id){ return pressed[id] ? 1 : 0; }
+function bankText(p, mode){
+  // energy bank grows with steps walked this cycle (purely illustrative)
+  const e = Math.round(p * GOAL);
+  return e.toLocaleString('en-US');
+}
+function superRow(ctx, x, y, m, txt, scale, gemAndCost){
+  // swords + word (+ optional gem/cost group), centred as one row
+  const sw = spriteW(CROSSED_SWORDS), sc = scale || 1;
+  let total = sw + 5 + textWidth(txt, sc);
+  if (gemAndCost) total += 8 + 5 + 3 + textWidth(gemAndCost, 1);
+  let cx = x;
+  drawSprite(ctx, CROSSED_SWORDS, cx, y - Math.round((spriteH(CROSSED_SWORDS)-5*sc)/2));
+  cx += sw + 5;
+  engrave(ctx, txt, cx, y, m, sc);
+  cx += textWidth(txt, sc);
+  if (gemAndCost){
+    cx += 8;
+    // little energy gem (blue diamond)
+    px(ctx, cx+2, y, 1, 1, 'blue_light'); px(ctx, cx+1, y+1, 3, 1, 'blue_mid');
+    px(ctx, cx, y+2, 5, 1, 'blue_mid');   px(ctx, cx+1, y+3, 3, 1, 'blue_dark');
+    px(ctx, cx+2, y+4, 1, 1, 'blue_dark');
+    cx += 5 + 3;
+    drawText(ctx, gemAndCost, cx, y, 'outline', 1);
+  }
+  return total;
+}
+function centeredSuperRow(ctx, bx, bw, y, m, txt, scale, gemAndCost){
+  // measure then draw centred
+  const sw = spriteW(CROSSED_SWORDS), sc = scale || 1;
+  let total = sw + 5 + textWidth(txt, sc);
+  if (gemAndCost) total += 8 + 5 + 3 + textWidth(gemAndCost, 1);
+  superRow(ctx, bx + Math.round((bw - total)/2), y, m, txt, scale, gemAndCost);
+}
+
+/* ---------- the five variants -------------------------------------------- */
+const VARIANTS = {
+
+  /* A — UNDERBAR: word on top, OVERDRIVE label + slim meter inside, below. */
+  A: { h: 64, btnH: 32, draw(ctx, ph, id){
+    const bh = this.btnH, by = 14, yo = pressOffset(id);
+    const active = ph.mode !== 'charge' || ph.p >= 1;
+    const m = active ? AM : AU;
+    sceneBg(ctx, DOCK_W, this.h);
+    hifiFace(ctx, BTN_X, by, BTN_W, bh, 6, m);
+    if (ph.mode === 'active') glowRect(ctx, BTN_X, by, BTN_W, bh, 6, .35 + .25*Math.sin(ph.pulse*Math.PI*6));
+    if (ph.mode === 'flash'){ ctx.fillStyle='rgba(247,243,231,.55)'; ctx.beginPath(); ctx.roundRect(BTN_X,by,BTN_W,bh,6); ctx.fill(); }
+    centeredSuperRow(ctx, BTN_X, BTN_W, by + 6 + yo, m, 'SUPER ATTACK', 1, bankText(ph.p));
+    // embedded OD row
+    const ry = by + bh - 15 + yo;
+    if (ph.mode === 'charge' && ph.p < 1){
+      drawText(ctx, 'OVERDRIVE', BTN_X + 7, ry + 1, m.dp, 1);
+      const lx = BTN_X + 7 + textWidth('OVERDRIVE',1) + 5;
+      hifiBar(ctx, lx, ry, BTN_X + BTN_W - 7 - lx, 7,
+        { mat: m, well:'od_well', wellD:'od_welld', hp: OD_FAM },
+        { value: ph.p, ghost: ph.p, slim: true });
+    } else {
+      const t = 'OVERDRIVE X2 - UNTIL RESET';
+      engrave(ctx, t, BTN_X + Math.round((BTN_W - textWidth(t,1))/2), ry + 1, m, 1);
+    }
+    streakChip(ctx, BTN_X + BTN_W - 20, by - 5);
+    stepsRing(ctx, by + bh/2, ph.p, active);
+  }},
+
+  /* B — THE BUTTON IS THE METER: purple charge rises behind the word. */
+  B: { h: 56, btnH: 26, draw(ctx, ph, id){
+    const bh = this.btnH, by = 15, yo = pressOffset(id);
+    const active = ph.mode !== 'charge' || ph.p >= 1;
+    const m = active ? AM : AU;
+    sceneBg(ctx, DOCK_W, this.h);
+    hifiFace(ctx, BTN_X, by, BTN_W, bh, 6, AU);
+    if (!active && ph.p > 0){
+      // purple charge clipped inside the face inset
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(BTN_X+2, by+2, BTN_W-4, bh-4, 4); ctx.clip();
+      const fw = Math.round((BTN_W-4) * ph.p);
+      ctx.beginPath(); ctx.rect(BTN_X+2, by+2, fw, bh-4); ctx.clip();
+      hifiFace(ctx, BTN_X, by, BTN_W, bh, 6, AM);
+      ctx.restore();
+      // charge lip highlight
+      px(ctx, BTN_X+2+Math.round((BTN_W-4)*ph.p)-1, by+3, 1, bh-6, 'amethyst1');
+    }
+    if (active) hifiFace(ctx, BTN_X, by, BTN_W, bh, 6, AM);
+    if (ph.mode === 'active') glowRect(ctx, BTN_X, by, BTN_W, bh, 6, .35 + .25*Math.sin(ph.pulse*Math.PI*6));
+    if (ph.mode === 'flash'){ ctx.fillStyle='rgba(247,243,231,.55)'; ctx.beginPath(); ctx.roundRect(BTN_X,by,BTN_W,bh,6); ctx.fill(); }
+    centeredSuperRow(ctx, BTN_X, BTN_W, by + Math.round(bh/2) - 4 + yo, m, 'SUPER ATTACK', 1, bankText(ph.p));
+    // tiny status line under the word, inside the face
+    const sub = active ? 'OVERDRIVE X2 - UNTIL RESET'
+                       : 'OVERDRIVE ' + Math.round(ph.p*100) + '%';
+    drawText(ctx, sub, BTN_X + Math.round((BTN_W - textWidth(sub,1))/2), by + bh - 10 + yo,
+             active ? m.rim : 'gold_deep', 1);
+    streakChip(ctx, BTN_X + BTN_W - 20, by - 5);
+    stepsRing(ctx, by + bh/2, ph.p, active);
+  }},
+
+  /* C — CHARGE FUSE: purple traces the rim; loop closes = ignition. */
+  C: { h: 56, btnH: 26, draw(ctx, ph, id){
+    const bh = this.btnH, by = 15, yo = pressOffset(id);
+    const active = ph.mode !== 'charge' || ph.p >= 1;
+    const m = active ? AM : AU;
+    sceneBg(ctx, DOCK_W, this.h);
+    hifiFace(ctx, BTN_X, by, BTN_W, bh, 6, m);
+    if (!active && ph.p > 0){
+      // the fuse: dash-trace the rounded rim from the top-center, clockwise
+      const per = 2*(BTN_W-2) + 2*(bh-2);
+      ctx.save();
+      ctx.lineWidth = 2; ctx.strokeStyle = PALETTE.amethyst2;
+      ctx.shadowColor = 'rgba(185,133,236,.8)'; ctx.shadowBlur = 4;
+      ctx.setLineDash([per*ph.p, 9999]);
+      ctx.beginPath(); ctx.roundRect(BTN_X+1, by+1, BTN_W-2, bh-2, 5); ctx.stroke();
+      ctx.restore();
+      // spark head
+      const sp = ph.p; // approximate head position along the dash
+      ctx.fillStyle = PALETTE.white;
+    }
+    if (ph.mode === 'active') glowRect(ctx, BTN_X, by, BTN_W, bh, 6, .4 + .25*Math.sin(ph.pulse*Math.PI*6));
+    if (ph.mode === 'flash'){ ctx.fillStyle='rgba(247,243,231,.6)'; ctx.beginPath(); ctx.roundRect(BTN_X,by,BTN_W,bh,6); ctx.fill(); }
+    centeredSuperRow(ctx, BTN_X, BTN_W, by + Math.round(bh/2) - 4 + yo, m, 'SUPER ATTACK', 1, bankText(ph.p));
+    const sub = active ? 'OVERDRIVE X2 - UNTIL RESET'
+                       : 'OVERDRIVE ' + Math.round(ph.p*100) + '%';
+    drawText(ctx, sub, BTN_X + Math.round((BTN_W - textWidth(sub,1))/2), by + bh - 10 + yo,
+             active ? m.rim : 'gold_deep', 1);
+    streakChip(ctx, BTN_X + BTN_W - 20, by - 5);
+    stepsRing(ctx, by + bh/2, ph.p, active);
+  }},
+
+  /* D — POWER NOTCHES: 10 segments along the bottom edge. */
+  D: { h: 58, btnH: 28, draw(ctx, ph, id){
+    const bh = this.btnH, by = 15, yo = pressOffset(id);
+    const active = ph.mode !== 'charge' || ph.p >= 1;
+    const m = active ? AM : AU;
+    sceneBg(ctx, DOCK_W, this.h);
+    hifiFace(ctx, BTN_X, by, BTN_W, bh, 6, m);
+    if (ph.mode === 'active') glowRect(ctx, BTN_X, by, BTN_W, bh, 6, .35 + .25*Math.sin(ph.pulse*Math.PI*6));
+    if (ph.mode === 'flash'){ ctx.fillStyle='rgba(247,243,231,.55)'; ctx.beginPath(); ctx.roundRect(BTN_X,by,BTN_W,bh,6); ctx.fill(); }
+    centeredSuperRow(ctx, BTN_X, BTN_W, by + 6 + yo, m, 'SUPER ATTACK', 1, bankText(ph.p));
+    // notches (charging) — merge into ONE solid lit strip once active
+    const N = 10, gap = 2, inx = BTN_X + 8, inw = BTN_W - 16;
+    const segW = Math.floor((inw - (N-1)*gap) / N);
+    const stripW = N*segW + (N-1)*gap;
+    const ny = by + bh - 10 + yo;
+    if (!active){
+      const lit = Math.floor(ph.p * N + 1e-6);
+      for (let i = 0; i < N; i++){
+        const sx = inx + i*(segW+gap);
+        if (i < lit){
+          px(ctx, sx, ny,   segW, 1, 'amethyst1');
+          px(ctx, sx, ny+1, segW, 2, 'amethyst3');
+          px(ctx, sx, ny+3, segW, 1, 'amethyst4');
+        } else {
+          px(ctx, sx, ny, segW, 4, 'gold_deep');
+          px(ctx, sx+1, ny+1, segW-2, 2, 'od_welld');
+        }
+      }
+    } else {
+      // all ten fused: one solid lit strip carrying the X2 message
+      px(ctx, inx, ny-1, stripW, 1, 'amethyst1');
+      px(ctx, inx, ny,   stripW, 5, 'amethyst3');
+      px(ctx, inx, ny+5, stripW, 1, 'amethyst4');
+      const t = 'X2 UNTIL RESET';
+      drawText(ctx, t, BTN_X + Math.round((BTN_W - textWidth(t,1))/2), ny, 'outline', 1);
+    }
+    streakChip(ctx, BTN_X + BTN_W - 20, by - 5);
+    stepsRing(ctx, by + bh/2, ph.p, active);
+  }},
+
+  /* E — RISING SLEEVE: a purple cradle rises behind the button. */
+  E: { h: 60, btnH: 26, draw(ctx, ph, id){
+    const bh = this.btnH, by = 18, yo = pressOffset(id);
+    const active = ph.mode !== 'charge' || ph.p >= 1;
+    const m = active ? AM : AU;
+    sceneBg(ctx, DOCK_W, this.h);
+    // sleeve: an amethyst plate 3px proud of the button, revealed bottom-up
+    const sx = BTN_X - 3, sy = by - 3, sw = BTN_W + 6, sh = bh + 6;
+    if (ph.p > 0){
+      const reveal = active ? sh : Math.round(sh * ph.p);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(sx, sy + sh - reveal, sw, reveal); ctx.clip();
+      hifiFace(ctx, sx, sy, sw, sh, 8, AM);
+      ctx.restore();
+    }
+    if (ph.mode === 'active') glowRect(ctx, sx, sy, sw, sh, 8, .4 + .25*Math.sin(ph.pulse*Math.PI*6));
+    hifiFace(ctx, BTN_X, by, BTN_W, bh, 6, m);
+    if (ph.mode === 'flash'){ ctx.fillStyle='rgba(247,243,231,.55)'; ctx.beginPath(); ctx.roundRect(BTN_X,by,BTN_W,bh,6); ctx.fill(); }
+    centeredSuperRow(ctx, BTN_X, BTN_W, by + Math.round(bh/2) - 4 + yo, m, 'SUPER ATTACK', 1, bankText(ph.p));
+    const sub = active ? 'OVERDRIVE X2 - UNTIL RESET'
+                       : 'OVERDRIVE ' + Math.round(ph.p*100) + '%';
+    drawText(ctx, sub, BTN_X + Math.round((BTN_W - textWidth(sub,1))/2), by + bh - 10 + yo,
+             active ? m.rim : 'gold_deep', 1);
+    streakChip(ctx, BTN_X + BTN_W - 20, by - 6);
+    stepsRing(ctx, by + bh/2, ph.p, active);
+  }},
+};
+
+/* ---------- mount + loop --------------------------------------------------- */
+const pressed = {};
+const cards = [...document.querySelectorAll('.card')].map(el => {
+  const id = el.dataset.v, v = VARIANTS[id], cv = el.querySelector('canvas');
+  cv.width = DOCK_W * S; cv.height = v.h * S;
+  const ctx = cv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  cv.addEventListener('pointerdown', () => { pressed[id] = true; });
+  addEventListener('pointerup', () => { pressed[id] = false; });
+  return { id, v, ctx, cv };
+});
+
+const scrub = document.getElementById('scrub');
+const playBtn = document.getElementById('playBtn');
+const stateLabel = document.getElementById('stateLabel');
+playBtn.onclick = () => { playing = !playing; playBtn.textContent = playing ? 'PAUSE' : 'PLAY'; };
+scrub.oninput = () => { playing = false; playBtn.textContent = 'PLAY'; tNorm = scrub.value/1000; };
+
+function frame(ts){
+  if (playing){
+    if (lastTs) tNorm = (tNorm + (ts - lastTs)/CYCLE_MS) % 1;
+    scrub.value = Math.round(tNorm*1000);
+  }
+  lastTs = ts;
+  const ph = phase();
+  stateLabel.textContent =
+    ph.mode === 'charge' ? 'CHARGING - ' + Math.round(ph.p*GOAL).toLocaleString() + ' / 6,000'
+    : ph.mode === 'flash' ? 'GOAL HIT!'
+    : 'OVERDRIVE X2 ACTIVE';
+  for (const c of cards){
+    c.ctx.setTransform(S, 0, 0, S, 0, 0);
+    c.ctx.clearRect(0, 0, DOCK_W, c.v.h);
+    c.v.draw(c.ctx, ph, c.id);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
