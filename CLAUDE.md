@@ -571,6 +571,8 @@ UI side.
   hero sprite serializes swings, so N=2≈1.1s / N=5≈3.5s / N=10≈6.5–7.5s; small/medium banks
   read as a punchy rat-a-tat, but the N=10 cap drags. Levers if more explosive is wanted:
   lower `maxHits`, tighten/overlap `hitStaggerMs`, or a teammate-parallel flurry (spec §8).
+  **DECISION 2026-07-15 (Neel): leave as-is, judge in playtest first — do NOT re-raise as an
+  open question; only tune if playtest says the big banks drag.**
   (b) day-5-vs-day-6 kill at 6k (nudge `BOSS.baseHP` if day-5 is wanted). Both are single
   `gameConfig` edits. Non-blocking dev-only artifacts from verification (cannot occur in
   prod): a dual-active-challenge only reachable by rewinding the dev clock ~23 days
