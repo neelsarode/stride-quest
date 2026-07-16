@@ -524,9 +524,9 @@ stays behind the flag as the fallback for one milestone (deletion is an M4 line)
      78/78 tests; scenario-1 re-confirmed with the flag on (`CRIT! 4,313` ==
      the exact boss HP drop).
 
-### Core Loop v2 — Continuous Combat + Super Attack 📋 PLANNED (spec + tickets 2026-07-15)
+### Core Loop v2 — Continuous Combat + Super Attack ✅ COMPLETE + E2E-VERIFIED (STR-73…80, 2026-07-15)
 Spec: `docs/superpowers/specs/2026-07-15-core-loop-v2-design.md` (owner-approved
-direction, decisions locked). Revises the fuel-hybrid loop into a *living* fight:
+direction, decisions locked). Revised the fuel-hybrid loop into a *living* fight:
 (1) the party **continuously auto-attacks** while fueled (scene-layer driver keyed
 off each member's Battling/Winded/Resting state — idle economy unchanged, just
 visible); (2) **COLLECT removed** — idle auto-applies on open, no tap; (3) **DEPLOY →
@@ -534,10 +534,48 @@ SUPER ATTACK** — same whole-bank math, new **combo/flurry** visual scaling wit
 bank size; (4) **Overdrive retriggered** — no meter/activate; **hitting the daily
 goal auto-enters ×2 Overdrive until the next reset**, now boosting idle AND super
 attacks. Fuel/Winded/Resting, streaks, shields, rally, the crowned bonus week, and
-the M2.75 game screen all survive; only `CommandDock`/`OverdriveBar` change on the UI
-side. Proposed tunables (Neel to confirm): `DAILY_STEP_GOAL` 8k→6k (+ re-anchor fuel
-burn 300→225), `BOSS.baseHP` 150k→300k, `OVERDRIVE.idleDamageMult` 3→2. Milestone:
-**Core Loop v2 — Continuous Combat + Super Attack** (backlog).
+the M2.75 game screen all survived; only `CommandDock`/`OverdriveBar` changed on the
+UI side.
+- **Confirmed tunables (Neel, 2026-07-15):** `DAILY_STEP_GOAL` 8k→**6k** + re-anchor
+  `FUEL.burnPerHourBattling` 300→**225** (a 6k goal-day still banks ~+2.7h surplus),
+  `BOSS.baseHP` 150k→**300k**, `OVERDRIVE.idleDamageMult` 3→**2** + `boostsSuperAttack`.
+  New `SUPER_ATTACK` feel block (`energyPerHit 1500, minHits 2, maxHits 10,
+  hitStaggerMs 110, finisherFrac 0.5`) + `SCENE` loop constants (`idleLoopCycleMs
+  2200, idleLoopStaggerMs 300, windedCycleMult 2.0, overdriveCycleMult 0.65`).
+- **Built as STR-73…79:** STR-73 config; STR-74 Overdrive retrigger (`overdriveActiveUntil`
+  repurposed as the auto EOD stamp — `endOfEffectiveDay` in `convex/time.ts`; `applyDeploy`
+  ×2 factor; charge/activate model deleted — `overdriveStatus` reshaped to
+  `{active,mult,endsAt,remainingSeconds,stepsToday,goal}`); STR-75 removed manual COLLECT
+  (`collectIdle`→`applyIdleOnOpen`, auto-apply-on-open kept); STR-76 DEPLOY→SUPER ATTACK
+  copy + deploy-event `spent` plumbing (internal `deploy` identifiers unchanged by design);
+  STR-77 the scene (self-rescheduling per-member timers keyed on `heroState`, ambient
+  swings carry NO number, the flurry splits `spent`→N hits summing EXACTLY to `r.damage`
+  with the special finisher largest — also fixed a `fire()` busy-path bug that nuked an
+  in-flight swing's queued damage); STR-78 CommandDock (Collect column gone, gold button
+  reads SUPER); STR-79 OverdriveBar (passive goal-progress → "OVERDRIVE X2 · UNTIL RESET"
+  status strip).
+- **STR-80 sign-off — GO, all 8 scenarios PASS** (browser, cloud dev deployment, numbers
+  predicted-then-checked-to-the-digit): continuous cadence Battling 2200ms / Winded 4403ms
+  / Resting 0 swings / Overdrive 1432ms, ambient hits show no numbers; no-COLLECT auto-apply
+  banked exactly 1,500 (10h×150); flurry drops 3,188 (N2) / 42,667 (N5) / 108,800 (N10-clamp)
+  with splits summing exact + finisher largest; Overdrive auto-arms on the 6k goal (dph
+  150→300, EOD stamp, off at reset with no punishment, re-arms next day) and stacks on
+  Super Attacks ×2; Winded ×0.5×OD ×2 and Resting=0 verified; bonus week kills→crowned with
+  tiers 75k/150k/300k (fractions of 300k) and post-kill Super+idle carry ×2 into the meter,
+  rollover stamped ×1.1; boss pacing dead ~day 6 solo at 6k (spec's day-5 assumed 8k), tier-2
+  rollover 420k with jobs reset + fuel/energy/streak/shields persisting; regression clean
+  (streak ticks + shield bridges a skip, rally/guild board work, classic DashboardScreen
+  loads flag-OFF with no COLLECT). 78/78 tests, `fx-test.html?verify=1` PASS 80/80, tsc clean
+  both projects, 0 console errors.
+- **Open owner tuning (non-blocking, playtest):** (a) **flurry max-length feel** — a single
+  hero sprite serializes swings, so N=2≈1.1s / N=5≈3.5s / N=10≈6.5–7.5s; small/medium banks
+  read as a punchy rat-a-tat, but the N=10 cap drags. Levers if more explosive is wanted:
+  lower `maxHits`, tighten/overlap `hitStaggerMs`, or a teammate-parallel flurry (spec §8).
+  (b) day-5-vs-day-6 kill at 6k (nudge `BOSS.baseHP` if day-5 is wanted). Both are single
+  `gameConfig` edits. Non-blocking dev-only artifacts from verification (cannot occur in
+  prod): a dual-active-challenge only reachable by rewinding the dev clock ~23 days
+  (monotonic prod clock + single-writer rollover prevent it); a transient Metro cache glitch
+  after a mid-session `node_modules/.cache` delete (fixed by a page reload).
 
 ### Phase 3+ — Deferred (architect for, don't build)
 Recognition screens, IAP, cosmetics, guild-vs-guild / global.
