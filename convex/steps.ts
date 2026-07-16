@@ -2,13 +2,13 @@
 // Steps ledger — the source of truth.
 // =============================================================================
 import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getUserGroup } from "./players";
 import {
-  effectiveDayForTz,
+  dayString,
   effectiveNow,
   effectiveWeekForTz,
   endOfEffectiveDay,
@@ -28,6 +28,14 @@ import {
 // source checks, device attestation) plugs in HERE without touching game logic.
 const MAX_PLAUSIBLE_DAILY_STEPS = 300_000;
 
+const DAY_MS = 86_400_000;
+
+/** The same ENABLE_DEV_TOOLS env gate dev.ts asserts (not imported from there —
+ *  dev.ts imports this module). Real deployments leave it unset. */
+function devToolsEnabled(): boolean {
+  return process.env.ENABLE_DEV_TOOLS === "true";
+}
+
 /**
  * Record a step observation. The client PROPOSES a cumulative total for `date`;
  * the server RECORDS it as a brand-new immutable ledger row (never edits a past
@@ -44,12 +52,46 @@ export const recordSteps = mutation({
     if (userId === null) throw new Error("Not signed in.");
 
     // Server decides which calendar day this is (guild timezone + dev clock),
-    // unless an explicit date is given (dev backdating).
+    // unless an explicit date is given.
     const ug = await getUserGroup(ctx, userId);
     const tz = ug?.group.tzOffsetMinutes;
-    const day = date ?? (await effectiveDayForTz(ctx, tz));
+    const now = await effectiveNow(ctx);
+    const today = dayString(now, tz ?? 0);
 
     // --- server-side validation (anti-cheat seam) ---
+    // Backdating clamp (2026-07-16 audit, STR-84): an arbitrary client `date`
+    // could mint energy/shields/jobs for any past day. Real clients only ever
+    // need today (live sync) or yesterday (HealthKit backfilling across
+    // midnight); anything else is rejected unless the deployment runs with
+    // dev tools on (dev backdating keeps working there).
+    let day: string;
+    if (date === undefined || devToolsEnabled()) {
+      day = date ?? today;
+    } else {
+      const yesterday = dayString(now - DAY_MS, tz ?? 0);
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+        (date !== today && date !== yesterday)
+      ) {
+        throw new ConvexError({
+          code: "bad_date",
+          message:
+            "Steps can only sync for today or yesterday — that date is out of range.",
+        });
+      }
+      day = date;
+    }
+
+    // Injector gate (STR-84): "injector" is the dev step source — real builds
+    // sync from HealthKit only.
+    if (source === "injector" && !devToolsEnabled()) {
+      throw new ConvexError({
+        code: "bad_source",
+        message:
+          "Injected steps only work on a dev build — real steps come from Health.",
+      });
+    }
+
     if (!Number.isFinite(stepCount) || stepCount < 0) {
       throw new Error("Invalid step count.");
     }
@@ -78,7 +120,6 @@ export const recordSteps = mutation({
       }
     }
 
-    const now = await effectiveNow(ctx);
     await grantStarterFuelIfNew(ctx, userId, now);
 
     // SETTLE fuel + idle damage together BEFORE this sync changes any rate:

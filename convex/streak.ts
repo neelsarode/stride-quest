@@ -13,11 +13,19 @@ import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { stepsForWeek } from "./steps"; // generic per-day-max sum over a date range
 import { dayString } from "./time";
-import { streakMultiplierFrom } from "./gameConfig";
+import { STREAK, streakMultiplierFrom } from "./gameConfig";
 
 const DAY_MS = 86_400_000;
 
-/** Average steps/day across the streak's day range [today−(n−1) … today]. */
+/** Average steps/day across the streak's RECENT day range — the last
+ *  min(streakCount, STREAK.intensityWindowDays) days ending today. The window
+ *  cap (2026-07-16 audit, STR-84) bounds the ledger scan that runs on EVERY
+ *  dashboard read and deploy (a 200-day streak used to read 200 days of
+ *  entries); the intensity axis now reflects recent effort, while the
+ *  day-count axis (streakMultiplierFrom's dayBonus) still uses the full
+ *  streakCount. Both consumers — deploy (combat.ts) and the dashboard preview
+ *  (game.ts) — go through computeStreakMultiplier below, so the cap applies to
+ *  both identically and shown == applied still holds. */
 export async function avgStepsOverStreak(
   ctx: QueryCtx,
   userId: Id<"users">,
@@ -27,12 +35,13 @@ export async function avgStepsOverStreak(
   today: string,
 ): Promise<number> {
   if (streakCount <= 0) return 0;
+  const windowDays = Math.min(streakCount, STREAK.intensityWindowDays);
   const startDate = dayString(
-    effNow - (streakCount - 1) * DAY_MS,
+    effNow - (windowDays - 1) * DAY_MS,
     tzOffsetMinutes ?? 0,
   );
   const total = await stepsForWeek(ctx, userId, startDate, today);
-  return total / streakCount;
+  return total / windowDays;
 }
 
 /** The streak deploy multiplier + the avg-steps it was based on (for display). */

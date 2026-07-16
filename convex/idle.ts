@@ -16,7 +16,7 @@
 // Bonus phase (M1.5, spec §3): while the progress row's challenge is "won",
 // the SAME settled damage banks into bonusDamageContributed (the accumulating
 // meter) instead of boss HP. Routed HERE, at the single write site, so every
-// settle path — collect, step sync, dev teleport — behaves identically and
+// settle path — the on-open settle, step sync, rally, dev teleport — behaves identically and
 // post-kill idle damage is never discarded (the old victory-lap "settle fuel,
 // throw the damage away" was a subtle punishment; fixed).
 // =============================================================================
@@ -57,9 +57,10 @@ export async function settleFuelAndIdle(
     idleLastAt: progress.lastIdleCollectedAt ?? effNow,
     now: effNow,
     jobMult: progress.idleMultiplierSnapshot ?? 1,
-    // Overdrive (STR-8): the elapsed window prices any active/just-expired ×3
-    // hours from the stamp in force. Activation patches this AFTER settling,
-    // so the pre-activation window never retroactively earns the boost.
+    // Overdrive (Core Loop v2 §5.4): the elapsed window prices any armed
+    // ×OVERDRIVE.idleDamageMult hours from the `overdriveActiveUntil` stamp in
+    // force. A goal-hit stamps it AFTER settling (steps.ts / dev.ts injectFor),
+    // so the pre-goal window never retroactively earns the boost.
     overdriveUntil: user.overdriveActiveUntil,
   });
 

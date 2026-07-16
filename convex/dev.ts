@@ -192,7 +192,32 @@ export const status = query({
   },
 });
 
-// --- step injection for any user --------------------------------------------
+/** Guard for dev tools that act ON a target user (2026-07-16 audit, STR-84):
+ *  the target must be a SIMULATED teammate inside the caller's own guild —
+ *  injectStepsFor/simulateTeammateDeploy previously accepted ANY userId, real
+ *  humans in other guilds included. Mirrors the isSimulated checks in
+ *  drainTeammate/simulateTeammateRally, plus the same-guild membership check. */
+async function assertSimulatedTeammate(
+  ctx: MutationCtx,
+  groupId: Id<"groups">,
+  userId: Id<"users">,
+): Promise<void> {
+  const target = await ctx.db.get(userId);
+  if (!target?.isSimulated) {
+    throw new Error("Pick a simulated teammate.");
+  }
+  const membership = await ctx.db
+    .query("memberships")
+    .withIndex("by_user_and_group", (q) =>
+      q.eq("userId", userId).eq("groupId", groupId),
+    )
+    .first();
+  if (!membership) {
+    throw new Error("That simulated teammate isn't in your guild.");
+  }
+}
+
+// --- step injection for simulated teammates -----------------------------------
 
 async function injectFor(
   ctx: MutationCtx,
@@ -239,8 +264,11 @@ export const injectStepsFor = mutation({
   handler: async (ctx, { userId, stepCount, date }) => {
     assertDevEnabled();
     const caller = await getAuthUserId(ctx);
-    const ug = caller ? await getUserGroup(ctx, caller) : null;
-    const tz = ug?.group.tzOffsetMinutes ?? 0;
+    if (caller === null) throw new Error("Not signed in.");
+    const ug = await getUserGroup(ctx, caller);
+    if (!ug) throw new Error("No guild.");
+    await assertSimulatedTeammate(ctx, ug.group._id, userId);
+    const tz = ug.group.tzOffsetMinutes ?? 0;
     const now = await effectiveNow(ctx);
     const day = date ?? dayString(now, tz);
     await injectFor(ctx, userId, stepCount, day, tz);
@@ -451,6 +479,7 @@ export const simulateTeammateDeploy = mutation({
     if (caller === null) throw new Error("Not signed in.");
     const ug = await getUserGroup(ctx, caller);
     if (!ug) throw new Error("No guild.");
+    await assertSimulatedTeammate(ctx, ug.group._id, userId);
     const challenge = await ensureCurrentChallenge(ctx, ug.group);
     return await applyDeploy(ctx, userId, ug.group, challenge);
   },

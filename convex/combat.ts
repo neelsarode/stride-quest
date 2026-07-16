@@ -1,5 +1,5 @@
 // =============================================================================
-// Combat — idle collection + the daily deploy.
+// Combat — the on-open idle settle + the Super Attack (the daily deploy).
 // =============================================================================
 // Boss HP is derived (maxHP − Σ damageContributed); each member only writes their
 // own progress row. The kill transition (active→won) is the single shared write,
@@ -159,6 +159,19 @@ export async function ensureCurrentChallenge(
     .query("challenges")
     .withIndex("by_group", (q) => q.eq("groupId", group._id))
     .collect();
+  // Self-heal (2026-07-16 audit, STR-84): a challenge can be left "active"
+  // past its own week (the dual-active artifact) — which confuses every
+  // status-based selector (game.ts / guild.ts / steps.ts pick "the" active
+  // via .first()). Any ACTIVE row from another week is stale by definition:
+  // expire it before the normal logic. This can't fight the legit rollover —
+  // the current week's active (startDate === weekStart) is never touched, and
+  // the prior-boss tier resolution below reads `all`'s in-memory statuses,
+  // so its won/expired tier logic is unchanged.
+  for (const c of all) {
+    if (c.status === "active" && c.startDate !== weekStart) {
+      await ctx.db.patch(c._id, { status: "expired" });
+    }
+  }
   const thisWeek = all.find((c) => c.startDate === weekStart);
   if (thisWeek) {
     if (thisWeek.status === "expired") {
@@ -211,9 +224,9 @@ export async function resolveBoss(ctx: MutationCtx, challengeId: Id<"challenges"
   }
 }
 
-// --- idle collection ---------------------------------------------------------
+// --- idle settle (applied on open) --------------------------------------------
 
-// now ONLY the once-per-open settle (Core Loop v2 removed manual collect, §5.2)
+// ONLY the once-per-open settle (Core Loop v2 removed manual collect, §5.2)
 export const applyIdleOnOpen = mutation({
   args: {},
   handler: async (ctx) => {
@@ -276,6 +289,17 @@ export async function applyDeploy(
   const user = (await ctx.db.get(userId))!;
   const earned = await energyEarned(ctx, userId);
   const available = Math.max(0, earned - (user.energySpent ?? 0));
+
+  // Zero-energy gate (2026-07-16 audit, STR-84): a 0-Energy Super previously
+  // ran the whole pipeline — ticking the streak (and its first-of-day
+  // guaranteed-crit) for free, with no steps behind it. Reject BEFORE any
+  // write (the shield settle below patches the user row).
+  if (available <= 0) {
+    throw new ConvexError({
+      code: "no_energy",
+      message: "Nothing banked yet — walk a little first.",
+    });
+  }
 
   // Streak (shield-aware, STR-10): first deploy of the day extends/keeps it; a
   // missed day is silently bridged by an auto-applied Streak Shield (the streak

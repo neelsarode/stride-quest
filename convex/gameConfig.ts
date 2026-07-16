@@ -50,9 +50,14 @@ export const STREAK = {
   // length
   perDayBonus: 0.08, // +8% per consecutive day — TUNABLE start
   perDayBonusCap: 0.8, // day component caps at +80% (~11 days) — TUNABLE start
-  // intensity: avg steps/day during the streak, relative to DAILY_STEP_GOAL
+  // intensity: avg steps/day over the streak's RECENT window, relative to
+  // DAILY_STEP_GOAL. The scan is capped at min(streakCount, intensityWindowDays)
+  // days (STR-84) so the per-day ledger read on every dashboard + deploy stays
+  // bounded on long streaks — the intensity axis reads recent effort, while
+  // the day-count axis below still uses the full streak length.
   intensityBonusAtGoal: 0.25, // hitting the goal avg each day → +25% — TUNABLE start
   intensityBonusCap: 0.6, // intensity caps at +60% (≈ 2.4× goal avg) — TUNABLE start
+  intensityWindowDays: 14, // max days the intensity avg scans back — TUNABLE start
   // progression
   jobBonusPerLevel: 0.1, // +10% per job above Job 1 (Job 5 → +40%) — TUNABLE start
   // overall safety ceiling
