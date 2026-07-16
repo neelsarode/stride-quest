@@ -228,7 +228,7 @@ const VARIANTS = {
     if (ph.mode === 'active') glowRect(ctx, BTN_X, by, BTN_W, bh, 6, .35 + .25*Math.sin(ph.pulse*Math.PI*6));
     if (ph.mode === 'flash'){ ctx.fillStyle='rgba(247,243,231,.55)'; ctx.beginPath(); ctx.roundRect(BTN_X,by,BTN_W,bh,6); ctx.fill(); }
     // -- big word row (scale 2), swords + word centred as one group ---------
-    const word = 'SUPER ATTACK', wy = by + 5 + yo;
+    const word = 'SUPER ATTACK', wy = by + 7 + yo;
     const rowW = spriteW(CROSSED_SWORDS) + 5 + textWidth(word, 2);
     let cx = BTN_X + Math.round((BTN_W - rowW)/2);
     drawSprite(ctx, CROSSED_SWORDS, cx, wy - 1);
