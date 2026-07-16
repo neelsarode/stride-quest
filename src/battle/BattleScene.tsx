@@ -34,6 +34,7 @@
 // =============================================================================
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -200,8 +201,14 @@ interface Shot {
   damage: number | null;
 }
 
-export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
-  function BattleScene(
+// memo (STR-85): ConnectedBattleScene re-renders on EVERY dashboard snapshot
+// (fuel/energy tick over constantly) but `heroes` is memoized off the roster,
+// `bossKey`/`autoPlay` are primitives, and `style` is a module constant at
+// every call site — so memo skips re-rendering the whole stage subtree unless
+// the roster/boss actually changed. (The DevPanel parity rig rebuilds its
+// heroes array per render; memo is simply a no-op there.)
+export const BattleScene = memo(
+  forwardRef<BattleSceneHandle, BattleSceneProps>(function BattleScene(
     { heroes, bossKey = "horse_256", autoPlay = false, style },
     ref,
   ) {
@@ -519,7 +526,7 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
         )}
       </View>
     );
-  },
+  }),
 );
 
 // Boss drop-shadow (HTML: filter drop-shadow(0 14px 10px rgba(0,0,0,.5))) —

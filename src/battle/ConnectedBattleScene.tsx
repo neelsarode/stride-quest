@@ -51,8 +51,14 @@
 // the next tick comes around shortly), while the flurry POLLS fire() until the
 // single fighter is free so every number lands (see runFlurry).
 // =============================================================================
-import { useEffect, useMemo, useRef } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import {
+  AppState,
+  Platform,
+  type AppStateStatus,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { CLASSES, type ClassKey } from "../../convex/gameConfig";
@@ -103,7 +109,38 @@ function jobFolderFor(cls: ClassKey, jobLevel: number): string {
   return folders[Math.max(0, Math.min(folders.length - 1, jobLevel - 1))];
 }
 
-export function ConnectedBattleScene({
+/**
+ * Background pause signal (STR-85): true while the app is foregrounded
+ * (native AppState "active") / the tab visible (web document.visibilityState).
+ * The continuous ambient loop keys off this — timers cleared on background,
+ * rebuilt on return — so a backgrounded app burns zero timer/animation work.
+ */
+function useAppVisible(): boolean {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      // react-native-web ships an AppState shim, but the DOM API is the exact
+      // signal we mean on web — use it directly (SSR-guarded).
+      if (typeof document === "undefined") return;
+      const onChange = () => setVisible(document.visibilityState !== "hidden");
+      onChange();
+      document.addEventListener("visibilitychange", onChange);
+      return () => document.removeEventListener("visibilitychange", onChange);
+    }
+    const onChange = (s: AppStateStatus) => setVisible(s === "active");
+    onChange(AppState.currentState);
+    const sub = AppState.addEventListener("change", onChange);
+    return () => sub.remove();
+  }, []);
+  return visible;
+}
+
+// memo (STR-85): the only prop is `style`, and every call site (GameScreen,
+// DashboardScreen, DevPanel) passes a module-constant StyleSheet value, so a
+// parent re-render — GameScreen re-renders on every engine snapshot — never
+// re-renders the scene tree. The scene still re-renders on its OWN Convex
+// query updates, by design.
+export const ConnectedBattleScene = memo(function ConnectedBattleScene({
   style,
 }: {
   style?: StyleProp<ViewStyle>;
@@ -285,7 +322,14 @@ export function ConnectedBattleScene({
     () => loop.map((m) => `${m.id}:${m.state}`).join(","),
     [loop],
   );
+  // Background pause (STR-85): appVisible joins the rebuild deps — flipping to
+  // false runs this effect's cleanup (clears EVERY ambient timer) and the
+  // early return schedules nothing; flipping back true rebuilds the full set.
+  // Repeated blur/focus cycles therefore can't leak or double a timer: each
+  // flip is one full teardown + (at most) one full rebuild.
+  const appVisible = useAppVisible();
   useEffect(() => {
+    if (!appVisible) return; // backgrounded/hidden — no ambient work at all
     const timers = idleTimers.current;
     loop.forEach((m, index) => {
       if (m.state === "resting") return; // kneels — no ambient swing (§5.1)
@@ -317,9 +361,10 @@ export function ConnectedBattleScene({
       timers.forEach((t) => clearTimeout(t));
       timers.clear();
     };
-    // loopSig fully captures the rebuild triggers; overdrive/meId are live refs.
+    // loopSig + appVisible fully capture the rebuild triggers; overdrive/meId
+    // are live refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loopSig]);
+  }, [loopSig, appVisible]);
 
   // The crowned form rises while the week's boss is beaten (status "won" —
   // the same condition that makes the bonus payload non-null).
@@ -339,6 +384,6 @@ export function ConnectedBattleScene({
       style={style}
     />
   );
-}
+});
 
 export default ConnectedBattleScene;
