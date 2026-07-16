@@ -90,12 +90,30 @@ export const recordSteps = mutation({
       const { weekStart, weekEnd } = await effectiveWeekForTz(ctx, tz);
       const weekly = await stepsForWeek(ctx, userId, weekStart, weekEnd);
       const newMult = multiplierForJobLevel(jobLevelForWeeklySteps(weekly));
-      const challenge = await ctx.db
+      // The guild's CURRENT challenge regardless of active/won status
+      // (2026-07-16 audit, STR-84): during a victory week the current
+      // challenge is the "won" one until Monday's rollover (M1.5), and the
+      // old status:"active" lookup skipped this settle all week — grantFuel
+      // below then re-stamped fuelSettledAt alone, orphaning
+      // progress.lastIdleCollectedAt. The stale idle window later got priced
+      // by fuelMath's damage-only lead-in at the CURRENT fuel state (wrong
+      // state, wrong cap anchor), and the settle-before-Overdrive-stamp
+      // invariant at the bottom of this handler was voided. settleFuelAndIdle
+      // already routes "won" damage into the bonus meter (idle.ts), so
+      // settling is correct in BOTH phases. Passive lookup — not
+      // ensureCurrentChallenge (combat.ts imports steps.ts; rollover stays
+      // the on-open/deploy path's job): prefer this week's live challenge,
+      // else a not-yet-rolled prior active (the pre-existing semantic).
+      const challenges = await ctx.db
         .query("challenges")
-        .withIndex("by_group_and_status", (q) =>
-          q.eq("groupId", ug.group._id).eq("status", "active"),
-        )
-        .first();
+        .withIndex("by_group", (q) => q.eq("groupId", ug.group._id))
+        .collect();
+      const challenge =
+        challenges.find(
+          (c) => c.startDate === weekStart && c.status !== "expired",
+        ) ??
+        challenges.find((c) => c.status === "active") ??
+        null;
       if (challenge) {
         const progress = await ctx.db
           .query("challengeProgress")
@@ -113,6 +131,9 @@ export const recordSteps = mutation({
             newMult,
           );
         }
+        // No progress row = a mid-victory-week joiner (join only creates rows
+        // on an "active" boss): they have no idle stamp to orphan yet, and
+        // applyIdleOnOpen's ensureProgress starts their clock fresh on open.
       }
     }
 

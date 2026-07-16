@@ -477,18 +477,21 @@ export const setFuelHours = mutation({
     const ug = await getUserGroup(ctx, caller);
     if (ug) {
       const challenge = await ensureCurrentChallenge(ctx, ug.group);
+      // Status-agnostic settle (2026-07-16 audit, STR-84): the old
+      // active-only branch settled fuel alone during a victory week ("won"),
+      // orphaning lastIdleCollectedAt (later mispriced by the damage-only
+      // lead-in). settleFuelAndIdle routes "won" damage into the bonus meter
+      // (idle.ts), so one shared-walk path serves both phases.
+      const progress = await ensureProgress(ctx, challenge, caller);
+      await settleFuelAndIdle(
+        ctx,
+        caller,
+        progress,
+        now,
+        challenge.boostMult ?? 1, // guild-wide boost stamped on this week (STR-56)
+      );
       if (challenge.status === "active") {
-        const progress = await ensureProgress(ctx, challenge, caller);
-        await settleFuelAndIdle(
-          ctx,
-          caller,
-          progress,
-          now,
-          challenge.boostMult ?? 1, // guild-wide boost stamped on this week (STR-56)
-        );
         await resolveBoss(ctx, challenge._id);
-      } else {
-        await settleFuel(ctx, caller, now);
       }
     } else {
       await settleFuel(ctx, caller, now);
@@ -562,18 +565,19 @@ export const drainTeammate = mutation({
     const ug = await getUserGroup(ctx, caller);
     if (ug) {
       const challenge = await ensureCurrentChallenge(ctx, ug.group);
+      // Status-agnostic settle (2026-07-16 audit, STR-84) — same reason as
+      // setFuelHours above: victory-week drains must price the bot's idle
+      // window through the shared walk (into the bonus meter), not orphan it.
+      const progress = await ensureProgress(ctx, challenge, userId);
+      await settleFuelAndIdle(
+        ctx,
+        userId,
+        progress,
+        now,
+        challenge.boostMult ?? 1,
+      );
       if (challenge.status === "active") {
-        const progress = await ensureProgress(ctx, challenge, userId);
-        await settleFuelAndIdle(
-          ctx,
-          userId,
-          progress,
-          now,
-          challenge.boostMult ?? 1,
-        );
         await resolveBoss(ctx, challenge._id);
-      } else {
-        await settleFuel(ctx, userId, now);
       }
     } else {
       await settleFuel(ctx, userId, now);

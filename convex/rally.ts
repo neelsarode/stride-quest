@@ -25,7 +25,7 @@ import { getUserGroup } from "./players";
 import { energyEarned } from "./economy";
 import { ensureCurrentChallenge, ensureProgress, resolveBoss } from "./combat";
 import { settleFuelAndIdle } from "./idle";
-import { settleFuel, grantFuel } from "./fuel";
+import { grantFuel } from "./fuel";
 import { fuelStateFor, RALLY_FUEL_GRANT } from "./fuelMath";
 import { RALLY } from "./gameConfig";
 
@@ -99,24 +99,25 @@ export async function applyRally(
     });
   }
 
-  // SETTLE the receiver FIRST at their old fuel level (and bank any idle
-  // damage over the same walk when there's a live boss) — THEN check state.
+  // SETTLE the receiver FIRST at their old fuel level (banking idle damage
+  // over the same walk) — THEN check state. Status-agnostic since the
+  // 2026-07-16 audit (STR-84): the old "victory lap" branch settled fuel
+  // ONLY, orphaning the receiver's lastIdleCollectedAt (later mispriced by
+  // fuelMath's damage-only lead-in at the then-current fuel state).
+  // settleFuelAndIdle routes "won"-phase damage into the bonus meter
+  // (idle.ts), so ONE shared-walk path now serves both phases.
   const challenge = await ensureCurrentChallenge(ctx, ug.group);
-  let settledFuel: number;
+  const progress = await ensureProgress(ctx, challenge, receiverId);
+  const settled = await settleFuelAndIdle(
+    ctx,
+    receiverId,
+    progress,
+    now,
+    challenge.boostMult ?? 1, // guild-wide boost stamped on this week (STR-56)
+  );
+  const settledFuel = settled.fuel;
   if (challenge.status === "active") {
-    const progress = await ensureProgress(ctx, challenge, receiverId);
-    const settled = await settleFuelAndIdle(
-      ctx,
-      receiverId,
-      progress,
-      now,
-      challenge.boostMult ?? 1, // guild-wide boost stamped on this week (STR-56)
-    );
-    settledFuel = settled.fuel;
     await resolveBoss(ctx, challenge._id);
-  } else {
-    // Victory lap: no boss to hit, but the tank still drains.
-    settledFuel = (await settleFuel(ctx, receiverId, now)).fuel;
   }
   if (fuelStateFor(settledFuel) === "battling") {
     throw new ConvexError({
