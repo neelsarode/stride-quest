@@ -28,7 +28,9 @@
 // DRIVERS: `autoPlay` runs the preview's idle choreography (basics every
 // cycle staggered down the party, every-4th = special) — the STR-21 parity
 // mode. Real Convex events drive the scene through the `fire()` handle with
-// STR-22; tap-a-hero always fires that hero's ultimate (preview parity).
+// STR-22; tap-a-hero fires that hero's ultimate — with the preview's rolled
+// number in autoPlay (parity), as a numberless ambient swing in live mode
+// (real numbers only ever come from fire() — STR-85).
 // =============================================================================
 import {
   forwardRef,
@@ -275,7 +277,14 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
     const handleRelease = useCallback((index: number, e: ReleaseEvent) => {
       const l = layoutRef.current;
       const pos = l?.heroes[index];
-      if (!l || !pos) return;
+      const heroId = heroesRef.current[index]?.id;
+      if (!l || !pos) {
+        // No layout/position yet → no projectile can spawn. Drop this swing's
+        // queued number too: an orphaned entry would ride a LATER unrelated
+        // swing as a stale figure (STR-85 queuedDamage hygiene).
+        if (heroId) queuedDamage.current.delete(heroId);
+        return;
+      }
       const entry = MANIFEST[firedAnimKey(e)];
       const scale = l.heroPx / entry.h;
       // The rendered frame box: bottom-left pinned at (left, bottom), height
@@ -294,7 +303,6 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
         height: l.bossH,
       };
       const geo = computeShotGeometry(shooter, e.anchor, bossRect);
-      const heroId = heroesRef.current[index]?.id;
       // .has() distinguishes an ambient queued `null` (→ no number) from "no
       // entry queued" (→ the preview's parity roll). A real number rides as-is.
       const hasQueued = heroId != null && queuedDamage.current.has(heroId);
@@ -302,51 +310,88 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
         ? (queuedDamage.current.get(heroId!) as number | null)
         : undefined;
       if (heroId) queuedDamage.current.delete(heroId);
+      // Only shots whose number came in through fire() carry the exact-sum
+      // promise; ambient (null) and autoPlay parity rolls are display flair.
+      const carriesRealNumber = hasQueued && queued !== null;
       setShots((s) => {
-        // Perf cap (plan §Perf risks): past the cap the swing still plays but
-        // the projectile is skipped; the preview never exceeds this naturally.
-        if (s.length >= SCENE.maxConcurrentShots) return s;
-        return [
-          ...s,
-          {
-            id: shotId.current++,
-            cls: e.cls,
-            kind: e.kind,
-            ...geo,
-            damage: hasQueued ? queued! : rollDamage(e.kind),
-          },
-        ];
+        const shot: Shot = {
+          id: shotId.current++,
+          cls: e.cls,
+          kind: e.kind,
+          ...geo,
+          damage: hasQueued ? queued! : rollDamage(e.kind),
+        };
+        if (s.length < SCENE.maxConcurrentShots) return [...s, shot];
+        // AT the perf cap (plan §Perf risks — bounds concurrent Reanimated
+        // work). For AMBIENT swings and autoPlay parity rolls the cap stays a
+        // HARD limit: the swing still plays, the projectile is skipped (the
+        // preview never exceeds it naturally). A REAL-number shot must never
+        // be silently swallowed (the on-screen numbers sum to the real damage
+        // — the exact-sum promise, STR-85): it EVICTS the oldest ambient shot
+        // to take its slot.
+        if (!carriesRealNumber) return s;
+        const ambientIdx = s.findIndex((x) => x.damage === null);
+        if (ambientIdx >= 0)
+          return [...s.slice(0, ambientIdx), ...s.slice(ambientIdx + 1), shot];
+        // Every in-flight shot carries a real number (practically
+        // unreachable: each needs one real swing and fighters serialize
+        // swings, so concurrency is bounded by roster size) — admit anyway;
+        // a brief 1-shot overshoot beats a vanished number.
+        return [...s, shot];
       });
     }, []);
 
+    // queuedDamage hygiene (STR-85): a hero's cls/job change makes Fighter
+    // abandon its in-flight swing (the jobKey effect cancels the scheduled
+    // release), and a roster removal unmounts the Fighter outright — either
+    // way a queued number would orphan and ride a LATER unrelated swing.
+    // Fighter must not know about the scene's map, so the scene watches the
+    // same signals (hero id + job key) and clears the entry here.
+    const jobKeys = useRef(new Map<string, string>());
+    useEffect(() => {
+      const seen = new Map<string, string>();
+      for (const h of heroes) {
+        const key = `${h.cls}/${h.job}`;
+        const prev = jobKeys.current.get(h.id);
+        if (prev !== undefined && prev !== key)
+          queuedDamage.current.delete(h.id);
+        seen.set(h.id, key);
+      }
+      for (const id of [...queuedDamage.current.keys()]) {
+        if (!seen.has(id)) queuedDamage.current.delete(id);
+      }
+      jobKeys.current = seen;
+    }, [heroes]);
+
     // --- imperative attack orders (the event wiring's entry point) ----------
-    useImperativeHandle(
-      ref,
-      () => ({
-        fire(heroId, kind, damage) {
-          const index = heroesRef.current.findIndex((h) => h.id === heroId);
-          const f = index >= 0 ? fighters.current[index] : null;
-          if (!f) return false;
-          // Capture any queued damage already waiting on this hero (an armed,
-          // not-yet-released swing's number) so a REJECTED fire (fighter busy)
-          // RESTORES it instead of nuking it. Core Loop v2 (STR-77) fires the
-          // SAME hero rapidly — the continuous idle loop can collide with a real
-          // event swing, and the Super Attack flurry polls while its own swing
-          // is in flight — so a failed attempt must never corrupt the in-flight
-          // swing's number (which would surface as a parity-roll fallback).
-          const hadPrev = queuedDamage.current.has(heroId);
-          const prev = hadPrev ? queuedDamage.current.get(heroId) : undefined;
-          if (damage !== undefined) queuedDamage.current.set(heroId, damage);
-          const ok = kind === "special" ? f.special() : f.basic();
-          if (!ok && damage !== undefined) {
-            if (hadPrev) queuedDamage.current.set(heroId, prev as number | null);
-            else queuedDamage.current.delete(heroId);
-          }
-          return ok;
-        },
-      }),
+    // Shared by the ref handle's fire() AND tap-a-hero below, so BOTH paths
+    // run the queue/restore protocol (a tap that bypassed it was how the
+    // parity roll leaked fabricated numbers into production — STR-85).
+    const orderAttack = useCallback(
+      (heroId: string, kind: AttackKind, damage?: number | null): boolean => {
+        const index = heroesRef.current.findIndex((h) => h.id === heroId);
+        const f = index >= 0 ? fighters.current[index] : null;
+        if (!f) return false;
+        // Capture any queued damage already waiting on this hero (an armed,
+        // not-yet-released swing's number) so a REJECTED fire (fighter busy)
+        // RESTORES it instead of nuking it. Core Loop v2 (STR-77) fires the
+        // SAME hero rapidly — the continuous idle loop can collide with a real
+        // event swing, and the Super Attack flurry polls while its own swing
+        // is in flight — so a failed attempt must never corrupt the in-flight
+        // swing's number (which would surface as a parity-roll fallback).
+        const hadPrev = queuedDamage.current.has(heroId);
+        const prev = hadPrev ? queuedDamage.current.get(heroId) : undefined;
+        if (damage !== undefined) queuedDamage.current.set(heroId, damage);
+        const ok = kind === "special" ? f.special() : f.basic();
+        if (!ok && damage !== undefined) {
+          if (hadPrev) queuedDamage.current.set(heroId, prev as number | null);
+          else queuedDamage.current.delete(heroId);
+        }
+        return ok;
+      },
       [],
     );
+    useImperativeHandle(ref, () => ({ fire: orderAttack }), [orderAttack]);
 
     // --- idle choreography (timer parity: CYCLE/STAGGER/SPECIAL_EVERY) ------
     useEffect(() => {
@@ -405,8 +450,15 @@ export const BattleScene = forwardRef<BattleSceneHandle, BattleSceneProps>(
                 <Pressable
                   key={hero.id}
                   testID={`scene-hero-${i}`}
-                  // Tap a hero → fire their ultimate now (preview parity).
-                  onPress={() => fighters.current[i]?.special()}
+                  // Tap a hero → fire their ultimate now. In autoPlay (the
+                  // DevPanel timer-parity QA rig, ≙ battlefield-ui.html) the
+                  // swing keeps the preview's rolled number (`undefined` →
+                  // parity roll); in LIVE mode it routes through the ambient
+                  // path (`null` → flair only, NO floating number) so a tap
+                  // can never float a fabricated figure (STR-85).
+                  onPress={() =>
+                    orderAttack(hero.id, "special", autoPlay ? undefined : null)
+                  }
                   style={{
                     position: "absolute",
                     left: pos.left,

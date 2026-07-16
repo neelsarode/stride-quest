@@ -142,6 +142,10 @@ export function Projectile({
   // Ambient swings (Core Loop v2 §5.1, STR-77) pass damage null/≤0 → the boss
   // flash + projectile still play, but no floating number is spawned.
   const showNumber = damage != null && damage > 0;
+  // Comma-grouped ("-624,000", not "-624000") — locale pinned so the display
+  // is deterministic; mirrored in assets/fx-engine.js for rig parity (STR-85).
+  const numberText =
+    damage != null && damage > 0 ? `-${damage.toLocaleString("en-US")}` : null;
   const [phase, setPhase] = useState<"flight" | "impact">("flight");
   const [burstDone, setBurstDone] = useState(false);
 
@@ -336,7 +340,7 @@ export function Projectile({
               },
             ]}
           >
-            -{damage}
+            {numberText}
           </Text>
         </Animated.View>
       )}

@@ -946,9 +946,10 @@ function BattleSceneDemo() {
 // STR-22 verification vehicle for src/battle/ConnectedBattleScene.tsx (plan
 // step 6 / D5): the scene on REAL Convex state — roster from guild.overview,
 // attacks from the live game-event stream. Drive it with the panel's own
-// tools: inject → DEPLOY (screen button) → your hero ults with the real
-// number; teammate ⚔ Deploy → their fighter fires; 💤 Drain → they kneel with
-// z's; ⚡ Activate ×3 → your specials chain; kill the boss → crowned form.
+// tools: inject → SUPER ATTACK (screen button) → your hero's flurry with the
+// real numbers; teammate ⚔ Deploy → their fighter fires; 💤 Drain → they
+// kneel with z's; ⚡ Overdrive → your ambient swing cadence speeds up (Core
+// Loop v2 — no more chained specials); kill the boss → crowned form.
 function LiveSceneDemo() {
   const [open, setOpen] = useState(false);
   return (

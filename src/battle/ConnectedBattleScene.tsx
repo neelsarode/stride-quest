@@ -33,9 +33,9 @@
 //                                     special when the hit is deploy-sized,
 //                                     basic otherwise; their real number. (No
 //                                     flurry for teammates yet — §8.)
-//   • damageDealt/idle + idleCollected (the auto-collect on open) → a quick
-//     staggered basic volley from the whole party; the banked total is split
-//     evenly across the volley's impact numbers (sum ≈ the real amount).
+//   • idleCollected (the auto-collect on open) → a quick staggered basic
+//     volley from the eligible (non-resting, non-mid-flurry) party; the banked
+//     total is split EXACTLY across the volley's impact numbers (STR-85).
 //   • bossDefeated                  → nothing here: the banner + victory lap
 //     stay with the feedback layer; the CROWNED form swap is reactive state
 //     (boss.status === "won" via boss.defeated), not an event.
@@ -58,6 +58,7 @@ import { api } from "../../convex/_generated/api";
 import { CLASSES, type ClassKey } from "../../convex/gameConfig";
 import { useFeedbackEvent } from "../feedback/FeedbackProvider";
 import { SUPER_ATTACK } from "../config/assets";
+import { splitSuperAttack } from "./flurryMath";
 import {
   BattleScene,
   type BattleSceneHandle,
@@ -76,8 +77,8 @@ const TEAMMATE_SPECIAL_MIN_DAMAGE = 5_000;
 const VOLLEY_STAGGER_MS = 120;
 
 // A hit that collided with a busy fighter retries once this much later (a basic
-// volley clears in well under a second). Used by the teammate/idle single-hit
-// paths and the Super Attack fallback.
+// volley clears in well under a second). Used by the teammate single-hit path,
+// each volley hit, and the Super Attack fallback.
 const RETRY_MS = 900;
 
 // Super Attack flurry dispatch (STR-77, §5.3). A single Fighter serializes
@@ -164,14 +165,31 @@ export function ConnectedBattleScene({
   const fire = (heroId: string, kind: AttackKind, damage?: number | null) =>
     sceneRef.current?.fire(heroId, kind, damage) ?? false;
 
-  // idleCollect → quick basic volley from the whole party, the banked total
-  // split evenly across the hits (sum ≈ the real collected amount).
+  // idleCollect → quick basic volley, the banked total split EXACTLY across
+  // the ELIGIBLE hitters (STR-85 exact-sum): resting members sit out (their
+  // Fighters refuse orders, which silently vanished their share of the shown
+  // sum), and YOUR hero sits out while a Super Attack flurry owns it (its
+  // share folds into the others'). Split rule: floor(total / n) each, the
+  // remainder distributed +1 to the first (total mod n) hitters — shares
+  // always sum to `total`. Each hit retries once if its fighter was mid-swing
+  // (an ambient collision); with no eligible hitter the volley is skipped —
+  // the feedback layer's own floating number still shows the amount.
   const volley = (total: number) => {
-    const roster = heroesRef.current;
-    if (roster.length === 0) return;
-    const share = Math.max(1, Math.round(total / roster.length));
-    roster.forEach((h, i) => {
-      setTimeout(() => fire(h.id, "basic", share), i * VOLLEY_STAGGER_MS);
+    const me = meIdRef.current;
+    const eligible = heroesRef.current.filter(
+      (h) => !h.resting && !(flurryActiveRef.current && h.id === me),
+    );
+    if (eligible.length === 0 || total <= 0) return;
+    const base = Math.floor(total / eligible.length);
+    const remainder = total - base * eligible.length;
+    eligible.forEach((h, i) => {
+      const share = base + (i < remainder ? 1 : 0);
+      if (share <= 0) return; // tiny totals: a 0 share adds nothing to the sum
+      setTimeout(() => {
+        if (!fire(h.id, "basic", share)) {
+          setTimeout(() => fire(h.id, "basic", share), RETRY_MS);
+        }
+      }, i * VOLLEY_STAGGER_MS);
     });
   };
 
@@ -234,39 +252,14 @@ export function ConnectedBattleScene({
           }
           return;
         }
-        // N = clamp(round(spent / energyPerHit), minHits, maxHits).
-        const N = Math.max(
-          SUPER_ATTACK.minHits,
-          Math.min(
-            SUPER_ATTACK.maxHits,
-            Math.round(spent / SUPER_ATTACK.energyPerHit),
-          ),
-        );
-        const buildupCount = N - 1;
-        // Damage split (sums to `amount` EXACTLY): the finisher carries
-        // finisherFrac PLUS every rounding remainder → the single largest
-        // number; the N−1 buildups share the floored rest evenly.
-        const finisherBase = Math.round(SUPER_ATTACK.finisherFrac * amount);
-        const pool = amount - finisherBase; // the buildups' shared pool
-        const each = buildupCount > 0 ? Math.floor(pool / buildupCount) : 0;
-        let finisher = finisherBase + (pool - each * buildupCount); // remainder → finisher
-        const buildups = Array.from({ length: buildupCount }, () => each);
-        // Keep the finisher STRICTLY largest even in the degenerate
-        // finisherFrac=0.5 / N=2 / even-total 50-50 (shift 1 pt; sum stays exact).
-        if (buildupCount > 0 && finisher <= each) {
-          buildups[0] -= 1;
-          finisher += 1;
-        }
-        const hits: { kind: AttackKind; dmg: number }[] = [
-          ...buildups.map((dmg) => ({ kind: "basic" as AttackKind, dmg })),
-          { kind: "special" as AttackKind, dmg: finisher },
-        ];
-        runFlurry(hits);
+        // N sizing + exact-sum damage split live in flurryMath.ts (pure,
+        // node-testable — STR-85); the LIVE tunables are passed in from
+        // assets.ts (flurryMath's defaults are a test-only mirror).
+        runFlurry(splitSuperAttack(spent, amount, SUPER_ATTACK));
         return;
       }
-      case "idle":
-        volley(amount);
-        return;
+      // (No `case "idle"` here: nothing emits damageDealt/idle anymore — the
+      // auto-applied idle economy arrives as the `idleCollected` event above.)
       case "teammate": {
         if (!e.userId) return;
         const kind: AttackKind =

@@ -84,7 +84,7 @@ window.FXEngine = (function () {
     const amount = big ? (9000 + Math.floor(Math.random() * 3000)) : (1800 + Math.floor(Math.random() * 900));
     if (api.onDamage) api.onDamage(amount, big);   // optional page hook (e.g. HUD boss HP bar)
     const dmg = document.createElement('div');
-    dmg.textContent = '-' + amount;
+    dmg.textContent = '-' + amount.toLocaleString('en-US'); // comma-grouped — RN parity (src/battle/Projectile.tsx, STR-85)
     dmg.style.cssText = `position:fixed;left:${cx - 12}px;top:${cy - isize / 2 - 8}px;z-index:62;pointer-events:none;
       font-weight:800;font-size:${big ? 30 : 22}px;color:${big ? '#ffe9a3' : '#ffd166'};text-shadow:0 2px 3px #000;
       transition:transform .8s ease-out,opacity .8s ease-out;`;
