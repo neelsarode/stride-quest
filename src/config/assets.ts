@@ -265,6 +265,21 @@ export const SUPER_ATTACK = {
   finisherFrac: 0.5, // TUNABLE start — final special = 50% of total; buildups split the rest
 } as const;
 
+/** IDLE HIT PREVIEW (live "the fight is landing" feedback). FEEL LAYER ONLY —
+ *  the idle DAMAGE economy is unchanged and server-authoritative. Your FRONT
+ *  hero's continuous swings float a small REAL number: the projected idle
+ *  accrued since the last shown one (a client extrapolation of the server's
+ *  uncollected `pending`, same math as usePendingIdle — dph × elapsed, capped
+ *  at the offline cap). It is a PREVIEW, not a settlement: the numbers sum to
+ *  the pending the next settle applies, so nothing is double-counted against
+ *  the boss (the bar still moves only when the server settles). `minNibble`
+ *  skips sub-1 rounding so we never float "-0"; the cadence rides the hero's
+ *  own swing timer, so number magnitude scales honestly with the real rate
+ *  (higher job / Overdrive / a bigger party → bigger, more frequent hits). */
+export const IDLE_PREVIEW = {
+  minNibble: 1, // TUNABLE start — smallest projected-idle delta worth floating
+} as const;
+
 export type BannerVariant = keyof typeof BANNER;
 
 /** Directions available for each sprite (matches the art folders). */
