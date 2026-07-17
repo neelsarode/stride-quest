@@ -9,14 +9,16 @@
 //    CONFIRM CARD before any join ("no surprise guilds") → joinGuildByCode.
 //    Structured ConvexError codes map to the comp's warm inline states —
 //    cozy, never punitive, no red UI (binding guardrail).
-// The solo-guild-switch path needs no extra UI: the same confirm card fronts
-// it, and the backend cascades the caller's empty solo guild inside
-// joinGuildByCode. OnboardingFlow keeps this component mounted through the
-// reactive hasGuild flip until onDone (see its header).
+//
+// Pixel-kit skin (STR-88): battlefield background (OnboardingBackground) + the
+// baked bitmap font (PixelText) + kit Button / Portrait + pixel code boxes,
+// replacing the old flat-dark / system-font placeholder. The state machine,
+// mutations, preview, and warm error routing are UNCHANGED — only the skin.
+// NOTE: the bitmap font has no apostrophe, so fixed copy drops it (arcade
+// style); user-supplied guild names render in a mono <Text> (any character).
 // =============================================================================
 import { useRef, useState } from "react";
 import {
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -25,23 +27,30 @@ import {
   Text,
   TextInput,
   View,
-  type ImageStyle,
 } from "react-native";
 import { useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { api } from "../../../convex/_generated/api";
 import { GUILD } from "../../../convex/gameConfig";
-import { PALETTE, SIZES } from "../../config/assets";
+import { portraitSpriteFor } from "../../config/assets";
 import { useFeedback } from "../../feedback/FeedbackProvider";
+import {
+  BakedImage,
+  Button,
+  PixelText,
+  Portrait,
+  UIScaleProvider,
+} from "../../ui";
+import { UI_PALETTE } from "../../ui/theme";
+import { OnboardingBackground, useOnbLayout } from "./OnboardingBackground";
 import type { Viewer } from "./OnboardingFlow";
 
 /** Mirrors guild.createGuild's validated bound. */
 const GUILD_NAME_MAX = 30;
+const WARM = "#ffe08a"; // warm amber for the "never red" error states (guardrail)
 
 /** Client-side mirror of convex/inviteCode.normalizeInviteCode (+ length cap
- *  for the six boxes): uppercase, drop the separators people type when reading
- *  a code aloud. Look-alike characters are NOT corrected — the server's
- *  alphabet check turns them into an honest not_found. */
+ *  for the six boxes): uppercase, drop the separators people type. */
 function normalizeAsTyped(input: string): string {
   return input
     .toUpperCase()
@@ -51,11 +60,10 @@ function normalizeAsTyped(input: string): string {
 
 /** The share payload for both the code-reveal screen and the guild board. */
 export function inviteShareMessage(code: string): string {
-  return `Join my guild on Stride Quest! Enter invite code ${code} — every step we walk hits the same boss.`;
+  return `Join my guild on WalkPG! Enter invite code ${code} — every step we walk hits the same boss.`;
 }
 
-/** Native share with a web-desktop fallback (no navigator.share there):
- *  copy to clipboard instead. Returns a user-facing note, or null. */
+/** Native share with a web-desktop fallback (copy to clipboard). */
 export async function shareInviteCode(code: string): Promise<string | null> {
   try {
     await Share.share({ message: inviteShareMessage(code) });
@@ -68,28 +76,18 @@ export async function shareInviteCode(code: string): Promise<string | null> {
         navigator.clipboard
       ) {
         await navigator.clipboard.writeText(inviteShareMessage(code));
-        return "Copied — paste it to your crew.";
+        return "COPIED - PASTE IT TO YOUR CREW.";
       }
     } catch {
       // fall through to the calm no-share note
     }
-    return "Sharing isn't available here — your code lives on the guild board.";
+    return "SHARING ISNT AVAILABLE HERE - YOUR CODE LIVES ON THE GUILD BOARD.";
   }
 }
 
-// Crew huddle on the fork (comp GUILD beat) — three job-1 heroes sell "guild"
-// better than an emblem. Static requires; M2's generated spriteMap replaces
-// these one-offs along with ChooseHeroScreen's map.
-const HUDDLE = [
-  require("../../../characters/mage/1_apprentice/animations/idle/frame_000.png"),
-  require("../../../characters/warrior/1_rookie/animations/idle/frame_000.png"),
-  require("../../../characters/medic/1_acolyte/animations/idle/frame_000.png"),
-];
-
-const PIXELATED: ImageStyle | null =
-  Platform.OS === "web"
-    ? ({ imageRendering: "pixelated" } as unknown as ImageStyle)
-    : null;
+// Crew huddle on the fork — three job-1 heroes sell "guild" better than an
+// emblem (mage / warrior / medic; the warrior in the middle wears the ring).
+const HUDDLE: readonly string[] = ["mage", "warrior", "medic"];
 
 type Step =
   | { id: "fork" }
@@ -104,39 +102,46 @@ export function GuildStepScreens({
   viewer: Viewer;
   onDone: () => void;
 }) {
+  const { artScale } = useOnbLayout();
   const [step, setStep] = useState<Step>({ id: "fork" });
 
   switch (step.id) {
     case "fork":
       return (
         <Frame>
-          <View style={styles.huddle}>
-            {HUDDLE.map((src, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.huddlePortrait,
-                  i === 1 && { borderColor: PALETTE.accent },
-                ]}
-              >
-                <Image source={src} style={[styles.huddleSprite, PIXELATED]} fadeDuration={0} />
-              </View>
-            ))}
+          <View style={[styles.huddle, { marginBottom: 6 * artScale }]}>
+            {HUDDLE.map((k, i) => {
+              const sp = portraitSpriteFor(k, 1);
+              return (
+                <View key={k} style={{ width: 30 * artScale, height: 30 * artScale }}>
+                  <Portrait size={30} source={sp.src} sourceSize={sp.size} cropKey={k} scale={artScale} />
+                  {i === 1 && (
+                    <View pointerEvents="none" style={ring(artScale)} />
+                  )}
+                </View>
+              );
+            })}
           </View>
-          <Text style={styles.headline}>HEROES DON'T{"\n"}FIGHT ALONE.</Text>
-          <Text style={styles.body}>
-            Every step your crew walks hits the same boss. Win Sundays
-            together.
-          </Text>
-          <View style={styles.forkButtons}>
-            <Btn gold label="START A GUILD" onPress={() => setStep({ id: "create" })} />
-            <Text style={styles.hint}>Mint a code to share</Text>
-            <Btn label="I HAVE A CODE" onPress={() => setStep({ id: "join" })} />
-            <Text style={styles.hint}>A friend already sent you one</Text>
+          <PixelText text="NO HERO FIGHTS" color={UI_PALETTE.gold_light} scale={artScale * 2} />
+          <PixelText text="ALONE." color={UI_PALETTE.gold_light} scale={artScale * 2} style={{ marginTop: 2 * artScale }} />
+          <PixelP
+            lines={["EVERY STEP YOUR CREW WALKS", "HITS THE SAME BOSS.", "WIN SUNDAYS TOGETHER."]}
+            color={UI_PALETTE.sky_mid}
+            scale={artScale}
+            style={{ marginTop: 6 * artScale }}
+          />
+          <View style={{ marginTop: 12 * artScale, alignItems: "center", gap: 6 * artScale }}>
+            <Btn gold big label="START A GUILD" onPress={() => setStep({ id: "create" })} artScale={artScale} />
+            <PixelText text="MINT A CODE TO SHARE" color={UI_PALETTE.sky_dark} scale={artScale} />
+            <Btn label="I HAVE A CODE" onPress={() => setStep({ id: "join" })} artScale={artScale} />
+            <PixelText text="A FRIEND ALREADY SENT YOU ONE" color={UI_PALETTE.sky_dark} scale={artScale} />
           </View>
-          <Text style={styles.footer}>
-            A guild holds up to {GUILD.maxMembers} heroes.
-          </Text>
+          <PixelText
+            text={`A GUILD HOLDS UP TO ${GUILD.maxMembers} HEROES.`}
+            color={UI_PALETTE.sky_dark}
+            scale={artScale}
+            style={{ marginTop: 16 * artScale }}
+          />
         </Frame>
       );
     case "create":
@@ -144,26 +149,15 @@ export function GuildStepScreens({
         <CreateGuildStep
           viewer={viewer}
           onBack={() => setStep({ id: "fork" })}
-          onCreated={(guildName, inviteCode) =>
-            setStep({ id: "reveal", guildName, inviteCode })
-          }
+          onCreated={(guildName, inviteCode) => setStep({ id: "reveal", guildName, inviteCode })}
         />
       );
     case "reveal":
       return (
-        <CodeRevealStep
-          guildName={step.guildName}
-          inviteCode={step.inviteCode}
-          onDone={onDone}
-        />
+        <CodeRevealStep guildName={step.guildName} inviteCode={step.inviteCode} onDone={onDone} />
       );
     case "join":
-      return (
-        <JoinGuildStep
-          onStartInstead={() => setStep({ id: "create" })}
-          onDone={onDone}
-        />
-      );
+      return <JoinGuildStep onStartInstead={() => setStep({ id: "create" })} onDone={onDone} />;
   }
 }
 
@@ -178,6 +172,7 @@ function CreateGuildStep({
   onBack: () => void;
   onCreated: (guildName: string, inviteCode: string) => void;
 }) {
+  const { artScale } = useOnbLayout();
   const createGuild = useMutation(api.guild.createGuild);
   const [name, setName] = useState(`${viewer.displayName}'s Guild`);
   const [busy, setBusy] = useState(false);
@@ -204,28 +199,35 @@ function CreateGuildStep({
 
   return (
     <Frame>
-      <Text style={styles.headline}>START A GUILD</Text>
-      <View style={styles.fieldBlock}>
-        <Text style={styles.fieldLabel}>GUILD NAME</Text>
-        <TextInput
-          style={styles.input}
-          value={name}
-          onChangeText={setName}
-          maxLength={GUILD_NAME_MAX}
-        />
-        <Text style={styles.hint}>Rename it any time.</Text>
+      <PixelText text="START A GUILD" color={UI_PALETTE.gold_light} scale={artScale * 2} />
+      <View style={[styles.panel, { marginTop: 12 * artScale }]}>
+        <PixelText text="GUILD NAME" color={UI_PALETTE.sky_mid} scale={artScale} />
+        <View style={[styles.well, { marginTop: 6 }]}>
+          <TextInput style={styles.input} value={name} onChangeText={setName} maxLength={GUILD_NAME_MAX} selectionColor={UI_PALETTE.gold_mid} />
+        </View>
+        <PixelText text="RENAME IT ANY TIME." color={UI_PALETTE.sky_dark} scale={artScale} style={{ marginTop: 6 }} />
+        <View style={styles.divider} />
+        <PixelText text="FOUNDING A GUILD MINTS:" color={UI_PALETTE.white} scale={artScale} />
+        <MintRow icon="icon_banner" text="YOUR INVITE CODE" artScale={artScale} />
+        <MintRow icon="icon_swords" text="THE WEEKLY BOSS" artScale={artScale} />
+        <MintRow icon="icon_gem" text="A 24H STARTER TANK" artScale={artScale} />
+        <PixelText text="FRIENDS JOIN ANY TIME." color={UI_PALETTE.sky_mid} scale={artScale} style={{ marginTop: 4 }} />
       </View>
-      <View style={styles.mintList}>
-        <Text style={styles.mintTitle}>Founding a guild mints:</Text>
-        <Text style={styles.mintRow}>• your invite code</Text>
-        <Text style={styles.mintRow}>• this week's boss</Text>
-        <Text style={styles.mintRow}>• a 24h starter tank</Text>
-        <Text style={styles.hint}>Friends join any time.</Text>
+      <View style={{ marginTop: 14 * artScale, opacity: busy || !nameOk ? 0.5 : 1 }}>
+        <Btn gold big label="CREATE GUILD" onPress={onCreate} disabled={busy || !nameOk} artScale={artScale} />
       </View>
-      <Btn gold label="CREATE GUILD" onPress={onCreate} disabled={busy || !nameOk} />
-      <Link label="Back" onPress={onBack} />
+      <Link label="BACK" onPress={onBack} artScale={artScale} />
       {note && <Text style={styles.note}>{note}</Text>}
     </Frame>
+  );
+}
+
+function MintRow({ icon, text, artScale }: { icon: "icon_banner" | "icon_swords" | "icon_gem"; text: string; artScale: number }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 }}>
+      <BakedImage name={icon} scale={artScale} />
+      <PixelText text={text} color={UI_PALETTE.white} scale={artScale} />
+    </View>
   );
 }
 
@@ -240,36 +242,32 @@ function CodeRevealStep({
   inviteCode: string;
   onDone: () => void;
 }) {
+  const { artScale } = useOnbLayout();
   const [note, setNote] = useState<string | null>(null);
   return (
     <Frame>
-      <Text style={[styles.headline, { color: PALETTE.accent }]}>
-        GUILD CREATED!
-      </Text>
-      <Text style={styles.subline}>{guildName}</Text>
-      <Text style={styles.fieldLabel}>YOUR INVITE CODE</Text>
-      <CodeBoxes chars={inviteCode} minted />
-      <Text style={styles.body}>
-        Send it to your crew. They enter it and fight beside you all week.
-      </Text>
-      <Btn
-        gold
-        label="SHARE CODE"
-        onPress={async () => setNote(await shareInviteCode(inviteCode))}
+      <PixelText text="GUILD CREATED!" color={UI_PALETTE.gold_light} scale={artScale * 2} />
+      <Text style={styles.guildName}>{guildName}</Text>
+      <PixelText text="YOUR INVITE CODE" color={UI_PALETTE.sky_mid} scale={artScale} style={{ marginTop: 8 * artScale }} />
+      <CodeBoxes chars={inviteCode} minted artScale={artScale} />
+      <PixelP
+        lines={["SEND IT TO YOUR CREW.", "THEY FIGHT BESIDE YOU ALL WEEK."]}
+        color={UI_PALETTE.sky_mid}
+        scale={artScale}
+        style={{ marginTop: 10 * artScale }}
       />
-      <Btn label="SKIP FOR NOW" onPress={onDone} />
-      {note && <Text style={styles.note}>{note}</Text>}
-      <Text style={styles.footer}>
-        Sharing can wait — your code lives on the guild board too.
-      </Text>
+      <View style={{ marginTop: 14 * artScale, alignItems: "center", gap: 6 * artScale }}>
+        <Btn gold big label="SHARE CODE" onPress={async () => setNote(await shareInviteCode(inviteCode))} artScale={artScale} />
+        <Btn label="SKIP FOR NOW" onPress={onDone} artScale={artScale} />
+      </View>
+      {note && <PixelText text={note} color={UI_PALETTE.sky_mid} scale={artScale} style={{ marginTop: 8 * artScale }} />}
+      <PixelText text="IT ALSO LIVES ON YOUR GUILD BOARD." color={UI_PALETTE.sky_dark} scale={artScale} style={{ marginTop: 16 * artScale }} />
     </Frame>
   );
 }
 
 // --- Beat 2b: join by code ----------------------------------------------------
 
-/** The joiner's inline states (comp beats JOIN/CONFIRM/NOT FOUND/FULL/MEMBER).
- *  `checkCode` drives the reactive preview; a join rejection overrides it. */
 type JoinError =
   | { kind: "not_found" }
   | { kind: "full"; guildName: string }
@@ -282,6 +280,7 @@ function JoinGuildStep({
   onStartInstead: () => void;
   onDone: () => void;
 }) {
+  const { artScale } = useOnbLayout();
   const joinGuildByCode = useMutation(api.guild.joinGuildByCode);
   const { emit } = useFeedback();
   const [code, setCode] = useState("");
@@ -290,8 +289,6 @@ function JoinGuildStep({
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  // Preview-confirm BEFORE joining (spec: "no surprise guilds"). null result =
-  // unknown/bad-format code → the warm not_found state.
   const preview = useQuery(
     api.guild.previewInviteCode,
     checkCode !== null ? { code: checkCode } : "skip",
@@ -301,7 +298,7 @@ function JoinGuildStep({
 
   function editCode(next: string) {
     setCode(normalizeAsTyped(next));
-    setCheckCode(null); // typing again clears any prior verdict
+    setCheckCode(null);
     setErr(null);
   }
 
@@ -310,11 +307,6 @@ function JoinGuildStep({
     setBusy(true);
     try {
       await joinGuildByCode({ code });
-      // Teaching moment (STR-49): welcome the joiner AT the join — the banner
-      // rides the app-root feedback overlay across the remaining beats
-      // ("You're in — Team Sofia grows to 4."). Counts come from the same
-      // preview the confirm card showed (+1 = them). Founder path stays
-      // quiet: the code reveal IS its moment.
       if (preview != null) {
         emit({
           type: "guildJoined",
@@ -322,13 +314,11 @@ function JoinGuildStep({
           memberCount: preview.memberCount + 1,
         });
       }
-      onDone(); // membership landed; OnboardingFlow stamps + lands the game
+      onDone();
     } catch (e) {
       if (e instanceof ConvexError && typeof e.data === "object" && e.data) {
         const d = e.data as { code?: string; message?: string };
         if (d.code === "already_member") {
-          // Typed their own guild's code — a homecoming, not an error: the
-          // membership already exists, so route straight through.
           onDone();
           return;
         }
@@ -344,7 +334,6 @@ function JoinGuildStep({
     }
   }
 
-  // Which inline block rides under the boxes right now?
   const showNotFound =
     err?.kind === "not_found" || (checkCode !== null && preview === null);
   const showFull =
@@ -357,14 +346,12 @@ function JoinGuildStep({
 
   return (
     <Frame>
-      <Text style={styles.headline}>ENTER YOUR CODE</Text>
-      <Text style={styles.body}>
-        {GUILD.inviteCodeLength} letters from your friend
-      </Text>
+      <PixelText text="ENTER YOUR CODE" color={UI_PALETTE.gold_light} scale={artScale * 2} />
+      <PixelText text={`${GUILD.inviteCodeLength} LETTERS FROM YOUR FRIEND`} color={UI_PALETTE.sky_mid} scale={artScale} style={{ marginTop: 6 * artScale }} />
 
       {/* Six boxes + a hidden input that actually holds the value. */}
       <Pressable onPress={() => inputRef.current?.focus()}>
-        <CodeBoxes chars={code} caretAt={code.length} />
+        <CodeBoxes chars={code} caretAt={code.length} artScale={artScale} />
         <TextInput
           ref={inputRef}
           style={styles.hiddenInput}
@@ -375,86 +362,75 @@ function JoinGuildStep({
           autoFocus
         />
       </Pressable>
-      <Text style={styles.hint}>Type any case — we uppercase it.</Text>
+      <PixelText text="TYPE ANY CASE - WE UPPERCASE IT." color={UI_PALETTE.sky_dark} scale={artScale} style={{ marginTop: 8 * artScale }} />
 
       {showNotFound && (
         <View style={styles.inlineBlock}>
-          <Text style={styles.warm}>Hmm — no guild wears that code.</Text>
-          <Text style={styles.body}>
-            Check it with your friend and try again.
-          </Text>
-          <Link label="Or start a guild instead" onPress={onStartInstead} />
+          <PixelText text="HMM - NO GUILD WEARS THAT CODE." color={WARM} scale={artScale} />
+          <PixelText text="CHECK IT WITH YOUR FRIEND AND RETRY." color={UI_PALETTE.sky_mid} scale={artScale} />
+          <Link label="OR START A GUILD INSTEAD" onPress={onStartInstead} artScale={artScale} />
         </View>
       )}
 
       {showFull && (
         <View style={styles.inlineBlock}>
-          <Text style={styles.warm}>
-            {fullName} is full — {GUILD.maxMembers} heroes strong.
-          </Text>
-          <Text style={styles.body}>
-            Your code was right. The bench is just out of seats.
-          </Text>
-          <Btn gold label="START MY OWN GUILD" onPress={onStartInstead} />
+          <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
+            <Text style={styles.guildNameSmall}>{fullName}</Text>
+            <PixelText text={`  IS FULL - ${GUILD.maxMembers} STRONG.`} color={WARM} scale={artScale} />
+          </View>
+          <PixelText text="YOUR CODE WAS RIGHT. NO SEATS LEFT." color={UI_PALETTE.sky_mid} scale={artScale} />
+          <Btn gold big label="START MY OWN GUILD" onPress={onStartInstead} artScale={artScale} />
           <Link
-            label="Try another code"
+            label="TRY ANOTHER CODE"
             onPress={() => {
               setCode("");
               setCheckCode(null);
               setErr(null);
             }}
+            artScale={artScale}
           />
         </View>
       )}
 
       {showConfirm && preview != null && (
-        <View style={styles.confirmCard}>
-          <Text style={styles.confirmTitle}>CODE FOUND!</Text>
-          <Text style={styles.confirmGuild}>{preview.guildName}</Text>
-          <Text style={styles.body}>
-            {preview.memberCount}{" "}
-            {preview.memberCount === 1 ? "hero fights" : "heroes fight"} beside
-            you.
-          </Text>
-          <Text style={styles.hint}>
-            {preview.memberCount} of {preview.maxMembers} spots filled
-          </Text>
-          <Btn
-            gold
-            label={`JOIN ${preview.guildName.toUpperCase()}`}
-            onPress={onJoin}
-            disabled={busy}
+        <View style={[styles.panel, styles.confirmCard]}>
+          <PixelText text="CODE FOUND!" color={UI_PALETTE.gold_light} scale={artScale} />
+          <Text style={styles.guildName}>{preview.guildName}</Text>
+          <PixelText
+            text={`${preview.memberCount} ${preview.memberCount === 1 ? "HERO FIGHTS" : "HEROES FIGHT"} BESIDE YOU.`}
+            color={UI_PALETTE.white}
+            scale={artScale}
           />
-          <Link label="Not this one" onPress={() => setCheckCode(null)} />
+          <PixelText text={`${preview.memberCount} OF ${preview.maxMembers} SPOTS FILLED`} color={UI_PALETTE.sky_dark} scale={artScale} />
+          <View style={{ marginTop: 8, opacity: busy ? 0.5 : 1 }}>
+            <Btn gold big label="JOIN GUILD" onPress={onJoin} disabled={busy} artScale={artScale} />
+          </View>
+          <Link label="NOT THIS ONE" onPress={() => setCheckCode(null)} artScale={artScale} />
         </View>
       )}
 
-      {err?.kind === "message" && <Text style={styles.warm}>{err.message}</Text>}
+      {err?.kind === "message" && (
+        <Text style={[styles.note, { color: WARM }]}>{err.message}</Text>
+      )}
 
       {!showConfirm && !showFull && (
-        <>
+        <View style={{ alignItems: "center", marginTop: 12 * artScale, gap: 6 * artScale }}>
           {complete ? (
-            <Btn
-              gold
-              label="CHECK CODE"
-              onPress={() => setCheckCode(code)}
-              disabled={checkCode !== null && preview === undefined}
-            />
+            <View style={{ opacity: checkCode !== null && preview === undefined ? 0.5 : 1 }}>
+              <Btn gold big label="CHECK CODE" onPress={() => setCheckCode(code)} disabled={checkCode !== null && preview === undefined} artScale={artScale} />
+            </View>
           ) : (
             <>
-              <View style={styles.ctaDisabled}>
-                <Text style={styles.ctaDisabledText}>CHECK CODE</Text>
+              <View style={{ opacity: 0.45 }}>
+                <Btn gold big label="CHECK CODE" onPress={() => {}} disabled artScale={artScale} />
               </View>
-              <Text style={styles.hint}>
-                Enter all {GUILD.inviteCodeLength} characters first
-              </Text>
+              <PixelText text={`ENTER ALL ${GUILD.inviteCodeLength} CHARACTERS FIRST`} color={UI_PALETTE.sky_dark} scale={artScale} />
             </>
           )}
-          {/* The not_found block has its own founder escape hatch. */}
           {!showNotFound && (
-            <Link label="No code? Start a guild" onPress={onStartInstead} />
+            <Link label="NO CODE? START A GUILD" onPress={onStartInstead} artScale={artScale} />
           )}
-        </>
+        </View>
       )}
     </Frame>
   );
@@ -462,43 +438,86 @@ function JoinGuildStep({
 
 // --- shared pieces ------------------------------------------------------------
 
-/** The six-box code row (comp codeBoxes): minted gold faces on the reveal,
- *  recessed entry wells (with a caret slot) while typing. */
+/** Six-box code row: minted gold faces on the reveal, recessed entry wells
+ *  (with a gold caret slot) while typing. Chars are the bitmap font. */
 function CodeBoxes({
   chars,
   minted,
   caretAt,
+  artScale,
 }: {
   chars: string;
   minted?: boolean;
   caretAt?: number;
+  artScale: number;
 }) {
+  const s = artScale;
   return (
-    <View style={styles.codeRow}>
-      {Array.from({ length: GUILD.inviteCodeLength }, (_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.codeBox,
-            minted && styles.codeBoxMinted,
-            !minted && caretAt === i && styles.codeBoxActive,
-          ]}
-        >
-          <Text style={[styles.codeChar, minted && styles.codeCharMinted]}>
-            {chars[i] ?? (!minted && caretAt === i ? "|" : "")}
-          </Text>
-        </View>
-      ))}
+    <View style={[styles.codeRow, { marginTop: 8 * s }]}>
+      {Array.from({ length: GUILD.inviteCodeLength }, (_, i) => {
+        const ch = chars[i];
+        const active = !minted && caretAt === i;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.codeBox,
+              { width: 20 * s, height: 26 * s, borderRadius: 4 * s, borderWidth: 2 },
+              minted && styles.codeBoxMinted,
+              active && { borderColor: UI_PALETTE.gold_mid },
+            ]}
+          >
+            {ch ? (
+              <PixelText text={ch} color={minted ? "#2a1e08" : UI_PALETTE.white} scale={s * 2} />
+            ) : active ? (
+              <View style={{ width: 2 * s, height: 12 * s, backgroundColor: UI_PALETTE.gold_mid }} />
+            ) : null}
+          </View>
+        );
+      })}
     </View>
   );
 }
 
 function Frame({ children }: { children: React.ReactNode }) {
+  const { artScale, insets } = useOnbLayout();
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <Text style={styles.wordmark}>STRIDE QUEST</Text>
-      {children}
-    </ScrollView>
+    <OnboardingBackground topDim={0.55}>
+      <UIScaleProvider value={artScale}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.content,
+            { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 32 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <PixelText text="WALKPG" color={UI_PALETTE.silver_dark} scale={artScale} style={{ marginBottom: 10 * artScale }} />
+          {children}
+        </ScrollView>
+      </UIScaleProvider>
+    </OnboardingBackground>
+  );
+}
+
+/** Stacked, centred bitmap-font lines (PixelText doesn't wrap). */
+function PixelP({
+  lines,
+  color,
+  scale,
+  style,
+}: {
+  lines: string[];
+  color: string;
+  scale: number;
+  style?: object;
+}) {
+  return (
+    <View style={[{ alignItems: "center", gap: Math.round(scale * 1.5) }, style]}>
+      {lines.map((l, i) => (
+        <PixelText key={i} text={l} color={color} scale={scale} />
+      ))}
+    </View>
   );
 }
 
@@ -507,33 +526,49 @@ function Btn({
   onPress,
   disabled,
   gold,
+  big,
+  artScale,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   gold?: boolean;
+  big?: boolean;
+  artScale: number;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
+    <Button
+      material={gold ? "gold" : "silver"}
+      label={label}
+      labelScale={big ? 2 : 1}
+      scale={artScale}
       disabled={disabled}
-      style={({ pressed }) => [
-        styles.btn,
-        gold ? styles.btnGold : styles.btnGhost,
-        (disabled || pressed) && styles.btnPressed,
-      ]}
-    >
-      <Text style={[styles.btnText, !gold && styles.btnTextGhost]}>{label}</Text>
+      onPress={onPress}
+    />
+  );
+}
+
+function Link({ label, onPress, artScale }: { label: string; onPress: () => void; artScale: number }) {
+  return (
+    <Pressable onPress={onPress} style={{ paddingVertical: 4 * artScale, alignItems: "center" }}>
+      <PixelText text={label} color={UI_PALETTE.gold_light} scale={artScale} />
+      <View style={{ height: 1, alignSelf: "stretch", backgroundColor: UI_PALETTE.gold_mid, marginTop: 1 }} />
     </Pressable>
   );
 }
 
-function Link({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress}>
-      <Text style={styles.link}>{label}</Text>
-    </Pressable>
-  );
+/** A gold selection ring overlaying a portrait tile (no layout shift). */
+function ring(artScale: number) {
+  return {
+    position: "absolute" as const,
+    left: -2 * artScale,
+    top: -2 * artScale,
+    right: -2 * artScale,
+    bottom: -2 * artScale,
+    borderWidth: 2 * artScale,
+    borderColor: UI_PALETTE.gold_mid,
+    borderRadius: 6 * artScale,
+  };
 }
 
 /** Structured ConvexError payloads carry a friendly `message`; show it. */
@@ -545,166 +580,56 @@ function errMessage(e: unknown): string {
   return "Something went wrong — try again.";
 }
 
+const MONO = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
+
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PALETTE.bg },
-  content: {
-    alignItems: "center",
-    padding: SIZES.screenPad,
-    paddingTop: 54,
-    paddingBottom: 40,
-    gap: 12,
-  },
-  wordmark: {
-    color: PALETTE.textDim,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 3,
-    marginBottom: 14,
-  },
-  huddle: { flexDirection: "row", gap: 10, marginBottom: 6 },
-  huddlePortrait: {
-    width: 56,
-    height: 56,
-    borderWidth: 2,
-    borderColor: PALETTE.panelBorder,
-    borderRadius: 10,
-    backgroundColor: "#0c0e14",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  huddleSprite: { width: 64, height: 64 },
-  headline: {
-    color: PALETTE.text,
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: 2,
-    textAlign: "center",
-    lineHeight: 32,
-  },
-  subline: { color: PALETTE.text, fontSize: 16, fontWeight: "700" },
-  body: {
-    color: PALETTE.text,
-    fontSize: 14,
-    textAlign: "center",
-    maxWidth: 300,
-    lineHeight: 20,
-  },
-  hint: { color: PALETTE.textDim, fontSize: 12, textAlign: "center" },
-  footer: { color: PALETTE.textDim, fontSize: 12, textAlign: "center", marginTop: 16 },
-  forkButtons: { gap: 8, marginTop: 12, alignItems: "center" },
-  fieldBlock: { width: 280, gap: 6, marginTop: 4 },
-  fieldLabel: {
-    color: PALETTE.textDim,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1.5,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: PALETTE.panelBorder,
-    backgroundColor: "#0c0e14",
-    borderRadius: 10,
-    color: PALETTE.text,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    fontSize: 16,
-  },
-  mintList: {
-    width: 280,
-    backgroundColor: PALETTE.panel,
-    borderColor: PALETTE.panelBorder,
-    borderWidth: 1,
-    borderRadius: SIZES.radius,
-    padding: 14,
+  scroll: { flex: 1 },
+  content: { alignItems: "center", paddingHorizontal: 20, gap: 4 },
+  huddle: { flexDirection: "row", gap: 10, alignItems: "center" },
+  panel: {
+    width: 300,
+    backgroundColor: "#141d30",
+    borderColor: UI_PALETTE.silver_dark,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    padding: 16,
     gap: 4,
   },
-  mintTitle: { color: PALETTE.text, fontSize: 13, fontWeight: "700" },
-  mintRow: { color: PALETTE.textDim, fontSize: 13 },
-  codeRow: { flexDirection: "row", gap: 6, marginTop: 4 },
+  divider: { height: 1, backgroundColor: "#2b3446", marginVertical: 8, alignSelf: "stretch" },
+  well: {
+    height: 42,
+    backgroundColor: "#0c0e14",
+    borderWidth: 1.5,
+    borderColor: UI_PALETTE.silver_dark,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    justifyContent: "center",
+  },
+  input: { color: UI_PALETTE.white, fontSize: 15, letterSpacing: 1, fontFamily: MONO, padding: 0 },
+  guildName: {
+    color: UI_PALETTE.gold_light,
+    fontSize: 18,
+    letterSpacing: 1,
+    fontFamily: MONO,
+    marginTop: 6,
+    textAlign: "center",
+  },
+  guildNameSmall: { color: WARM, fontSize: 14, fontFamily: MONO },
+  codeRow: { flexDirection: "row", gap: 6 },
   codeBox: {
-    width: 44,
-    height: 54,
-    borderWidth: 2,
-    borderColor: PALETTE.panelBorder,
-    borderRadius: 8,
+    borderColor: UI_PALETTE.silver_dark,
     backgroundColor: "#0c0e14",
     alignItems: "center",
     justifyContent: "center",
   },
-  codeBoxActive: { borderColor: PALETTE.accent },
-  codeBoxMinted: { backgroundColor: PALETTE.accent, borderColor: PALETTE.accent },
-  codeChar: { color: PALETTE.text, fontSize: 26, fontWeight: "900" },
-  codeCharMinted: { color: "#11131a" },
-  hiddenInput: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    opacity: 0,
+  codeBoxMinted: {
+    backgroundColor: UI_PALETTE.gold_mid,
+    borderColor: UI_PALETTE.gold_dark,
   },
-  inlineBlock: { gap: 8, alignItems: "center", marginTop: 6 },
-  warm: {
-    color: "#ffe08a", // warm, never red (guardrail)
-    fontSize: 14,
-    fontWeight: "700",
-    textAlign: "center",
-    maxWidth: 300,
-  },
-  confirmCard: {
-    width: 300,
-    backgroundColor: PALETTE.panel,
-    borderColor: PALETTE.panelBorder,
-    borderWidth: 1,
-    borderRadius: SIZES.radius,
-    padding: 16,
-    gap: 8,
-    alignItems: "center",
-    marginTop: 6,
-  },
-  confirmTitle: {
-    color: PALETTE.textDim,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 2,
-  },
-  confirmGuild: { color: PALETTE.accent, fontSize: 20, fontWeight: "900" },
-  btn: {
-    borderRadius: 12,
-    paddingVertical: 13,
-    minWidth: 260,
-    alignItems: "center",
-  },
-  btnGold: { backgroundColor: PALETTE.accent },
-  btnGhost: { borderWidth: 1, borderColor: PALETTE.panelBorder },
-  btnPressed: { opacity: 0.55 },
-  btnText: {
-    color: "#11131a",
-    fontSize: 15,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
-  btnTextGhost: { color: PALETTE.text },
-  ctaDisabled: {
-    borderRadius: 12,
-    paddingVertical: 13,
-    minWidth: 260,
-    alignItems: "center",
-    backgroundColor: PALETTE.panel,
-  },
-  ctaDisabledText: {
-    color: PALETTE.textDim,
-    fontSize: 15,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
-  link: {
-    color: PALETTE.accent,
-    fontSize: 13,
-    fontWeight: "700",
-    textDecorationLine: "underline",
-    padding: 6,
-  },
-  note: { color: PALETTE.textDim, fontSize: 13, textAlign: "center", maxWidth: 280 },
+  hiddenInput: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0 },
+  inlineBlock: { gap: 8, alignItems: "center", marginTop: 10 },
+  confirmCard: { alignItems: "center", gap: 6, marginTop: 10 },
+  note: { color: UI_PALETTE.sky_mid, fontSize: 13, textAlign: "center", maxWidth: 280, marginTop: 8 },
 });
+
+export default GuildStepScreens;

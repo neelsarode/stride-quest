@@ -101,7 +101,7 @@ export function DashboardScreen() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>STRIDE QUEST</Text>
+      <Text style={styles.title}>WALKPG</Text>
       <Text style={styles.guild}>{guild ? guild.name : "Setting up your guild…"}</Text>
 
       {/* Calm CONNECT HEALTH chip (STR-48; comp BATTLE beat): only while Health

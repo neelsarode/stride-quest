@@ -48,6 +48,7 @@ import {
 } from "./clipboard";
 import { GuildSheet } from "./sheets/GuildSheet";
 import { StatsSheet } from "./sheets/StatsSheet";
+import { HealthPermissionScreen } from "../screens/onboarding/HealthPermissionScreen";
 
 // =============================================================================
 // The overlay store (module-level; consumed by PartyRail + RightNav).
@@ -66,6 +67,7 @@ type Overlay =
   | { kind: "guild" }
   | { kind: "stats" }
   | { kind: "help" }
+  | { kind: "health" }
   | { kind: "dev" };
 
 let overlayState: Overlay = { kind: "none" };
@@ -106,6 +108,9 @@ export function openStats() {
 }
 export function openHelp() {
   setOverlay({ kind: "help" });
+}
+export function openHealth() {
+  setOverlay({ kind: "health" });
 }
 export function openDev() {
   setOverlay({ kind: "dev" });
@@ -216,6 +221,15 @@ export function Overlays() {
         )}
 
         {overlay.kind === "help" && <HelpModal onClose={closeOverlay} />}
+
+        {overlay.kind === "health" && (
+          <View
+            style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}
+            pointerEvents="auto"
+          >
+            <HealthPermissionScreen onDone={closeOverlay} />
+          </View>
+        )}
 
         {overlay.kind === "dev" && (
           <DevSheet scale={artScale} stepsToday={dashboard?.steps.today ?? 0} />

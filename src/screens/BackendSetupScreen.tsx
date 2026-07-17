@@ -9,7 +9,7 @@ export function BackendSetupScreen() {
       style={styles.root}
       contentContainerStyle={styles.content}
     >
-      <Text style={styles.title}>STRIDE QUEST</Text>
+      <Text style={styles.title}>WALKPG</Text>
       <Text style={styles.subtitle}>Backend not connected yet</Text>
 
       <View style={styles.card}>

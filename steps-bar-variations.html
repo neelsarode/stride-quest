@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — Steps Bar Variations</title>
+<!--
+  Exploration: replace the circular steps/goal RING (right of the SUPER ATTACK
+  button in the CommandDock) with a SQUARE VERTICAL LOADING BAR the same height
+  as the button (35 art px = 70 dp).  Daily goal = 6,000 steps.  Shown here at
+  ~1.7x real size, next to a mock SUPER button so the height match reads.
+  Toggle switches every bar between IN-PROGRESS (54%) and GOAL-HIT (100%).
+  Nothing here is wired to the app — pick a direction and I'll implement it.
+-->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Press+Start+2P&display=swap');
+
+  :root{
+    --ink:#0b0e14; --panel:#141b28; --panel2:#0f1420; --line:#26303f;
+    --gold-l:#ffe694; --gold-m:#e8bd48; --gold-d:#a9781c; --gold-bd:#6b4a17;
+    --green-l:#9ae06b; --green-m:#46b34e; --green-d:#256e30; --green-br:#c7f58a;
+    --stone-l:#39415a; --stone-d:#20263a; --channel:#0b1018;
+    --white:#f7f3e7; --dim:#67727f; --sky:#a9c8e6; --gem:#4fd1ff;
+    --engrave:#2a1e08; --rim:#ffe9a0;
+    --H:120px;                 /* mock button / bar height (real 70dp) */
+    --p:0.54;                  /* progress (in-progress state) */
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 500px at 50% -10%, #1a1420 0%, transparent 60%),
+      var(--ink);
+    color:var(--white); font-family:"Silkscreen",monospace;
+    padding:34px 24px 80px; -webkit-font-smoothing:none;
+  }
+  .head{max-width:1080px; margin:0 auto 26px;}
+  h1{font-size:18px; letter-spacing:1px; margin:0 0 8px; color:var(--gold-l);
+     text-shadow:0 2px 0 #4a3208;}
+  .sub{font-size:11px; line-height:20px; color:var(--sky); max-width:760px;}
+  .sub b{color:var(--white);}
+  .ctl{margin-top:16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  .toggle{
+    font-family:"Silkscreen"; font-weight:700; font-size:11px; letter-spacing:.5px;
+    color:var(--engrave); cursor:pointer; border:none; border-radius:8px;
+    padding:10px 16px; background:linear-gradient(180deg,var(--gold-l),var(--gold-m) 55%,var(--gold-d));
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 0 0 2px var(--gold-bd), 0 3px 5px rgba(0,0,0,.5);
+    text-shadow:0 1px 0 var(--rim);
+  }
+  .state-tag{font-size:10px; color:var(--dim);}
+  .state-tag b{color:var(--green-l);}
+
+  .grid{
+    max-width:1080px; margin:0 auto;
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(500px,1fr)); gap:18px;
+  }
+  .card{
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--line); border-radius:14px; padding:18px 18px 16px;
+  }
+  .card h2{font-size:12px; margin:0 0 3px; letter-spacing:.5px; color:var(--white);}
+  .card .desc{font-size:9.5px; line-height:16px; color:var(--dim); margin:0 0 16px; min-height:32px;}
+  .dock{
+    display:flex; align-items:center; gap:14px; justify-content:center;
+    background:
+      radial-gradient(340px 120px at 50% 120%, rgba(60,40,30,.35), transparent 70%),
+      #0a0d13;
+    border-radius:12px; padding:22px 20px; border:1px solid #1a2130;
+  }
+
+  /* ---- mock SUPER button (context; not part of the exploration) ---- */
+  .super{
+    position:relative; width:230px; height:var(--H); border-radius:12px;
+    background:linear-gradient(180deg,var(--gold-l) 0,var(--gold-m) 52%,var(--gold-d) 100%);
+    box-shadow:inset 0 3px 0 rgba(255,255,255,.55), inset 0 0 0 2px var(--gold-bd), 0 4px 6px rgba(0,0,0,.5);
+    display:flex; align-items:center; justify-content:center; gap:12px;
+  }
+  .super .sw{font-size:22px; color:#3a2a05; transform:translateY(-1px);}
+  .super .word{font-size:22px; letter-spacing:1px; color:var(--engrave); text-shadow:0 2px 0 var(--rim);}
+  .super .gem{width:14px; height:14px; background:var(--gem); transform:rotate(45deg);
+     box-shadow:inset 0 0 0 2px #bff0ff, 0 0 5px rgba(79,209,255,.7);}
+  .super .en{font-size:16px; color:#2a1e08;}
+  .super .streak{
+    position:absolute; top:-9px; right:6px; font-size:10px; color:#3a2a05;
+    background:linear-gradient(180deg,#ffe08a,#e6b22b); border:1px solid #8a6a1d;
+    border-radius:6px; padding:2px 6px;
+  }
+
+  /* ---- shared vertical bar shell ---- */
+  .bar{position:relative; height:var(--H); flex:none;}
+  .frame{
+    position:absolute; inset:0; border-radius:6px;
+    background:linear-gradient(180deg,var(--stone-l),var(--stone-d));
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.14), inset 0 0 0 1.5px #0e1622, 0 2px 4px rgba(0,0,0,.5);
+  }
+  .channel{position:absolute; left:5px; right:5px; top:5px; bottom:5px; border-radius:3px;
+     background:var(--channel); box-shadow:inset 0 2px 4px rgba(0,0,0,.7); overflow:hidden;}
+  .fill{position:absolute; left:0; right:0; bottom:0; height:calc(var(--p)*100%);
+     transition:height .5s cubic-bezier(.2,.7,.2,1);}
+  .cap{position:absolute; left:0; right:0; bottom:calc(var(--p)*100% - 1.5px); height:3px;
+     background:var(--green-br); box-shadow:0 0 6px var(--green-br); transition:bottom .5s cubic-bezier(.2,.7,.2,1);}
+
+  /* labels */
+  .num{position:absolute; left:50%; transform:translateX(-50%); text-align:center; white-space:nowrap;}
+  .num .big{font-size:13px; color:var(--white); text-shadow:0 1px 2px #000;}
+  .num .goal{font-size:8px; color:var(--dim);}
+  .above{bottom:calc(var(--H) + 6px);}
+  .below{top:calc(var(--H) + 6px);}
+
+  .flag{position:absolute; left:50%; transform:translateX(-50%); bottom:calc(var(--H) + 6px);
+     font-size:9px; color:var(--green-l); letter-spacing:1px; opacity:0; text-shadow:0 0 6px rgba(154,224,107,.6);}
+  .goalhit .flag{opacity:1;}
+  .goalhit .frame{box-shadow:inset 0 2px 0 rgba(255,255,255,.2), inset 0 0 0 1.5px #0e1622,
+     0 0 14px rgba(120,201,74,.55), 0 2px 4px rgba(0,0,0,.5);}
+  .goalhit{--p:1;}
+  /* on goal-hit the celebratory GOAL! flag takes the spot; hide the counts that
+     would otherwise collide with it (above-count + the V6 knob number). */
+  .goalhit .num.above{opacity:0;}
+  .goalhit .knobnum{opacity:0;}
+
+  /* ============ V1 — Segmented Tube ============ */
+  .v1{width:46px;}
+  .v1 .fill{
+    background:repeating-linear-gradient(to top,
+      var(--green-d) 0, var(--green-m) 7px, var(--green-l) 8px,
+      rgba(0,0,0,.6) 9px, rgba(0,0,0,.6) 11px);
+  }
+  .v1 .channel::after{content:""; position:absolute; inset:0;
+    background:repeating-linear-gradient(to top, transparent 0 9px, rgba(255,255,255,.04) 9px 11px);}
+
+  /* ============ V2 — Liquid ============ */
+  .v2{width:42px;}
+  .v2 .fill{background:linear-gradient(to top,var(--green-d),var(--green-m) 55%,var(--green-l));}
+
+  /* ============ V3 — Ticked + goal marker + fill chip ============ */
+  .v3{width:44px;}
+  .v3 .fill{background:linear-gradient(to top,var(--green-d),var(--green-m) 60%,var(--green-l));}
+  .v3 .channel::after{content:""; position:absolute; right:0; top:0; bottom:0; width:6px;
+    background:repeating-linear-gradient(to top, transparent 0 10px, rgba(255,255,255,.22) 10px 11px);}
+  .v3 .goalmark{position:absolute; left:2px; right:2px; top:5px; height:2px;
+    background:var(--gold-m); box-shadow:0 0 4px var(--gold-l);}
+  .v3 .chip{position:absolute; left:50%; transform:translateX(-50%);
+    bottom:calc(var(--p)*100% - 8px); background:#0d1320; border:1px solid var(--green-m);
+    border-radius:4px; padding:1px 4px; font-size:9px; color:var(--green-l);
+    transition:bottom .5s cubic-bezier(.2,.7,.2,1); white-space:nowrap;}
+
+  /* ============ V4 — Wide, number inside (ring-like) ============ */
+  .v4{width:64px;}
+  .v4 .fill{background:linear-gradient(to top,var(--green-d),var(--green-m) 55%,var(--green-l));}
+  .v4 .inside{position:absolute; left:0; right:0; top:0; bottom:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;}
+  .v4 .inside .big{font-size:14px; color:var(--white);
+    text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000,0 2px 3px rgba(0,0,0,.8);}
+  .v4 .inside .goal{font-size:8px; color:var(--sky);
+    text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000;}
+
+  /* ============ V5 — Green→Gold proximity ============ */
+  .v5{width:42px;}
+  .v5 .fill{background:linear-gradient(to top,var(--green-m),var(--green-l) 68%,var(--gold-m) 90%,var(--gold-l));}
+  .v5 .cap{background:var(--gold-l); box-shadow:0 0 6px var(--gold-l);}
+
+  /* ============ V6 — Knob indicator ============ */
+  .v6{width:28px;}
+  .v6 .fill{background:linear-gradient(to top,var(--green-d),var(--green-m));}
+  .v6 .knob{position:absolute; left:50%; transform:translate(-50%,50%);
+    bottom:calc(var(--p)*100%); width:16px; height:16px; border-radius:3px;
+    background:var(--green-br); box-shadow:0 0 8px var(--green-br), inset 0 0 0 2px #0e1622;
+    transition:bottom .5s cubic-bezier(.2,.7,.2,1);}
+  .v6 .knobnum{position:absolute; right:calc(100% + 8px); transform:translateY(50%);
+    bottom:calc(var(--p)*100%); font-size:12px; color:var(--white); white-space:nowrap;
+    text-shadow:0 1px 2px #000; transition:bottom .5s cubic-bezier(.2,.7,.2,1);}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>STEPS GOAL — VERTICAL BAR VARIATIONS</h1>
+    <div class="sub">
+      Replacing the circular <b>steps ring</b> (right of SUPER ATTACK) with a square
+      vertical loading bar, <b>same height as the button</b> (70&nbsp;dp). Daily goal
+      <b>6,000</b> steps. Each option is shown beside a mock SUPER button so the height
+      match reads. Pick a direction (or mix — e.g. "V2 fill + V4 inside number") and
+      I'll wire it into <b>CommandDock.tsx</b>.
+    </div>
+    <div class="ctl">
+      <button class="toggle" id="toggle">TOGGLE: SHOW GOAL-HIT STATE</button>
+      <span class="state-tag">Current: <b id="stateName">IN PROGRESS · 3,240 / 6,000</b></span>
+    </div>
+  </div>
+
+  <div class="grid" id="grid">
+
+    <!-- V1 -->
+    <div class="card">
+      <h2>V1 · Segmented Tube</h2>
+      <p class="desc">Discrete pixel segments fill bottom-up — the most retro / arcade read. Count above.</p>
+      <div class="dock">
+        <div class="super"><span class="sw">✕</span><span class="word">SUPER</span><span class="gem"></span><span class="en">0</span><span class="streak">X1.13</span></div>
+        <div class="bar v1">
+          <div class="frame"></div>
+          <div class="channel"><div class="fill"></div></div>
+          <div class="num above"><span class="big count">3,240</span></div>
+          <div class="num below"><span class="goal">/ 6,000</span></div>
+          <div class="flag">GOAL!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V2 -->
+    <div class="card">
+      <h2>V2 · Liquid Fill</h2>
+      <p class="desc">Smooth green gradient with a bright glowing cap line at the fill level. Clean, energetic.</p>
+      <div class="dock">
+        <div class="super"><span class="sw">✕</span><span class="word">SUPER</span><span class="gem"></span><span class="en">0</span><span class="streak">X1.13</span></div>
+        <div class="bar v2">
+          <div class="frame"></div>
+          <div class="channel"><div class="fill"></div><div class="cap"></div></div>
+          <div class="num above"><span class="big count">3,240</span></div>
+          <div class="num below"><span class="goal">/ 6,000</span></div>
+          <div class="flag">GOAL!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V3 -->
+    <div class="card">
+      <h2>V3 · Ticked + Goal Marker</h2>
+      <p class="desc">Side ticks + a gold goal line at the top; a little chip rides the fill level showing the count.</p>
+      <div class="dock">
+        <div class="super"><span class="sw">✕</span><span class="word">SUPER</span><span class="gem"></span><span class="en">0</span><span class="streak">X1.13</span></div>
+        <div class="bar v3">
+          <div class="frame"></div>
+          <div class="channel"><div class="fill"></div><div class="goalmark"></div></div>
+          <div class="chip count">3,240</div>
+          <div class="num below"><span class="goal">GOAL 6,000</span></div>
+          <div class="flag">GOAL!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V4 -->
+    <div class="card">
+      <h2>V4 · Wide · Number Inside</h2>
+      <p class="desc">Closest to the ring — a wider bar with the count read INSIDE it, over the fill. Most legible.</p>
+      <div class="dock">
+        <div class="super"><span class="sw">✕</span><span class="word">SUPER</span><span class="gem"></span><span class="en">0</span><span class="streak">X1.13</span></div>
+        <div class="bar v4">
+          <div class="frame"></div>
+          <div class="channel"><div class="fill"></div>
+            <div class="inside"><span class="big count">3,240</span><span class="goal">/6,000</span></div>
+          </div>
+          <div class="flag">GOAL!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V5 -->
+    <div class="card">
+      <h2>V5 · Green → Gold</h2>
+      <p class="desc">Fill warms from green to gold as you near the goal — anticipation, ties to the Overdrive reward.</p>
+      <div class="dock">
+        <div class="super"><span class="sw">✕</span><span class="word">SUPER</span><span class="gem"></span><span class="en">0</span><span class="streak">X1.13</span></div>
+        <div class="bar v5">
+          <div class="frame"></div>
+          <div class="channel"><div class="fill"></div><div class="cap"></div></div>
+          <div class="num above"><span class="big count">3,240</span></div>
+          <div class="num below"><span class="goal">/ 6,000</span></div>
+          <div class="flag">GOAL!</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- V6 -->
+    <div class="card">
+      <h2>V6 · Knob Indicator</h2>
+      <p class="desc">A slimmer track with a bright knob at the fill line and the count riding beside it. Minimal / modern.</p>
+      <div class="dock">
+        <div class="super"><span class="sw">✕</span><span class="word">SUPER</span><span class="gem"></span><span class="en">0</span><span class="streak">X1.13</span></div>
+        <div class="bar v6">
+          <div class="frame"></div>
+          <div class="channel"><div class="fill"></div></div>
+          <div class="knob"></div>
+          <div class="knobnum count">3,240</div>
+          <div class="num below"><span class="goal">/ 6,000</span></div>
+          <div class="flag">GOAL!</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+  var grid = document.getElementById('grid');
+  var btn = document.getElementById('toggle');
+  var stateName = document.getElementById('stateName');
+  var hit = false;
+  btn.addEventListener('click', function(){
+    hit = !hit;
+    document.querySelectorAll('.bar').forEach(function(b){ b.classList.toggle('goalhit', hit); });
+    document.querySelectorAll('.count').forEach(function(c){ c.textContent = hit ? '6,120' : '3,240'; });
+    btn.textContent = hit ? 'TOGGLE: SHOW IN-PROGRESS STATE' : 'TOGGLE: SHOW GOAL-HIT STATE';
+    stateName.innerHTML = hit ? 'GOAL HIT · <b style="color:#c7f58a">6,120 / 6,000 ✓</b>'
+                              : 'IN PROGRESS · <b>3,240 / 6,000</b>';
+  });
+</script>
+</body>
+</html>

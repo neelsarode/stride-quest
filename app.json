@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "Stride Quest",
+    "name": "WalkPG",
     "slug": "stride-quest",
-    "scheme": "stridequest",
+    "scheme": "walkpg",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stridequest.app"
+      "bundleIdentifier": "com.walkpg.app"
     },
     "android": {
-      "package": "com.stridequest.app",
+      "package": "com.walkpg.app",
       "adaptiveIcon": {
         "backgroundColor": "#11131a",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -29,7 +29,7 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Stride Quest reads your step count so your walking deals damage to your guild's weekly boss.",
+          "NSHealthShareUsageDescription": "WalkPG reads your step count so your walking deals damage to your guild's weekly boss.",
           "NSHealthUpdateUsageDescription": false,
           "background": false
         }

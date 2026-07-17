@@ -11,15 +11,11 @@
 // effect — we deliberately do NOT call useGameEngine, whose open-effects would
 // double-fire).
 // =============================================================================
-import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CLASSES, type ClassKey } from "../../../convex/gameConfig";
 import { GAME_ZONES } from "../../config/assets";
-import { DEV_FLAGS } from "../../devConfig";
-import { isAvailable as healthKitAvailable } from "../../health/healthkit";
-import { HealthPermissionScreen } from "../../screens/onboarding/HealthPermissionScreen";
 import { SPRITES, type SpriteKey } from "../../battle/spriteMap";
 import manifest from "../../battle/sprites/manifest.json";
 import {
@@ -98,24 +94,9 @@ function Scrim({ topInset }: { topInset: number }) {
 export function TopBar() {
   const { topPad, artScale } = useGameLayout();
   const data = useQuery(api.game.dashboard, {});
-  // Local mirror of the classic screen's showHealthScreen seam (STR-48): the
-  // GameScreen shell does not wire the engine's toggle to any overlay host, so
-  // the calm CONNECT HEALTH chip self-hosts its Beat-3 takeover here — exact
-  // same gate (HealthKit-capable + not yet connected) and same onDone return.
-  const [showHealth, setShowHealth] = useState(false);
 
   if (!data) return null;
   const { player, boss, streak, shields, weekEnd, now, date } = data;
-
-  // Health takeover (full-screen, above every zone) — identical behaviour to
-  // DashboardScreen's early return.
-  if (showHealth) {
-    return (
-      <View style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}>
-        <HealthPermissionScreen onDone={() => setShowHealth(false)} />
-      </View>
-    );
-  }
 
   // Portrait: the viewer's live class/job idle sprite cropped into the silver
   // well. Source is the packed idle strip; the crop key is job-specific when a
@@ -131,10 +112,8 @@ export function TopBar() {
   const cropKey = jobCropKey in PORTRAIT_CROPS ? jobCropKey : classKey;
 
   const metaLine = `${player.className} - JOB ${player.jobLevel} ${player.jobName}`;
-  const showHealthChip =
-    (healthKitAvailable() || DEV_FLAGS.forceHealthBeat) && !data.health.connected;
-  // Small icon scales (integer → crisp): shield/heart art is chunkier than the
-  // 5-art-px font, so they ride one scale step down to sit inline with the text.
+  // Small icon scale (integer → crisp): the shield art is chunkier than the
+  // 5-art-px font, so it rides one scale step down to sit inline with the text.
   const iconScale = Math.max(1, artScale - 1);
 
   return (
@@ -174,9 +153,8 @@ export function TopBar() {
               </View>
             </View>
 
-            {/* RIGHT — week clock + boss-reset countdown; the quiet CONNECT
-                HEALTH chip rides here (above the fuel band, off the identity
-                column) when applicable. */}
+            {/* RIGHT — week clock + boss-reset countdown. (CONNECT HEALTH now
+                lives as a pulsing 4th button in RightNav, not a chip here.) */}
             <View style={styles.clock}>
               {boss && (
                 <>
@@ -189,15 +167,6 @@ export function TopBar() {
                     color={UI_PALETTE.silver_dark}
                   />
                 </>
-              )}
-              {showHealthChip && (
-                <Pressable
-                  onPress={() => setShowHealth(true)}
-                  style={({ pressed }) => [styles.healthChip, pressed && styles.pressed]}
-                >
-                  <BakedImage name="icon_heart" scale={iconScale} />
-                  <PixelText text="CONNECT HEALTH" color={UI_PALETTE.silver_dark} />
-                </Pressable>
               )}
             </View>
           </View>
@@ -213,23 +182,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
   },
-  identity: { flexDirection: "row", alignItems: "flex-start", flexShrink: 1 },
+  identity: { flexDirection: "row", alignItems: "center", flexShrink: 1 },
   chipRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   shieldChip: { flexDirection: "row", alignItems: "center", gap: 3 },
   clock: { alignItems: "flex-end", gap: ROW_GAP, marginLeft: 8 },
-  healthChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    alignSelf: "flex-start",
-    marginTop: 2,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: UI_PALETTE.silver_dark,
-    borderRadius: 999,
-  },
-  pressed: { opacity: 0.55 },
 });
 
 export default TopBar;

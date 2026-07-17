@@ -52,12 +52,13 @@ const SLICE = {
 // standard 16; the super plates + their socket twins are the tall 35 (face 34
 // + shadow row) two-row dock button (approved variant A, od-super-lab.html).
 const SLICE_H: Record<ButtonMaterial, number> = {
-  gold: 16,
+  gold: 25, // STR-89: PRIMARY CTA — tall enough that the scale-2 label gets the
+  //           same ~7.5-art padding the silver scale-1 button has at 20.
   supergold: 35,
   superamethyst: 35,
   socketgold: 35,
   socketamethyst: 35,
-  silver: 16,
+  silver: 20, // STR-89: chunkier than the old 16; scale-1 label, ~7.5-art padding
 };
 
 export interface ButtonProps {
@@ -140,13 +141,10 @@ export function Button({
             }}
           >
             {label != null && (
-              <PixelText
-                text={label}
-                variant="engraved"
-                color={eng.color}
-                rimColor={eng.rim}
-                scale={s * labelScale}
-              />
+              // FLAT label (STR-89): the engraved rim-ledge (a lit copy 1 art px
+              // below the ink) muddied the letters on the gold/silver faces and
+              // hurt legibility — dark ink on the bright face reads cleaner.
+              <PixelText text={label} color={eng.color} scale={s * labelScale} />
             )}
             {children}
           </View>

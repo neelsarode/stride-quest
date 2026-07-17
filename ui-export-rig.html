@@ -221,10 +221,15 @@ const INVENTORY = [
   // its band boundaries with a per-column checkerboard; the 1px stretch mid
   // loses that boundary dither, so transitions read as very slightly harder
   // bands. Acceptable — same tradeoff as speckles-on-caps-only.
-  { name: 'btn_gold', type: 'slice3h', h: 16, capW: 9, bakeW: 40,
-    cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 15, 6, AU) },
-  { name: 'btn_silver', type: 'slice3h', h: 16, capW: 9, bakeW: 40,
-    cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 15, 6, AG) },
+  // Chunkier standard buttons (STR-89): silver face 15 → 19 (slice 16 → 20) so a
+  // CTA reads as a button, not a thin bar. Gold goes TALLER (face 24, slice 25)
+  // because gold = the PRIMARY CTA and uses the big scale-2 label — 25 art gives
+  // that 10-art label the same ~7.5-art top/bottom padding the silver (scale-1)
+  // button has at 20. Both still shorter than the tall SUPER plate.
+  { name: 'btn_gold', type: 'slice3h', h: 25, capW: 9, bakeW: 40,
+    cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 24, 6, AU) },
+  { name: 'btn_silver', type: 'slice3h', h: 20, capW: 9, bakeW: 40,
+    cat: 'buttonface', draw: (c, w) => hifiFace(c, 0, 0, w, 19, 6, AG) },
   // Tall gold button (Core Loop v2 dock SUPER ATTACK) — same hifiFace bevel as
   // btn_deploy_gold but a horizontal 3-slice so it stretches to any width.
   // Height per the approved od-super-lab.html variant A (2026-07-16): a

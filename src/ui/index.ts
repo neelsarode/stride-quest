@@ -24,6 +24,7 @@ export { Badge } from "./Badge";
 export { Portrait, type PortraitSize } from "./Portrait";
 export { StatusDot, type HeroState } from "./StatusDot";
 export { Ring } from "./Ring";
+export { StepsBar } from "./StepsBar";
 export { Beacon } from "./Beacon";
 export { Sheet } from "./Sheet";
 export { Popover, type PopoverSide } from "./Popover";

@@ -47,7 +47,7 @@ import {
   Button,
   Chip,
   PixelText,
-  Ring,
+  StepsBar,
   UIScaleProvider,
   measurePixelText,
 } from "../../ui";
@@ -55,7 +55,7 @@ import { UI_PALETTE } from "../../ui/theme";
 import { useGameLayout } from "../useGameLayout";
 import { zoneStyles } from "./zoneStyle";
 
-const RING_ART = 30; // steps_ring frame is 30×30 art px
+const STEPS_W = 24; // vertical segmented steps bar width (art px); height = BAR_H
 const BAR_H = 35; // btn_super_gold/amethyst 3-slice height (art px, face 34 + shadow row)
 const FACE_H = 34; // the visible plate face the two rows lay out against
 // Approved variant A (od-super-lab.html, 2026-07-16): row 1 = swords + a BIG
@@ -160,7 +160,7 @@ export function CommandDock() {
   const contentArt = Math.floor(contentDp / s);
   const barArtW = Math.max(
     64,
-    contentArt - DOCK.sidePad * 2 - RING_ART - DOCK.superBarGap,
+    contentArt - DOCK.sidePad * 2 - STEPS_W - DOCK.superBarGap,
   );
 
   return (
@@ -194,47 +194,51 @@ export function CommandDock() {
               onDenied={() => emit({ type: "actionRejected", message: deniedMessage })}
             />
 
-            {/* ---- steps RING (30-frame) + inside numbers + GOAL glow/chip ---- */}
+            {/* ---- steps BAR (vertical segmented "power cells", variant A) +
+                 count above / goal-or-GOAL! below + goal-hit bloom ---- */}
             <View style={{ alignItems: "center" }}>
-            <View style={{ width: RING_ART * s, height: RING_ART * s, overflow: "visible" }}>
+            <View style={{ width: STEPS_W * s, height: BAR_H * s, overflow: "visible" }}>
               {goalHit && <GoalGlow s={s} />}
-              <Ring value={ringFrac} style={{ position: "absolute", left: 0, top: 0 }} />
-              {/* today/goal centred over the ring. The box is wider than the ring
-                  and never clips, so a big step count overhangs the thin ring
-                  onto the dark scene (still legible) instead of being cut. */}
+              <StepsBar
+                value={ringFrac}
+                width={STEPS_W}
+                height={BAR_H}
+                style={{ position: "absolute", left: 0, top: 0 }}
+              />
+              {/* today's steps ABOVE the bar — the box is wider than the bar and
+                  never clips, so a big count overhangs onto the dark scene. */}
               <View
                 pointerEvents="none"
                 style={{
                   position: "absolute",
-                  left: -RING_ART * s,
-                  right: -RING_ART * s,
-                  top: 0,
-                  bottom: 0,
+                  left: -STEPS_W * s,
+                  right: -STEPS_W * s,
+                  bottom: (BAR_H + 2) * s,
                   alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "visible",
                 }}
               >
                 <PixelText text={data.steps.today.toLocaleString()} color={UI_PALETTE.white} />
-                <PixelText
-                  text={`/${dailyGoal.goal.toLocaleString()}`}
-                  color={UI_PALETTE.silver_dark}
-                  style={{ marginTop: 1 * s }}
-                />
               </View>
-              {goalHit && (
-                <View
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    right: 0,
-                    top: (RING_ART + 2) * s,
-                    alignItems: "center",
-                  }}
-                >
+              {/* goal fraction BELOW — flips to the green GOAL! chip on a hit. */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left: -STEPS_W * s,
+                  right: -STEPS_W * s,
+                  top: (BAR_H + 3) * s,
+                  alignItems: "center",
+                }}
+              >
+                {goalHit ? (
                   <Chip color="green" label="GOAL!" />
-                </View>
-              )}
+                ) : (
+                  <PixelText
+                    text={`/${dailyGoal.goal.toLocaleString()}`}
+                    color={UI_PALETTE.silver_dark}
+                  />
+                )}
+              </View>
             </View>
             </View>
           </View>
@@ -575,11 +579,11 @@ function Caption({ text, color, s, top }: { text: string; color: string; s: numb
 }
 
 // -----------------------------------------------------------------------------
-// GoalGlow — the celebratory bloom around the steps ring on goal-hit. A single
-// transparent circle whose soft shadow (web box-shadow / iOS shadow*) blooms
-// outward; a Reanimated shared value breathes its opacity + scale on the UI
-// thread, so React never re-renders while it pulses (spec §12). The element is
-// transparent (no fill) so the ring's inner numbers stay crisp on top.
+// GoalGlow — the celebratory bloom behind the steps bar on goal-hit. A single
+// transparent rounded rect whose soft shadow (web box-shadow / iOS shadow*)
+// blooms outward; a Reanimated shared value breathes its opacity + scale on the
+// UI thread, so React never re-renders while it pulses (spec §12). The element
+// is transparent (no fill) so the bar + its count stay crisp on top.
 // -----------------------------------------------------------------------------
 function GoalGlow({ s }: { s: number }) {
   const t = useSharedValue(0);
@@ -598,7 +602,8 @@ function GoalGlow({ s }: { s: number }) {
       transform: [{ scale: GOAL_GLOW.minScale + (GOAL_GLOW.maxScale - GOAL_GLOW.minScale) * k }],
     };
   }, [t]);
-  const size = RING_ART * s;
+  const w = STEPS_W * s;
+  const h = BAR_H * s;
   const shadow =
     Platform.OS === "web"
       ? ({
@@ -620,9 +625,9 @@ function GoalGlow({ s }: { s: number }) {
           position: "absolute",
           left: 0,
           top: 0,
-          width: size,
-          height: size,
-          borderRadius: size / 2,
+          width: w,
+          height: h,
+          borderRadius: 4 * s,
         },
         shadow,
         style,

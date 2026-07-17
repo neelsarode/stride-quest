@@ -59,8 +59,15 @@ export const SIZES = {
 
 /** ART scale rule (spec §6): 1 art px = ART_SCALE dp. 2 below this width
  *  (phone), 3 at/above (tablet / web desktop). Hierarchy comes from ART size,
- *  never mixed scales. Consumed by the game-screen scale/safe-area hook. */
-export const ART_SCALE_BREAKPOINT_DP = 430;
+ *  never mixed scales. Consumed by the game-screen scale/safe-area hook.
+ *
+ *  BREAKPOINT = 600 (was 430): the 2× HUD is the only fully-tuned layout, and
+ *  the widest iPhone in portrait — the Pro Max — is 440dp. The old 430 line put
+ *  the Pro Max on the unfinished 3× "tablet" layout (fixed dp zone offsets tuned
+ *  at 2× → cascading overlap; SUPER label wider than its button). 600 keeps
+ *  EVERY iPhone (portrait-locked, ≤440dp) on the validated 2× layout and reserves
+ *  3× for true tablets (iPad mini portrait = 744dp) and wide desktop web. */
+export const ART_SCALE_BREAKPOINT_DP = 600;
 
 /** Zone offsets (dp) for the game-screen HUD, transcribed from spec §6's zone
  *  table (dashboard-ui comp + battlefield-ui media query). Top offsets add to
@@ -78,15 +85,16 @@ export const GAME_ZONES = {
   /** Fuel gauge: below identity, left-aligned (effective y≈66, mock #fuelwrap). */
   fuelTop: 52,
   fuelLeft: 14,
-  /** Boss plate: centered gold HP bar (effective y≈104, mock #bossbar). Was 56 +
-   *  a local BOSS_EXTRA_TOP=26; reconciled to a single offset in STR-71. */
-  bossPlateTop: 90,
-  /** Party rail: horizontal portrait row, centered. Sits just under the boss
-   *  bar's bottom with a small gap (was 196 — too far from the bar per playtest). */
-  partyRailTop: 180,
-  /** Right nav: guild / stats / help column (kept a touch lower so it clears the
-   *  full-width boss bar's right end). */
-  rightNavTop: 196,
+  /** Boss plate: gold HP bar with the name/subtitle now on ONE row above it
+   *  (name left, "WEEKLY BOSS - TIER N" right — reclaims a line). Nudged up from
+   *  90 now that the plate is a row shorter. */
+  bossPlateTop: 82,
+  /** Party rail: horizontal portrait row, centered. Raised with the boss plate
+   *  (the reclaimed boss-subtitle line lets the whole cluster sit higher). */
+  partyRailTop: 150,
+  /** Right nav: guild / stats / help / (connect-health) column, kept a touch
+   *  lower than the rail so it clears the full-width boss bar's right end. */
+  rightNavTop: 166,
   rightNavRight: 9,
   /** Command dock (DEPLOY / COLLECT / steps ring), above the job strip. Raised
    *  from the spec's starting 46 so the COLLECT caption / GOAL chip / first-crit
@@ -107,10 +115,11 @@ export const DOCK = {
   /** Horizontal inset (art px) of the steps-ring cluster from the screen edges
    *  (mirrors dashboard-ui's left/right 16px on a ~320 comp). */
   sidePad: 6,
-  /** Gap (art px) between the full-width SUPER ATTACK bar and the steps ring.
+  /** Gap (art px) between the full-width SUPER ATTACK bar and the steps bar.
    *  The bar is left-aligned and stretches to fill the row up to this gap before
-   *  the ring (Core Loop v2 dock: wide gold action bar + circular steps gauge). */
-  superBarGap: 12,
+   *  the steps bar. Tightened 12 → 6 so the SUPER bar runs a touch wider AND
+   *  sits closer to the steps gauge (the width calc = row − this gap). */
+  superBarGap: 6,
   /** Max dock content width (dp) so the wide SUPER bar fills a phone edge-to-edge
    *  but doesn't sprawl absurdly on wide desktop web (the content centres above
    *  this width). Phones (<460dp) always fill full width. */

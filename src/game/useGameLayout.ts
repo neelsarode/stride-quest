@@ -37,7 +37,8 @@ export function useGameLayout(): GameLayout {
   const insets = useSafeAreaInsets();
   return useMemo<GameLayout>(
     () => ({
-      // "2 below 430dp, 3 at/above" — exactly the breakpoint boundary lands on 3.
+      // 2× below the breakpoint (all iPhones, ≤440dp portrait), 3× at/above it
+      // (tablets / wide desktop web). The boundary itself lands on 3×.
       artScale: width < ART_SCALE_BREAKPOINT_DP ? 2 : 3,
       insets,
       topPad: Math.max(14, insets.top),

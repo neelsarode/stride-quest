@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — Steps Bar (procedural kit)</title>
+<!--
+  V1 (segmented vertical bar) drawn in the REAL procedural pixel kit
+  (assets/ui-kit.js) — same material ramps / slim frame / pixel font the HUD is
+  baked from. Everything below is drawn on a canvas at art resolution and scaled
+  up (image-rendering:pixelated). Height = the SUPER button (35 art px = 70 dp).
+  Toggle previews the goal-hit state. Nothing is wired to the app yet.
+-->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap');
+  *{box-sizing:border-box;}
+  body{margin:0; background:radial-gradient(1000px 460px at 50% -12%, #1a1420, transparent 60%), #0a0d13;
+    color:#f7f3e7; font-family:"Silkscreen",monospace; padding:32px 24px 70px; -webkit-font-smoothing:none;}
+  canvas{image-rendering:pixelated; image-rendering:crisp-edges; display:block; margin:0 auto;}
+  .head{max-width:1040px; margin:0 auto 24px;}
+  h1{font-size:17px; letter-spacing:1px; margin:0 0 8px; color:#ffe9a0; text-shadow:0 2px 0 #4a3208;}
+  .sub{font-size:11px; line-height:19px; color:#a9c8e6; max-width:760px;}
+  .sub b{color:#f7f3e7;}
+  .ctl{margin-top:15px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  .toggle{font-family:"Silkscreen"; font-weight:700; font-size:11px; letter-spacing:.5px; color:#2a1e08;
+    cursor:pointer; border:none; border-radius:8px; padding:10px 16px;
+    background:linear-gradient(180deg,#ffe694,#e8bd48 55%,#a9781c);
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.5), inset 0 0 0 2px #6b4a17, 0 3px 5px rgba(0,0,0,.5);
+    text-shadow:0 1px 0 #ffe9a0;}
+  .state{font-size:10px; color:#67727f;}
+  .state b{color:#9ae06b;}
+  .grid{max-width:1040px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(470px,1fr)); gap:16px;}
+  .card{background:linear-gradient(180deg,#141b28,#0f1420); border:1px solid #26303f; border-radius:14px; padding:16px 14px 14px;}
+  .card h2{font-size:11px; margin:0 0 3px; letter-spacing:.5px; color:#f7f3e7;}
+  .card .desc{font-size:9px; line-height:15px; color:#67727f; margin:0 0 12px; min-height:30px;}
+  .stagewrap{background:radial-gradient(300px 110px at 62% 120%, rgba(60,40,30,.35), transparent 70%), #090c12;
+    border:1px solid #1a2130; border-radius:10px; padding:14px 8px;}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>STEPS BAR — V1 IN THE PROCEDURAL KIT</h1>
+    <div class="sub">
+      The vertical <b>segmented</b> steps bar drawn with <b>assets/ui-kit.js</b> — the same
+      slim frame, material ramps and pixel font the real HUD bakes from. Same height as the
+      SUPER button (<b>70&nbsp;dp</b>), goal <b>6,000</b>. A few sub-variants of V1 so you can
+      dial in segment count / frame colour / number placement. Toggle to see the goal-hit state.
+    </div>
+    <div class="ctl">
+      <button class="toggle" id="toggle">TOGGLE: SHOW GOAL-HIT STATE</button>
+      <span class="state">Current: <b id="stateName">IN PROGRESS · 3,240 / 6,000</b></span>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+
+<script src="assets/ui-kit.js"></script>
+<script>
+  var S = 3;                              // display scale (art px -> css px)
+  var CW = 150, CH = 68;                  // card canvas art size
+  var PROGRESS = 3240 / 6000;             // 0.54
+  var goalHit = false;
+
+  var GREEN = { light:'green_light', mid:'green_mid', dark:'green_dark' };
+  var GOLD  = { light:'gold_light',  mid:'gold_mid',  dark:'gold_dark'  };
+
+  // ---- the SUPER button (context; drawn with the kit for a faithful match) ----
+  function drawSuper(ctx, x, y, w, h){
+    var m = M('gold');
+    hifiFace(ctx, x, y, w, h, 4, m);
+    var sw = spriteW(CROSSED_SWORDS), gw = spriteW(GEM);
+    var total = sw + 4 + textWidth('SUPER') + 5 + gw + 3 + textWidth('0');
+    var cx = x + Math.round((w - total) / 2);
+    var cy = y + Math.round((h - 5) / 2);
+    drawSprite(ctx, CROSSED_SWORDS, cx, y + Math.round((h - spriteH(CROSSED_SWORDS)) / 2));
+    cx += sw + 4;
+    engrave(ctx, 'SUPER', cx, cy, m); cx += textWidth('SUPER') + 5;
+    drawSprite(ctx, GEM, cx, y + Math.round((h - spriteH(GEM)) / 2)); cx += gw + 3;
+    drawText(ctx, '0', cx, cy, 'gold_deep');
+  }
+
+  // ---- vertical segmented bar in the kit's slim-frame style ----
+  function vSegBar(ctx, x, y, w, h, frac, opts){
+    opts = opts || {};
+    var m = opts.mat || M('silver');
+    var N = opts.cells || 7, gap = 1;
+    var well = hifiFrameSlim(ctx, x, y, w, h, 4, m, opts.wellKey || 'slate_w');
+    var ch = (well.wh - (N - 1) * gap) / N;
+    var filled = Math.max(0, Math.min(1, frac)) * N;
+    for (var i = 0; i < N; i++){
+      var cellBot = Math.round(well.wy + well.wh - i * (ch + gap));
+      var cellTop = Math.round(cellBot - ch);
+      var cellH = cellBot - cellTop;
+      if (i < N - 1) px(ctx, well.wx, cellTop - gap, well.ww, gap, 'outline');
+      var rem = Math.max(0, Math.min(1, filled - i));
+      if (rem > 0){
+        var fh = Math.max(1, Math.round(rem * cellH));
+        var fTop = cellBot - fh;
+        var fam = opts.cellFam ? opts.cellFam(i, N) : (opts.fam || GREEN);
+        px(ctx, well.wx, fTop, well.ww, 1, fam.light);
+        if (fh > 2) px(ctx, well.wx, fTop + 1, well.ww, fh - 2, fam.mid);
+        if (fh > 1) px(ctx, well.wx, fTop + fh - 1, well.ww, 1, fam.dark);
+      }
+    }
+    // goal-hit: bright rim just outside the frame (a flat "glow" edge)
+    if (goalHit){
+      px(ctx, x, y - 1, w, 1, 'green_light');
+      px(ctx, x, y + h, w, 1, 'green_dark');
+      px(ctx, x - 1, y, 1, h, 'green_mid');
+      px(ctx, x + w, y, 1, h, 'green_mid');
+    }
+    return well;
+  }
+
+  var VARIANTS = [
+    { name:'A · Silver · 7 cells', desc:'The default V1: chunky segments, silver slim frame, count above. Matches the S8 HUD.',
+      bar:function(ctx,x,y,w,h){ return vSegBar(ctx,x,y,w,h,PROGRESS,{mat:M('silver'),cells:7,wellKey:'slate_w'}); }, label:'above' },
+    { name:'B · Gold frame', desc:'Same segments in a gold slim frame — reads as one family with the SUPER button.',
+      bar:function(ctx,x,y,w,h){ return vSegBar(ctx,x,y,w,h,PROGRESS,{mat:M('gold'),cells:7,wellKey:'oak_w'}); }, label:'above' },
+    { name:'C · Green → Gold', desc:'Top two segments turn gold as you near the goal — anticipation, ties to the Overdrive reward.',
+      bar:function(ctx,x,y,w,h){ return vSegBar(ctx,x,y,w,h,PROGRESS,{mat:M('silver'),cells:7,cellFam:function(i,n){return i>=n-2?GOLD:GREEN;}}); }, label:'above' },
+    { name:'D · Coarse (5)', desc:'Fewer, taller blocks — bolder, more "power cells", less granular.',
+      bar:function(ctx,x,y,w,h){ return vSegBar(ctx,x,y,w,h,PROGRESS,{mat:M('silver'),cells:5,wellKey:'slate_w'}); }, label:'above' },
+    { name:'E · Fine (11)', desc:'More, thinner blocks — smoother, thermometer-like read of progress.',
+      bar:function(ctx,x,y,w,h){ return vSegBar(ctx,x,y,w,h,PROGRESS,{mat:M('silver'),cells:11,wellKey:'slate_w'}); }, label:'above' },
+    { name:'F · Number inside', desc:'Count read INSIDE the bar over the segments (outlined) — no number floating above.',
+      bar:function(ctx,x,y,w,h){ return vSegBar(ctx,x,y,w,h,PROGRESS,{mat:M('silver'),cells:7,wellKey:'slate_w'}); }, label:'inside', wide:true },
+  ];
+
+  function renderCard(canvas, v){
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, CW, CH);
+    var BY = 22, BH = 35;                 // button/bar top + height (35 art = 70dp)
+    drawSuper(ctx, 6, BY, 92, BH);
+    var barW = v.wide ? 30 : 24;
+    var barX = CW - barW - 8;
+    v.bar(ctx, barX, BY, barW, BH);
+
+    var count = goalHit ? '6,120' : '3,240';
+    if (v.label === 'inside'){
+      var lx = barX + Math.round((barW - textWidth(count)) / 2);
+      var ly = BY + Math.round((BH - 5) / 2);
+      var o = [[1,0],[-1,0],[0,1],[0,-1]];
+      for (var k = 0; k < o.length; k++) drawText(ctx, count, lx + o[k][0], ly + o[k][1], 'outline');
+      drawText(ctx, count, lx, ly, goalHit ? 'green_light' : 'white');
+    } else {
+      var cx = barX + Math.round((barW - textWidth(count)) / 2);
+      drawText(ctx, count, cx, BY - 9, goalHit ? 'green_light' : 'white');
+      var g = '/6,000', gx = barX + Math.round((barW - textWidth(g)) / 2);
+      drawText(ctx, g, gx, BY + BH + 3, 'stone_light');
+    }
+    if (goalHit){
+      var flag = 'GOAL!', fx = barX + Math.round((barW - textWidth(flag)) / 2);
+      drawText(ctx, flag, fx, 4, 'green_light');
+    }
+  }
+
+  var grid = document.getElementById('grid');
+  var cards = [];
+  VARIANTS.forEach(function(v){
+    var card = document.createElement('div'); card.className = 'card';
+    card.innerHTML = '<h2>' + v.name + '</h2><div class="desc">' + v.desc + '</div>';
+    var wrap = document.createElement('div'); wrap.className = 'stagewrap';
+    var cv = document.createElement('canvas');
+    cv.width = CW; cv.height = CH; cv.style.width = (CW * S) + 'px'; cv.style.height = (CH * S) + 'px';
+    wrap.appendChild(cv); card.appendChild(wrap); grid.appendChild(card);
+    cards.push({ cv: cv, v: v });
+  });
+
+  function renderAll(){ cards.forEach(function(c){ renderCard(c.cv, c.v); }); }
+  renderAll();
+
+  document.getElementById('toggle').addEventListener('click', function(){
+    goalHit = !goalHit;
+    PROGRESS = goalHit ? 1 : 3240 / 6000;
+    this.textContent = goalHit ? 'TOGGLE: SHOW IN-PROGRESS STATE' : 'TOGGLE: SHOW GOAL-HIT STATE';
+    document.getElementById('stateName').innerHTML = goalHit
+      ? 'GOAL HIT · <b>6,120 / 6,000</b>' : 'IN PROGRESS · <b style="color:#a9c8e6">3,240 / 6,000</b>';
+    renderAll();
+  });
+</script>
+</body>
+</html>

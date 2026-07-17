@@ -115,10 +115,12 @@ export function BossPlate() {
     const wellW = barArtW - inset.dw;
     body = (
       <>
-        <PixelText text={bonus.bossName} color={UI_PALETTE.gold_light} />
-        <View style={styles.subRow}>
+        <View style={[styles.nameRow, { width: barArtW * artScale }]}>
+          <View style={styles.nameLeft}>
+            <PixelText text={bonus.bossName} color={UI_PALETTE.gold_light} />
+            {boostChip}
+          </View>
           <PixelText text="VICTORY WEEK" color={UI_PALETTE.gold_mid} />
-          {boostChip}
         </View>
         <View style={{ width: barArtW * artScale, height: 20 * artScale }}>
           <Bar
@@ -157,13 +159,18 @@ export function BossPlate() {
     // ---- Live weekly boss: gold HP bar ------------------------------------
     body = (
       <>
-        <PixelText text={boss.name} color={UI_PALETTE.gold_light} />
-        <View style={styles.subRow}>
+        {/* Name row spanning the bar width: boss name left, "WEEKLY BOSS - TIER
+            N" right (was two stacked centered rows — the single row reclaims a
+            line so the whole cluster sits higher). */}
+        <View style={[styles.nameRow, { width: barArtW * artScale }]}>
+          <View style={styles.nameLeft}>
+            <PixelText text={boss.name} color={UI_PALETTE.gold_light} />
+            {boostChip}
+          </View>
           <PixelText
             text={`WEEKLY BOSS - TIER ${boss.tier}`}
             color={UI_PALETTE.silver_dark}
           />
-          {boostChip}
         </View>
         <Bar
           ref={barRef}
@@ -199,7 +206,14 @@ export function BossPlate() {
 
 const styles = StyleSheet.create({
   plate: { alignItems: "center", gap: PLATE_GAP },
-  subRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  // Name + subtitle share one full-bar-width row (name left, subtitle right).
+  nameRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  // Left group: boss name + optional persistent boost chip.
+  nameLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
 });
 
 export default BossPlate;
