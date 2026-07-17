@@ -36,6 +36,7 @@ import {
 } from "../../config/assets";
 import { Button, PixelText, Portrait, UIScaleProvider } from "../../ui";
 import { UI_PALETTE } from "../../ui/theme";
+import { PixelCrisp } from "../../../modules/pixel-crisp";
 import { OnboardingBackground } from "./OnboardingBackground";
 import type { Viewer } from "./OnboardingFlow";
 
@@ -194,7 +195,10 @@ export function ChooseHeroScreen({ viewer }: { viewer: Viewer }) {
 
           {/* Stage — the selected class's job-1 idle, live (all 4 frames stay
               mounted, opacity-swapped, so web never flickers on frame change). */}
-          <View style={[styles.stage, { marginTop: 4 * artScale }]}>
+          {/* PixelCrisp → nearest-neighbor on iOS so the hero preview stays crisp
+              pixel art when upscaled (matches the battle-scene sprites); a plain
+              View elsewhere, where PIXELATED handles web crispness. */}
+          <PixelCrisp style={[styles.stage, { marginTop: 4 * artScale }]}>
             {frames ? (
               frames.map((src, i) => (
                 <Image
@@ -207,7 +211,7 @@ export function ChooseHeroScreen({ viewer }: { viewer: Viewer }) {
             ) : (
               <PixelText text={cls.displayName[0]} color={accent} scale={artScale * 8} />
             )}
-          </View>
+          </PixelCrisp>
 
           <PixelText
             text={cls.displayName}
