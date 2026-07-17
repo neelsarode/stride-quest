@@ -78,6 +78,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const simDeploy = useMutation(api.dev.simulateTeammateDeploy);
   const removeTeammates = useMutation(api.dev.removeSimulatedTeammates);
   const resetAccount = useMutation(api.dev.resetAccount);
+  const rescaleBoss = useMutation(api.dev.rescaleActiveBoss);
   const resetOnboarding = useMutation(api.dev.resetOnboarding);
   const setFuelHours = useMutation(api.dev.setFuelHours);
   const simRally = useMutation(api.dev.simulateTeammateRally);
@@ -194,6 +195,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
             <Btn label="Advance day +1" onPress={run(() => advanceDay({ days: 1 }))} busy={busy} />
             <Btn label="+10h idle" onPress={run(() => fastForwardIdle({ hours: 10 }))} busy={busy} />
             <Btn label="Weekly reset →" onPress={run(() => triggerWeeklyReset({}))} busy={busy} />
+            <Btn label="Rescale boss →" onPress={run(() => rescaleBoss({}))} busy={busy} />
             <Btn label="Reset clock" onPress={run(() => resetClock({}))} busy={busy} />
           </Section>
 

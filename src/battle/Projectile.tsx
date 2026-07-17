@@ -30,6 +30,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
+import { fmtCompact } from "../format";
 import type { FxAnchor } from "./anchors";
 import type { AttackKind } from "./Fighter";
 import { CLASS_FX, FX, projectileSizePx, type ClassName } from "./fxConfig";
@@ -142,10 +143,11 @@ export function Projectile({
   // Ambient swings (Core Loop v2 §5.1, STR-77) pass damage null/≤0 → the boss
   // flash + projectile still play, but no floating number is spawned.
   const showNumber = damage != null && damage > 0;
-  // Comma-grouped ("-624,000", not "-624000") — locale pinned so the display
-  // is deterministic; mirrored in assets/fx-engine.js for rig parity (STR-85).
+  // Compact ("-1.4M", "-412K", small hits grouped like "-17") so a scaled-up
+  // Super Attack finisher (millions) can't overrun the impact label, which is
+  // absolutely positioned with no width guard (see src/format.ts).
   const numberText =
-    damage != null && damage > 0 ? `-${damage.toLocaleString("en-US")}` : null;
+    damage != null && damage > 0 ? `-${fmtCompact(damage)}` : null;
   const [phase, setPhase] = useState<"flight" | "impact">("flight");
   const [burstDone, setBurstDone] = useState(false);
 

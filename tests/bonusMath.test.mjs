@@ -2,11 +2,13 @@
 // Bonus Boss math tests — pure functions, no Convex. Run with:
 //   node --experimental-strip-types --test tests/
 // (the flag lets Node load the .ts modules directly; they use erasable-types-
-// only syntax). All expected numbers below are hand-computed from the tunables:
+// only syntax). Expected values are expressed as multiples of BOSS.baseHP (B)
+// rather than hard-coded magnitudes, so they stay correct if the DAMAGE_SCALE
+// is re-tuned (see gameConfig.ts). The invariants under test are the tier
+// FRACTIONS and member/tier scaling, not the absolute numbers:
 //   tiers 0.25 / 0.5 / 1.0 of the KILLED boss's bossMaxHP → ×1.1 / ×1.2 / ×1.35
-//   maxBoostMult 1.5 · baseHP 300k (Core Loop v2 §6) · tierScaling 1.4
-//   → 4-member tier-1 boss = 1,200k (tiers 300k/600k/1,200k), solo = 300k
-//     (tiers 75k/150k/300k) — the spec §4 worked examples, re-anchored to baseHP 300k.
+//   maxBoostMult 1.5 · tierScaling 1.4
+//   → 4-member tier-1 boss = 4·B (tiers B / 2B / 4B), solo = B (tiers .25B/.5B/B).
 // =============================================================================
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -22,45 +24,49 @@ import {
   nextBonusTierTarget,
 } from "../convex/gameConfig.ts";
 
+// Anchor every expectation to the configured boss base HP so a scale re-tune
+// can't break these (they test the fractions/scaling, not the magnitudes).
+const B = BOSS.baseHP;
+
 // The spec's two worked examples, derived via bossMaxHP() (NOT hard-coded HP)
 // so the bonus tiers provably inherit member-count scaling.
-const CREW_HP = bossMaxHP(1, 4); // 4-member guild, week tier 1
-const SOLO_HP = bossMaxHP(1, 1); // solo guild, week tier 1
+const CREW_HP = bossMaxHP(1, 4); // 4-member guild, week tier 1 = 4·B
+const SOLO_HP = bossMaxHP(1, 1); // solo guild, week tier 1 = B
 
 // --- thresholds inherit boss scaling (spec §4 example math) -------------------
 
-test("4-member tier-1 guild: tiers land at 300k / 600k / 1,200k", () => {
-  assert.equal(CREW_HP, 1_200_000); // 300k × 4 members × 1.4^0
+test("4-member tier-1 guild: tiers land at B / 2B / 4B", () => {
+  assert.equal(CREW_HP, 4 * B); // baseHP × 4 members × 1.4^0
   assert.deepEqual(
     BONUS_BOSS.tiers.map((t) => t.thresholdFrac * CREW_HP),
-    [300_000, 600_000, 1_200_000],
+    [B, 2 * B, 4 * B],
   );
-  assert.deepEqual(bonusTierFor(300_000, CREW_HP), { tier: 1, mult: 1.1 });
-  assert.deepEqual(bonusTierFor(600_000, CREW_HP), { tier: 2, mult: 1.2 });
-  assert.deepEqual(bonusTierFor(1_200_000, CREW_HP), { tier: 3, mult: 1.35 });
+  assert.deepEqual(bonusTierFor(B, CREW_HP), { tier: 1, mult: 1.1 });
+  assert.deepEqual(bonusTierFor(2 * B, CREW_HP), { tier: 2, mult: 1.2 });
+  assert.deepEqual(bonusTierFor(4 * B, CREW_HP), { tier: 3, mult: 1.35 });
 });
 
-test("solo guild: tiers land at 75k / 150k / 300k — small crews can always reach", () => {
-  assert.equal(SOLO_HP, 300_000);
+test("solo guild: tiers land at .25B / .5B / B — small crews can always reach", () => {
+  assert.equal(SOLO_HP, B);
   assert.deepEqual(
     BONUS_BOSS.tiers.map((t) => t.thresholdFrac * SOLO_HP),
-    [75_000, 150_000, 300_000],
+    [0.25 * B, 0.5 * B, B],
   );
-  // The spec's solo sanity check: a ~2-day window at ~40k/day ≈ 80k lands T1.
-  assert.deepEqual(bonusTierFor(80_000, SOLO_HP), { tier: 1, mult: 1.1 });
-  assert.deepEqual(bonusTierFor(75_000, SOLO_HP), { tier: 1, mult: 1.1 });
-  assert.deepEqual(bonusTierFor(300_000, SOLO_HP), { tier: 3, mult: 1.35 });
+  // A short window of engaged walking clears the first solo tier (0.25·B).
+  assert.deepEqual(bonusTierFor(0.3 * B, SOLO_HP), { tier: 1, mult: 1.1 });
+  assert.deepEqual(bonusTierFor(0.25 * B, SOLO_HP), { tier: 1, mult: 1.1 });
+  assert.deepEqual(bonusTierFor(B, SOLO_HP), { tier: 3, mult: 1.35 });
 });
 
 // --- tier boundaries: reaching a threshold is INCLUSIVE (damage ≥ threshold) --
 
 test("boundaries: 1 short of a threshold stays below, exactly ON it reaches", () => {
-  assert.deepEqual(bonusTierFor(299_999, CREW_HP), { tier: 0, mult: 1 });
-  assert.deepEqual(bonusTierFor(300_000, CREW_HP), { tier: 1, mult: 1.1 });
-  assert.deepEqual(bonusTierFor(599_999, CREW_HP), { tier: 1, mult: 1.1 });
-  assert.deepEqual(bonusTierFor(600_000, CREW_HP), { tier: 2, mult: 1.2 });
-  assert.deepEqual(bonusTierFor(1_199_999, CREW_HP), { tier: 2, mult: 1.2 });
-  assert.deepEqual(bonusTierFor(1_200_000, CREW_HP), { tier: 3, mult: 1.35 });
+  assert.deepEqual(bonusTierFor(B - 1, CREW_HP), { tier: 0, mult: 1 });
+  assert.deepEqual(bonusTierFor(B, CREW_HP), { tier: 1, mult: 1.1 });
+  assert.deepEqual(bonusTierFor(2 * B - 1, CREW_HP), { tier: 1, mult: 1.1 });
+  assert.deepEqual(bonusTierFor(2 * B, CREW_HP), { tier: 2, mult: 1.2 });
+  assert.deepEqual(bonusTierFor(4 * B - 1, CREW_HP), { tier: 2, mult: 1.2 });
+  assert.deepEqual(bonusTierFor(4 * B, CREW_HP), { tier: 3, mult: 1.35 });
 });
 
 test("below the first threshold is tier 0 / ×1.0 — the floor, never a loss", () => {
@@ -87,43 +93,43 @@ test("mult never exceeds maxBoostMult, even at absurd overkill damage", () => {
 
 test("nextBonusTierTarget at tier 0: the full first threshold to go", () => {
   assert.deepEqual(nextBonusTierTarget(0, CREW_HP), {
-    damageToGo: 300_000,
+    damageToGo: B,
     mult: 1.1,
   });
   assert.deepEqual(nextBonusTierTarget(0, SOLO_HP), {
-    damageToGo: 75_000,
+    damageToGo: 0.25 * B,
     mult: 1.1,
   });
 });
 
 test("nextBonusTierTarget at tiers 1 and 2 chases the NEXT threshold", () => {
-  // Exactly on T1 (300k): 600k − 300k = 300k to ×1.2.
-  assert.deepEqual(nextBonusTierTarget(300_000, CREW_HP), {
-    damageToGo: 300_000,
+  // Exactly on T1 (B): 2B − B = B to ×1.2.
+  assert.deepEqual(nextBonusTierTarget(B, CREW_HP), {
+    damageToGo: B,
     mult: 1.2,
   });
-  // 1k short of T2: the readout counts down to the boundary.
-  assert.deepEqual(nextBonusTierTarget(599_000, CREW_HP), {
+  // 1,000 short of T2: the readout counts down to the boundary.
+  assert.deepEqual(nextBonusTierTarget(2 * B - 1000, CREW_HP), {
     damageToGo: 1_000,
     mult: 1.2,
   });
-  // Mid tier 2 (800k): 1,200k − 800k = 400k to ×1.35.
-  assert.deepEqual(nextBonusTierTarget(800_000, CREW_HP), {
-    damageToGo: 400_000,
+  // Mid tier 2 (3B): 4B − 3B = B to ×1.35.
+  assert.deepEqual(nextBonusTierTarget(3 * B, CREW_HP), {
+    damageToGo: B,
     mult: 1.35,
   });
 });
 
 test("nextBonusTierTarget is null at max tier — nothing left to chase", () => {
-  assert.equal(nextBonusTierTarget(1_200_000, CREW_HP), null); // exactly on T3
-  assert.equal(nextBonusTierTarget(2_000_000, CREW_HP), null); // way past it
-  assert.equal(nextBonusTierTarget(300_000, SOLO_HP), null);
+  assert.equal(nextBonusTierTarget(4 * B, CREW_HP), null); // exactly on T3
+  assert.equal(nextBonusTierTarget(5 * B, CREW_HP), null); // way past it
+  assert.equal(nextBonusTierTarget(B, SOLO_HP), null);
 });
 
 test("shown == applied: dealing exactly damageToGo lands exactly the previewed mult", () => {
   // The UI promises "N damage to ×M"; dealing precisely N must stamp M — this
   // pins both the shared-helper invariant and the inclusive (≥) boundary.
-  for (const damage of [0, 150_000, 299_000, 400_000, 599_999]) {
+  for (const damage of [0, 0.5 * B, B, 1.5 * B, 2 * B - 1]) {
     const target = nextBonusTierTarget(damage, CREW_HP);
     const landed = bonusTierFor(damage + target.damageToGo, CREW_HP);
     assert.equal(landed.mult, target.mult, `preview broke its promise at ${damage}`);
@@ -150,14 +156,14 @@ test("tiers ascend in BOTH fields — nextBonusTierTarget walks them in order", 
 
 test("bonusTiersFor: absolute thresholds = thresholdFrac × killed bossMaxHP", () => {
   assert.deepEqual(bonusTiersFor(CREW_HP), [
-    { threshold: 300_000, boostMult: 1.1 },
-    { threshold: 600_000, boostMult: 1.2 },
-    { threshold: 1_200_000, boostMult: 1.35 },
+    { threshold: B, boostMult: 1.1 },
+    { threshold: 2 * B, boostMult: 1.2 },
+    { threshold: 4 * B, boostMult: 1.35 },
   ]);
   assert.deepEqual(bonusTiersFor(SOLO_HP), [
-    { threshold: 75_000, boostMult: 1.1 },
-    { threshold: 150_000, boostMult: 1.2 },
-    { threshold: 300_000, boostMult: 1.35 },
+    { threshold: 0.25 * B, boostMult: 1.1 },
+    { threshold: 0.5 * B, boostMult: 1.2 },
+    { threshold: B, boostMult: 1.35 },
   ]);
 });
 
