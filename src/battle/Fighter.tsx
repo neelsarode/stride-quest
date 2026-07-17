@@ -35,7 +35,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
+import { View, type StyleProp, type ViewStyle } from "react-native";
 import { FX_ANCHORS, FX_SPECIAL_ANCHORS, type FxAnchor } from "./anchors";
 import { FX, type ClassName } from "./fxConfig";
 import { Sprite } from "./Sprite";
@@ -209,43 +209,85 @@ export const Fighter = forwardRef<FighterHandle, FighterProps>(
     // return to idle, or straight to rest if requested mid-swing.
     const handleDone = () => go(restingRef.current ? "rest" : "idle");
 
-    // Special anim falls back to the attack strip when absent (see fire()).
-    const animName =
-      mode === "special" && !FX_SPECIAL_ANCHORS[jobKey] ? "attack" : mode;
-    // Template keys can't be narrowed to the generated SpriteKey union; the
-    // FX_ANCHORS guard in fire() + shared codegen walk make the cast safe.
-    const animKey = `${cls}/${job}/${animName}` as SpriteKey;
-    const fps =
-      mode === "idle"
-        ? FX.idleFps
-        : mode === "rest"
-          ? FX.restFps
-          : mode === "special"
-            ? FX.specialFps
-            : FX.attackFps;
-    const looping = mode === "idle" || mode === "rest";
+    // STACKED STRIPS (native flash fix): mount all four animation strips at
+    // once, absolutely stacked, and toggle which one is VISIBLE via opacity —
+    // never swap a single <Image>'s source+size mid-scene. On iOS a source
+    // swap applies the new frame WIDTH synchronously but the new bitmap a
+    // frame later, so for ~1 frame the finishing strip (e.g. a 13-frame
+    // special, 1560px wide) got squeezed into the incoming idle window
+    // (4-frame, 480px) under resizeMode:"stretch" — the little mirrored
+    // "flash from the left/right" a finishing attack showed. Separate
+    // fixed-source Images can never do that (Boss.tsx stacks its hit-flash the
+    // same way). Frame w/h is constant across a job's anims (pack-sprites
+    // invariant), so ONE box sizes them all and the scale never jumps modes.
+    const box = MANIFEST[`${cls}/${job}/idle` as SpriteKey];
 
     // displayHeight (see prop doc): scale the native frame window so the
-    // rendered height is exactly displayHeight, feet staying planted.
+    // rendered height is exactly displayHeight, feet staying planted. Applied
+    // on the wrapper so all four stacked strips scale together.
     const scaleStyle =
       displayHeight != null
         ? {
-            transform: [{ scale: displayHeight / MANIFEST[animKey].h }],
+            transform: [{ scale: displayHeight / box.h }],
             transformOrigin: "left bottom" as const,
           }
         : null;
 
     return (
-      <Sprite
-        animKey={animKey}
-        fps={fps}
-        loop={looping}
-        playKey={playKey}
-        onDone={looping ? undefined : handleDone}
-        style={scaleStyle ? [scaleStyle, style] : style}
-      />
+      <View
+        style={[
+          { width: box.w, height: box.h, overflow: "hidden" },
+          scaleStyle,
+          style,
+        ]}
+      >
+        {FIGHTER_MODES.map((m) => {
+          const visible = m === mode;
+          const looping = m === "idle" || m === "rest";
+          // Special falls back to the attack strip when a job has no special
+          // (fx-engine rule; all 40 jobs currently have one).
+          const animName =
+            m === "special" && !FX_SPECIAL_ANCHORS[jobKey] ? "attack" : m;
+          // Template keys can't be narrowed to the generated SpriteKey union;
+          // the shared codegen walk makes the cast safe.
+          const animKey = `${cls}/${job}/${animName}` as SpriteKey;
+          const fps =
+            m === "idle"
+              ? FX.idleFps
+              : m === "rest"
+                ? FX.restFps
+                : m === "special"
+                  ? FX.specialFps
+                  : FX.attackFps;
+          return (
+            <Sprite
+              key={m}
+              animKey={animKey}
+              fps={fps}
+              loop={looping}
+              playKey={playKey}
+              // onDone drives the return-to-idle; wire it ONLY to the strip
+              // actually playing this swing. The one-shot strips (attack/
+              // special) auto-play once on mount while hidden — gating on
+              // `visible` keeps that mount play from firing a spurious mode
+              // change. (Changing onDone never restarts a Sprite; playKey does.)
+              onDone={!looping && visible ? handleDone : undefined}
+              style={[STACKED, { opacity: visible ? 1 : 0 }]}
+            />
+          );
+        })}
+      </View>
     );
   },
 );
+
+const FIGHTER_MODES = ["idle", "rest", "attack", "special"] as const;
+
+// Every stacked strip fills the wrapper box; only opacity distinguishes them.
+const STACKED = {
+  position: "absolute",
+  left: 0,
+  top: 0,
+} as const;
 
 export default Fighter;
