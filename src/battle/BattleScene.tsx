@@ -72,7 +72,33 @@ const MANIFEST = manifestJson as Record<
   { frames: number; w: number; h: number; file: string }
 >;
 
-const BACKGROUND = require("../../assets/backgrounds/battlefield_beach.png");
+const BACKGROUND = require("../../assets/backgrounds/battlefield_ruins.png");
+
+// Concentric ellipses that fade outward → a cheap soft "blur" for the ground
+// shadow (RN has no CSS blur off web, and boxShadow/filter don't render reliably
+// on iOS here). Overlapping translucent black layers build a darker core that
+// fades to nothing at the edges. Filled into the styles.shadow footprint.
+const SHADOW_LAYERS = (
+  [
+    [0, 0.1],
+    [10, 0.12],
+    [20, 0.15],
+    [30, 0.18],
+    [40, 0.2],
+  ] as const
+).map(([n, opacity]) => {
+  const inset = `${n}%` as const;
+  return {
+    position: "absolute" as const,
+    top: inset,
+    left: inset,
+    right: inset,
+    bottom: inset,
+    borderRadius: 999,
+    backgroundColor: "#000",
+    opacity,
+  };
+});
 
 /** One party member as the scene needs it. */
 export interface SceneHero {
@@ -475,7 +501,11 @@ export const BattleScene = memo(
                     zIndex: pos.z,
                   }}
                 >
-                  <View style={styles.shadow} />
+                  <View style={styles.shadow} pointerEvents="none">
+                    {SHADOW_LAYERS.map((s, li) => (
+                      <View key={li} style={s} />
+                    ))}
+                  </View>
                   <Fighter
                     ref={(h) => {
                       fighters.current[i] = h;
@@ -548,18 +578,18 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  // .hero .shadow parity: ellipse at 66% width centered, 4px above the feet.
-  // blur(5px) is web-only (adaptation #4); native gets the crisp ellipse.
+  // Soft ground shadow footprint, centred under the character's FEET — bottom is
+  // a PERCENTAGE (not px) because the sprite frame carries ~27% transparent
+  // padding below the feet; a fixed offset dropped the shadow far below the
+  // character (into the lower grass), which is why it read as a detached bar.
+  // The % scales with each hero's size, so front (big) and back (small) rows
+  // both land at the feet. Filled by SHADOW_LAYERS for a soft edge.
   shadow: {
     position: "absolute",
-    left: "17%",
-    bottom: 4,
-    width: "66%",
-    height: 15,
-    borderRadius: 999,
-    backgroundColor: "#000",
-    opacity: 0.65,
-    ...(Platform.OS === "web" ? ({ filter: "blur(5px)" } as object) : null),
+    left: "26%",
+    bottom: "27%",
+    width: "48%",
+    height: 14,
   },
   // Native frame box pinned bottom-left of the wrapper; the displayHeight
   // scale (origin left-bottom) grows it to fill the wrapper exactly.
