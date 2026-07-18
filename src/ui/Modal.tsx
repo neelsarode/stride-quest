@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { Frame } from "./Frame";
 import { Button } from "./Button";
+import { RevealGate } from "./RevealGate";
+import { UI_ASSETS } from "./uiMap";
 import { PixelText, measurePixelText } from "./PixelText";
 import { SCRIM, UI_PALETTE, WELL_INSETS } from "./theme";
 import { useResolvedScale } from "./scale";
@@ -59,7 +61,11 @@ export function Modal({
         style={[StyleSheet.absoluteFill, { backgroundColor: SCRIM.modal }]}
         onPress={onClose}
       />
-      <View style={[{ width: WIDTH * s, height: height * s }, style]}>
+      <RevealGate
+        waitFor={[UI_ASSETS.font_white, UI_ASSETS.font_white_outlined]}
+        minHold={420}
+        style={[{ width: WIDTH * s, height: height * s }, style]}
+      >
         <Frame slice="modal_silver" length={height} scale={s} />
 
         {/* gold nameplate straddling the top frame band */}
@@ -107,7 +113,7 @@ export function Modal({
         >
           {children}
         </View>
-      </View>
+      </RevealGate>
     </View>
   );
 }

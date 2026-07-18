@@ -28,7 +28,9 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ConnectedBattleScene } from "../battle/ConnectedBattleScene";
 import {
+  RevealGate,
   UIThemeProvider,
+  UI_FONT_ATLASES,
   prefetchUiChrome,
   themeForClass,
   useDevThemeOverride,
@@ -71,20 +73,27 @@ export function GameScreen() {
 
       {/* HUD ZONES — each self-positions off useGameLayout + the GAME_ZONES
           table, above the scene FX layer. Wrapped in the theme provider (a
-          Context, no layout node) so every zone reads the class accent. The
-          chrome prewarm (above) means these mount with a warm image cache, so
-          the HUD appears whole instead of decoding in piece-by-piece. */}
+          Context, no layout node) so every zone reads the class accent, and in a
+          RevealGate so the whole HUD comes up as ONE unit over the scene — the
+          glyph/chrome <Image> loads resolve during the hold, so it never decodes
+          in letter-by-letter (the "typing" effect). */}
       <UIThemeProvider theme={theme}>
-        <TopBar />
-        <FuelGauge />
-        <BossPlate />
-        <PartyRail />
-        <RightNav />
-        <CommandDock />
-        <JobStrip />
+        <RevealGate
+          waitFor={UI_FONT_ATLASES}
+          minHold={700}
+          style={StyleSheet.absoluteFill}
+        >
+          <TopBar />
+          <FuelGauge />
+          <BossPlate />
+          <PartyRail />
+          <RightNav />
+          <CommandDock />
+          <JobStrip />
 
-        {/* Overlay host — sheets / popovers / help modal, above all zones. */}
-        <Overlays />
+          {/* Overlay host — sheets / popovers / help modal, above all zones. */}
+          <Overlays />
+        </RevealGate>
       </UIThemeProvider>
     </View>
   );

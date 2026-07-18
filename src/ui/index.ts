@@ -17,7 +17,12 @@ export {
   type ThemeAccent,
 } from "./theme-context";
 export { BakedImage, PIXELATED, artDims } from "./Baked";
+export { RevealGate, type RevealGateProps } from "./RevealGate";
 export { prefetchUiChrome } from "./prefetch";
+import { UI_ASSETS } from "./uiMap";
+/** The shared bitmap-font atlases every label samples — the asset a RevealGate
+ *  waits on so text reveals whole instead of typing in (class-invariant). */
+export const UI_FONT_ATLASES = [UI_ASSETS.font_white, UI_ASSETS.font_white_outlined];
 export {
   PixelText,
   measurePixelText,
