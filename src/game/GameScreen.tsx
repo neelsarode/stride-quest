@@ -22,11 +22,17 @@
 //     OverdriveBar strip was retired 2026-07-16, approved od-super-lab.html A)
 //   PartyRail / RightNav / Overlays / sheets/* .... STR-69 (rail + nav + sheets)
 // =============================================================================
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { ConnectedBattleScene } from "../battle/ConnectedBattleScene";
-import { UIThemeProvider, themeForClass, useDevThemeOverride } from "../ui";
+import {
+  UIThemeProvider,
+  prefetchUiChrome,
+  themeForClass,
+  useDevThemeOverride,
+} from "../ui";
 import { useGameEngine } from "./useGameEngine";
 import { TopBar } from "./zones/TopBar";
 import { FuelGauge } from "./zones/FuelGauge";
@@ -51,6 +57,12 @@ export function GameScreen() {
   const devThemeOverride = useDevThemeOverride();
   const theme = themeForClass(devThemeOverride ?? data?.player?.classKey);
 
+  // Warm this class's chrome cache so the HUD (and its modals/sheets) mount with
+  // decoded art — no progressive "types-in" paint. Re-warms on a class switch.
+  useEffect(() => {
+    prefetchUiChrome(theme.classKey);
+  }, [theme.classKey]);
+
   return (
     <View style={styles.root}>
       {/* THE STAGE — the scene IS the screen (spec §6): full-bleed, edge to
@@ -59,7 +71,9 @@ export function GameScreen() {
 
       {/* HUD ZONES — each self-positions off useGameLayout + the GAME_ZONES
           table, above the scene FX layer. Wrapped in the theme provider (a
-          Context, no layout node) so every zone reads the class accent. */}
+          Context, no layout node) so every zone reads the class accent. The
+          chrome prewarm (above) means these mount with a warm image cache, so
+          the HUD appears whole instead of decoding in piece-by-piece. */}
       <UIThemeProvider theme={theme}>
         <TopBar />
         <FuelGauge />

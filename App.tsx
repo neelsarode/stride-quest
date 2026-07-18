@@ -29,6 +29,7 @@ import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { GameScreen } from "./src/game/GameScreen";
 import { BackendSetupScreen } from "./src/screens/BackendSetupScreen";
 import { FeedbackProvider } from "./src/feedback/FeedbackProvider";
+import { prefetchUiChrome } from "./src/ui";
 import { TitleCard } from "./src/screens/onboarding/TitleCard";
 import { OnboardingFlow } from "./src/screens/onboarding/OnboardingFlow";
 
@@ -84,6 +85,14 @@ function AuthGate() {
       void signIn("anonymous");
     }
   }, [isLoading, isAuthenticated, signIn]);
+
+  // Warm the HUD chrome + font cache as early as possible (fonts + the default
+  // kit are shared, so this covers onboarding AND the first game-screen paint;
+  // GameScreen warms the player's actual class on top). Kills the "types-in on
+  // open" progressive decode before any surface mounts.
+  useEffect(() => {
+    prefetchUiChrome();
+  }, []);
 
   // The routing keys, straight from the server (skip until the token exists).
   const viewer = useQuery(api.users.viewer, isAuthenticated ? {} : "skip");

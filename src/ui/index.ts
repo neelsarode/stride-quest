@@ -17,6 +17,7 @@ export {
   type ThemeAccent,
 } from "./theme-context";
 export { BakedImage, PIXELATED, artDims } from "./Baked";
+export { prefetchUiChrome } from "./prefetch";
 export {
   PixelText,
   measurePixelText,
