@@ -25,7 +25,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { GAME_ZONES } from "../../config/assets";
 import { usePrevious } from "../../feedback/usePrevious";
-import { Bar, type BarHandle, Chip, PixelText, UIScaleProvider } from "../../ui";
+import { Bar, type BarHandle, Chip, PixelText, UIScaleProvider, useUITheme } from "../../ui";
 import { UI_PALETTE, WELL_INSETS } from "../../ui/theme";
 import { usePendingIdle } from "../../usePendingIdle";
 import { useGameLayout } from "../useGameLayout";
@@ -61,6 +61,7 @@ type BonusData = {
 
 export function BossPlate() {
   const { topPad, artScale, width } = useGameLayout();
+  const theme = useUITheme();
   const data = useQuery(api.game.dashboard, {});
 
   // Hooks run unconditionally (guarded bodies) so hook order never forks.
@@ -165,7 +166,7 @@ export function BossPlate() {
                     top: inset.y * artScale,
                     width: 1 * artScale,
                     height: (20 - inset.dh) * artScale,
-                    backgroundColor: reached ? UI_PALETTE.white : UI_PALETTE.sky_dark,
+                    backgroundColor: reached ? UI_PALETTE.white : theme.accent.dark,
                   }}
                 />
               );

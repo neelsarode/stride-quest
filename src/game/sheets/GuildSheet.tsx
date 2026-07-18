@@ -20,6 +20,7 @@ import {
   PixelText,
   Sheet,
   StatusDot,
+  useUITheme,
   type HeroState,
 } from "../../ui";
 import { STATE_COLORS, UI_PALETTE } from "../../ui/theme";
@@ -102,6 +103,7 @@ export function GuildSheet({
   onToast: (msg: string) => void;
 }) {
   const { artScale, height } = useGameLayout();
+  const theme = useUITheme();
   const s = artScale;
   const { members, recognition, inviteCode, maxMembers } = overview;
   const sendRally = useMutation(api.rally.sendRally);
@@ -195,7 +197,7 @@ export function GuildSheet({
               </View>
               <PixelText
                 text={`${m.todaySteps.toLocaleString()} TODAY - JOB ${m.jobLevel} - ${m.displayStreak}D - ${sign}${m.improvementPct}%${m.bonusDamage > 0 ? ` - ${m.bonusDamage.toLocaleString()} BONUS` : ""}`}
-                color={UI_PALETTE.sky_mid}
+                color={theme.accent.mid}
                 scale={s}
               />
               {badges.length > 0 && (
@@ -233,7 +235,7 @@ export function GuildSheet({
         {/* invite code + COPY */}
         {inviteCode ? (
           <View style={{ marginTop: 8 * s, gap: 4 * s }}>
-            <PixelText text="INVITE CODE" color={UI_PALETTE.sky_mid} scale={s} />
+            <PixelText text="INVITE CODE" color={theme.accent.mid} scale={s} />
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <PixelText text={inviteCode} color={UI_PALETTE.gold_light} scale={s + 1} />
               <Button
@@ -259,7 +261,7 @@ export function GuildSheet({
 
         {/* join-by-code (closes the joinGuildByCode UI gap) */}
         <View style={{ marginTop: 10 * s, gap: 4 * s }}>
-          <PixelText text="JOIN ANOTHER GUILD" color={UI_PALETTE.sky_mid} scale={s} />
+          <PixelText text="JOIN ANOTHER GUILD" color={theme.accent.mid} scale={s} />
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 * s }}>
             <TextInput
               value={joinCode}

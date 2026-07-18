@@ -34,6 +34,7 @@ import {
   Popover,
   Sheet,
   UIScaleProvider,
+  useUITheme,
 } from "../ui";
 import { STATE_COLORS, UI_PALETTE } from "../ui/theme";
 import { useFeedback } from "../feedback/FeedbackProvider";
@@ -382,6 +383,7 @@ function PopStat({
   top: number;
   scale: number;
 }) {
+  const theme = useUITheme();
   return (
     <View
       style={{
@@ -393,7 +395,7 @@ function PopStat({
         justifyContent: "space-between",
       }}
     >
-      <PixelText text={label} color={UI_PALETTE.sky_mid} scale={scale} />
+      <PixelText text={label} color={theme.accent.mid} scale={scale} />
       <PixelText text={value} color={UI_PALETTE.silver_rim} scale={scale} />
     </View>
   );
@@ -417,6 +419,7 @@ function InvitePopover({
   onCopied: (ok: boolean) => void;
 }) {
   const { left, top, arrowAt } = computePopover(rect, scale, winW);
+  const theme = useUITheme();
 
   async function onCopy() {
     const ok = await copyToClipboard(code);
@@ -435,7 +438,7 @@ function InvitePopover({
     >
       <PixelText text="INVITE A FRIEND" color={UI_PALETTE.silver_rim} scale={scale} />
       <View style={{ position: "absolute", top: 13 * scale }}>
-        <PixelText text="SHARE YOUR GUILD CODE" color={UI_PALETTE.sky_mid} scale={scale} />
+        <PixelText text="SHARE YOUR GUILD CODE" color={theme.accent.mid} scale={scale} />
       </View>
       <View style={{ position: "absolute", top: 24 * scale, left: 0, right: 0, alignItems: "center" }}>
         <PixelText text={code} color={UI_PALETTE.gold_light} scale={scale} />
@@ -453,24 +456,32 @@ function InvitePopover({
 // Overdrive is automatic on a goal-hit (no charge/activate). Pixel-font
 // conventions: caps, "X2" not "×2", short lines that fit the 134-art-px well.
 // =============================================================================
-const HELP_LINES: [string, string][] = [
-  ["WALK EVERY DAY.", UI_PALETTE.silver_rim],
-  ["STEPS BECOME ENERGY.", UI_PALETTE.sky_mid],
-  ["SUPER ATTACK SPENDS IT", UI_PALETTE.silver_rim],
-  ["ON THE WEEKLY BOSS.", UI_PALETTE.sky_mid],
-  ["YOUR CREW FIGHTS 24/7.", UI_PALETTE.sky_mid],
-  ["HIT YOUR GOAL: X2 OVERDRIVE.", UI_PALETTE.sky_mid],
-  ["RALLY RESTING FRIENDS.", UI_PALETTE.sky_mid],
-  ["JOBS RESET MONDAYS.", UI_PALETTE.sky_mid],
+// "rim" = neutral silver; "accent" = the class theme accent (resolved in render,
+// so a class swap re-colors these — never bake the color at module load).
+const HELP_LINES: [string, "rim" | "accent"][] = [
+  ["WALK EVERY DAY.", "rim"],
+  ["STEPS BECOME ENERGY.", "accent"],
+  ["SUPER ATTACK SPENDS IT", "rim"],
+  ["ON THE WEEKLY BOSS.", "accent"],
+  ["YOUR CREW FIGHTS 24/7.", "accent"],
+  ["HIT YOUR GOAL: X2 OVERDRIVE.", "accent"],
+  ["RALLY RESTING FRIENDS.", "accent"],
+  ["JOBS RESET MONDAYS.", "accent"],
 ];
 
 function HelpModal({ onClose }: { onClose: () => void }) {
   const { artScale } = useGameLayout();
+  const theme = useUITheme();
   return (
     <Modal visible onClose={onClose} title="HOW TO PLAY" height={120} scale={artScale}>
       <View style={{ gap: 4 * artScale }}>
-        {HELP_LINES.map(([line, color]) => (
-          <PixelText key={line} text={line} color={color} scale={artScale} />
+        {HELP_LINES.map(([line, kind]) => (
+          <PixelText
+            key={line}
+            text={line}
+            color={kind === "accent" ? theme.accent.mid : UI_PALETTE.silver_rim}
+            scale={artScale}
+          />
         ))}
         <View style={{ marginTop: 6 * artScale, alignItems: "center" }}>
           <Button material="silver" label="OK" onPress={onClose} scale={artScale} />

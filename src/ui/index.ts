@@ -5,6 +5,17 @@
 // the game screen both build ON these).
 // =============================================================================
 export { UIScaleProvider, useUIScale, DEFAULT_ART_SCALE } from "./scale";
+export {
+  UIThemeProvider,
+  useUITheme,
+  themeForClass,
+  DEFAULT_UI_THEME,
+  THEME_CLASS_KEYS,
+  setDevThemeOverride,
+  useDevThemeOverride,
+  type UITheme,
+  type ThemeAccent,
+} from "./theme-context";
 export { BakedImage, PIXELATED, artDims } from "./Baked";
 export {
   PixelText,

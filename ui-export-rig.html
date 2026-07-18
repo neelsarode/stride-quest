@@ -98,9 +98,46 @@
 // Wells: night_w / night_wd (midnight). Fills (gold vitals, sky fuel) are
 // runtime Views — never baked (spec §5) — but their hexes ship in theme.ts.
 // ===========================================================================
-const AG = M('silver'), AU = M('gold');
+// PER-CLASS KITS (Approach 2) — mirror ui-style-lab.html THEMES. `mat` = primary
+// frame material, `sec` = secondary/accent faces (the "gold" buttons), wells =
+// recessed interiors, `accent` = the class accent family (was S8 "sky"), `hp`/
+// `seg` = the runtime fill families. Semantic colors (chip green/red/gold, state
+// dots, rally-gold beacons) are NOT per class — they encode meaning, so they
+// stay fixed across kits. The build loop bakes one PNG set + theme per kit.
+const KITS = [
+  { cls:'warrior',  mat:'silver',   sec:'gold',     well:'night_w',  wellD:'night_wd',  accent:['sky_light','sky_mid','sky_dark'],       hp:['gold1','gold2','gold4'],             seg:['sky_light','sky_mid','sky_dark'] },
+  { cls:'mage',     mat:'amethyst', sec:'silver',   well:'glass_w',  wellD:'glass_wd',  accent:['amethyst1','amethyst2','amethyst4'],    hp:['amethyst1','amethyst2','amethyst4'], seg:['blue_light','blue_mid','blue_dark'] },
+  { cls:'medic',    mat:'slate',    sec:'slate',    well:'slate_w',  wellD:'slate_wd',  accent:['green_light','green_mid','green_dark'], hp:['green_light','green_mid','green_dark'], seg:['green_light','green_mid','green_dark'] },
+  { cls:'warlock',  mat:'bone',     sec:'iron',     well:'shadow_w', wellD:'shadow_wd', accent:['ghoul_light','ghoul_mid','ghoul_dark'],hp:['ghoul_light','ghoul_mid','ghoul_dark'], seg:['ghoul_light','ghoul_mid','ghoul_dark'] },
+  { cls:'archer',   mat:'elder',    sec:'oak',      well:'leaf_w',   wellD:'leaf_wd',   accent:['elder1','elder3','elder5'],            hp:['green_light','green_mid','green_dark'], seg:['yellow_light','yellow_mid','yellow_dark'] },
+  { cls:'assassin', mat:'iron',     sec:'ember',    well:'blood_w',  wellD:'blood_wd',  accent:['ember1','ember2','ember4'],            hp:['ember1','ember2','ember4'],          seg:['red_light','red_mid','red_dark'] },
+  { cls:'paladin',  mat:'gold',     sec:'iron',     well:'choc_w',   wellD:'choc_wd',   accent:['oak0','oak1','oak3'],                  hp:['green_light','green_mid','green_dark'], seg:['blue_light','blue_mid','blue_dark'] },
+  { cls:'bard',     mat:'gold',     sec:'amethyst', well:'velvet_w', wellD:'velvet_wd', accent:['amethyst1','amethyst2','amethyst4'],    hp:['green_light','green_mid','green_dark'], seg:['gold1','gold2','gold4'] },
+];
+
+// Reassigned per kit by the build loop. The INVENTORY draw closures read AG/AU
+// (materials) live by name; the wells + accent are semantic palette KEYS the
+// draws reference by literal ('night_w', 'sky_mid', …), so the loop overwrites
+// just those palette values per kit — one INVENTORY re-bakes for every kit with
+// no per-entry edits. SEG_T (the segment frame kit) is recomputed per kit too.
+let AG = M('silver'), AU = M('gold'), SEG_T;
 const hex = k => PALETTE[k];
 const fam3 = (l, m, d) => ({ light: hex(l), mid: hex(m), dark: hex(d) });
+
+// Overwrite the per-kit palette tokens (wells + the "sky" accent role) so every
+// draw that references them by literal renders in the kit's colors. Materials
+// are handled by reassigning AG/AU (their ramps stay intact in PALETTE).
+function applyKitPalette(kit) {
+  AG = M(kit.mat);
+  AU = M(kit.sec);
+  PALETTE.night_w = PALETTE[kit.well];
+  PALETTE.night_wd = PALETTE[kit.wellD];
+  PALETTE.sky_light = PALETTE[kit.accent[0]];
+  PALETTE.sky_mid = PALETTE[kit.accent[1]];
+  PALETTE.sky_dark = PALETTE[kit.accent[2]];
+  SEG_T = { mat: AG, well: 'night_w', wellD: 'night_wd',
+    seg: fam3('sky_light', 'sky_mid', 'sky_dark') };
+}
 
 // EMPTY-SOCKET face (approved super-disabled-lab.html K, 2026-07-16): the
 // SUPER plate's disabled state — a dark recessed well with only the parent
@@ -192,8 +229,8 @@ function beaconRing(ctx, S, key) {
  * capW/capH is the cap thickness (>= corner radius + glint reach). bakeW/bakeH
  * is a scratch size wide/tall enough to have a clean uniform mid band.
  * =========================================================================== */
-const SEG_T = { mat: AG, well: 'night_w', wellD: 'night_wd',
-  seg: fam3('sky_light', 'sky_mid', 'sky_dark') };
+// SEG_T (the segment-frame kit) is recomputed per kit in applyKitPalette; the
+// INVENTORY draw closures below read it live at bake time.
 
 const INVENTORY = [
   /* ---- bar frames (3-slice, spec §5 full=boss/plate, slim=xp/fuel) -------- */
@@ -341,7 +378,12 @@ for (const [name, sprite] of ICONS) {
 
 /* ===========================================================================
  * BUILD — render each entry, populate files{} (@1x dataURLs), dims{}, slices{}.
+ * Wrapped in bakeKit(kit): the loop below runs it once per class, each pass
+ * re-tinting AG/AU + the per-kit palette tokens (applyKitPalette) so the same
+ * INVENTORY re-bakes into a full PNG set + theme for every class.
  * =========================================================================== */
+function bakeKit(kit) {
+applyKitPalette(kit);
 const files = {};      // "<name>.png" → @1x dataURL (art px × DP_PER_ART)
 const dims = {};       // "<name>" → { w, h } in ART px
 const slices = {};     // slice family → assembly metadata for the runtime
@@ -472,7 +514,11 @@ const theme = {
   palette: {
     white: hex('white'), outline: hex('outline'),
     night_w: hex('night_w'), night_wd: hex('night_wd'),
-    silver_rim: hex('silver1'), silver_dark: hex('silver4'),
+    // "silver_rim/dark" keep their legacy key names but carry the KIT's primary
+    // frame-material rim/dark (AG), so frame-edge text matches the class frame.
+    silver_rim: hex(AG.rim), silver_dark: hex(AG.d),
+    // Gold stays the SHARED high-hierarchy fill (boss HP / overdrive) across all
+    // classes — not re-tinted per kit (theme-context.tsx rationale).
     gold_light: hex('gold1'), gold_mid: hex('gold2'), gold_dark: hex('gold4'),
     sky_light: hex('sky_light'), sky_mid: hex('sky_mid'), sky_dark: hex('sky_dark'),
     red_light: hex('red_light'),
@@ -510,16 +556,34 @@ const theme = {
 /* --------------------------------- publish ------------------------------- */
 const payload = {
   meta: { generatedBy: 'ui-export-rig.html', dpPerArt: DP_PER_ART, scales: [1, 2, 3],
-    theme: 'S8 CELESTIAL SILVER', note: '@1x only in JSON; pack-ui derives @2x/@3x' },
+    kit: kit.cls, theme: `${kit.cls.toUpperCase()} KIT`,
+    note: '@1x only in JSON; pack-ui derives @2x/@3x' },
   files, dims, slices, cats, theme,
   report: Object.keys(files).sort().join('\n'),
 };
-window.__EXPORTS = payload;
-window.__EXPORT_JSON = JSON.stringify(payload);
+return { payload, galleryItems, fontWhite, fontOutlined };
+}  // end bakeKit
+
+/* --------- run the bake for every class kit → EXPORTS_ALL[cls] = payload ----- */
+const EXPORTS_ALL = {};
+let firstBake = null;
+for (const kit of KITS) {
+  const r = bakeKit(kit);
+  EXPORTS_ALL[kit.cls] = r.payload;
+  if (!firstBake) firstBake = r;   // warrior (KITS[0]) drives the human preview
+}
+window.__EXPORTS_ALL = EXPORTS_ALL;
+window.__EXPORTS_ALL_JSON = JSON.stringify(EXPORTS_ALL);
+// Back-compat: the single-kit hooks (pack-ui default, older drivers) still read
+// __EXPORTS/__EXPORT_JSON → point them at the warrior kit (the shipped default).
+window.__EXPORTS = EXPORTS_ALL.warrior;
+window.__EXPORT_JSON = JSON.stringify(EXPORTS_ALL.warrior);
 
 /* ------------------------------ human preview ---------------------------- */
+// The gallery shows ONE kit (warrior, KITS[0] = firstBake) so the page stays
+// readable; every kit is staged on window.__EXPORTS_ALL for the packer.
 const gallery = document.getElementById('gallery');
-for (const [name, art] of galleryItems) {
+for (const [name, art] of firstBake.galleryItems) {
   const cell = document.createElement('div');
   cell.className = 'cell';
   cell.appendChild(up(art, 3 * DP_PER_ART));
@@ -530,7 +594,7 @@ for (const [name, art] of galleryItems) {
 }
 {
   const fr = document.getElementById('fontrow');
-  for (const [nm, atlas] of [['font_white', fontWhite.canvas], ['font_white_outlined', fontOutlined.canvas]]) {
+  for (const [nm, atlas] of [['font_white', firstBake.fontWhite.canvas], ['font_white_outlined', firstBake.fontOutlined.canvas]]) {
     const cell = document.createElement('div'); cell.className = 'cell';
     const shown = up(atlas, 3); shown.className = 'px'; cell.appendChild(shown);
     const cap = document.createElement('div'); cap.className = 'cap';
@@ -539,21 +603,24 @@ for (const [name, art] of galleryItems) {
   }
 }
 
-const nFiles = Object.keys(files).length;
-const byCat = {};
-for (const s of INVENTORY) byCat[s.cat] = (byCat[s.cat] || 0) + 1;
+const nFiles = Object.keys(firstBake.payload.files).length;
+const nKits = Object.keys(EXPORTS_ALL).length;
 document.getElementById('report').textContent =
-  `${nFiles} @1x PNGs staged on window.__EXPORTS (pack-ui derives @2x/@3x → ${nFiles * 3} files).\n` +
-  `${INVENTORY.length} inventory entries + 2 font atlases.\n\n` +
-  Object.keys(files).sort().join('\n');
+  `${nKits} class kits baked → window.__EXPORTS_ALL (${nFiles} @1x PNGs each; ` +
+  `pack-ui derives @2x/@3x → ${nFiles * 3} files/kit, ${nFiles * 3 * nKits} total).\n` +
+  `${INVENTORY.length} inventory entries + 2 font atlases per kit.\n` +
+  `Kits: ${Object.keys(EXPORTS_ALL).join(', ')}\n\n` +
+  Object.keys(firstBake.payload.files).sort().join('\n');
 
 /* ------------------------------ download button -------------------------- */
+// Saves ALL kits (Approach 2). pack-ui reads window.__EXPORTS_ALL via a headless
+// evaluate, so this is the human fallback path.
 document.getElementById('dl').addEventListener('click', () => {
-  const blob = new Blob([window.__EXPORT_JSON], { type: 'application/json' });
+  const blob = new Blob([window.__EXPORTS_ALL_JSON], { type: 'application/json' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'ui-export.json';
+  a.href = URL.createObjectURL(blob); a.download = 'ui-export-all.json';
   document.body.appendChild(a); a.click(); a.remove();
-  document.getElementById('dlstatus').textContent = '✓ saved ui-export.json';
+  document.getElementById('dlstatus').textContent = '✓ saved ui-export-all.json (all kits)';
 });
 </script>
 </body>

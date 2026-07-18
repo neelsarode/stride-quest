@@ -29,6 +29,9 @@ import {
   Sheet,
   StatusDot,
   UIScaleProvider,
+  THEME_CLASS_KEYS,
+  setDevThemeOverride,
+  useDevThemeOverride,
 } from "../ui";
 import { BakedImage } from "../ui/Baked";
 import { UI_PALETTE } from "../ui/theme";
@@ -92,6 +95,16 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+
+  // Theme cycler: force the HUD accent through each class, then back to OFF
+  // (honor the real class). Lets a warrior account preview every class theme.
+  const themeOverride = useDevThemeOverride();
+  const cycleTheme = () => {
+    const keys = THEME_CLASS_KEYS as readonly string[];
+    if (themeOverride == null) return setDevThemeOverride(keys[0]);
+    const i = keys.indexOf(themeOverride);
+    setDevThemeOverride(i < 0 || i >= keys.length - 1 ? null : keys[i + 1]);
+  };
 
   const run = (fn: () => Promise<unknown>) => async () => {
     setBusy(true);
@@ -190,6 +203,13 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
           <BattleDemo />
           <BattleSceneDemo />
           <LiveSceneDemo />
+
+          <Section title="UI THEME (per-class accent)">
+            <Btn
+              label={`Theme: ${(themeOverride ?? "OFF (real class)").toUpperCase()} ▸`}
+              onPress={cycleTheme}
+            />
+          </Section>
 
           <Section title="TIME">
             <Btn label="Advance day +1" onPress={run(() => advanceDay({ days: 1 }))} busy={busy} />

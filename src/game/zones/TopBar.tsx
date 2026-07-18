@@ -23,6 +23,7 @@ import {
   PixelText,
   Portrait,
   UIScaleProvider,
+  useUITheme,
 } from "../../ui";
 import { PORTRAIT_CROPS, UI_PALETTE } from "../../ui/theme";
 import { useGameLayout } from "../useGameLayout";
@@ -32,8 +33,9 @@ import { zoneStyles } from "./zoneStyle";
 const PAD_H = 14; // dashboard-ui #topbar side padding
 const NAME_GAP = 6; // dp between portrait and identity column
 const ROW_GAP = 3; // dp between identity text lines
-const SCRIM_H = 118; // scrim gradient height (dp) behind the top bar
-const SCRIM_BANDS = 7; // stacked translucent bands that fake a top-down gradient
+const SCRIM_H = 150; // scrim gradient height (dp) behind the top bar
+const SCRIM_BANDS = 28; // many thin bands → a SMOOTH fade (no visible stepping)
+const SCRIM_PEAK = 0.72; // top opacity — dark enough to keep HUD text legible on a bright sky
 // The weekday map (data.date is a local "YYYY-MM-DD"; read as UTC so the tz the
 // server already applied is not double-counted).
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"] as const;
@@ -77,12 +79,16 @@ function Scrim({ topInset }: { topInset: number }) {
     >
       {Array.from({ length: SCRIM_BANDS }).map((_, i) => {
         const t = i / (SCRIM_BANDS - 1); // 0 (top) → 1 (bottom)
+        // Hold near-full for the top third (where the identity/fuel rows sit),
+        // then ease to transparent — so the whole HUD band stays legible and the
+        // fade into the scene is soft, not a hard edge.
+        const fade = Math.min(1, (1 - t) * 1.5);
         return (
           <View
             key={i}
             style={{
               flex: 1,
-              backgroundColor: `rgba(6,8,12,${(0.62 * (1 - t)).toFixed(3)})`,
+              backgroundColor: `rgba(6,8,12,${(SCRIM_PEAK * fade).toFixed(3)})`,
             }}
           />
         );
@@ -93,6 +99,7 @@ function Scrim({ topInset }: { topInset: number }) {
 
 export function TopBar() {
   const { topPad, artScale } = useGameLayout();
+  const theme = useUITheme();
   const data = useQuery(api.game.dashboard, {});
 
   if (!data) return null;
@@ -135,7 +142,7 @@ export function TopBar() {
               />
               <View style={{ marginLeft: NAME_GAP, gap: ROW_GAP }}>
                 <PixelText text={player.displayName} color={UI_PALETTE.white} />
-                <PixelText text={metaLine} color={UI_PALETTE.sky_mid} />
+                <PixelText text={metaLine} color={theme.accent.mid} />
                 <View style={styles.chipRow}>
                   {streak.count > 0 && (
                     <PixelText
@@ -160,7 +167,7 @@ export function TopBar() {
                 <>
                   <PixelText
                     text={`WEEK ${boss.tier} - ${weekdayOf(date)}`}
-                    color={UI_PALETTE.sky_mid}
+                    color={theme.accent.mid}
                   />
                   <PixelText
                     text={`RESETS ${resetCountdown(weekEnd, now)}`}

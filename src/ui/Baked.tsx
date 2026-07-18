@@ -11,9 +11,10 @@
 // native has no equivalent Image prop (slight smoothing, iOS polish note).
 // =============================================================================
 import { Image, Platform, type ImageStyle, type StyleProp } from "react-native";
-import { UI_ASSETS, type UiAssetKey } from "./uiMap";
+import { uiAsset, type UiAssetKey } from "./uiMap";
 import { UI_DIMS } from "./theme";
 import { useResolvedScale } from "./scale";
+import { useUITheme } from "./theme-context";
 
 /** Crisp pixel-art upscaling on web (parity with Sprite.tsx PIXELATED). */
 export const PIXELATED =
@@ -33,13 +34,16 @@ export interface BakedImageProps {
   style?: StyleProp<ImageStyle>;
 }
 
-/** A generated PNG at its baked art size × scale. */
+/** A generated PNG at its baked art size × scale, resolved for the current class
+ *  (context classKey → uiAsset). Class-invariant art (fonts, ring, beacons)
+ *  deduped to one pool entry, so every class resolves the same file there. */
 export function BakedImage({ name, scale, tintColor, style }: BakedImageProps) {
   const s = useResolvedScale(scale);
+  const { classKey } = useUITheme();
   const d = artDims(name);
   return (
     <Image
-      source={UI_ASSETS[name]}
+      source={uiAsset(classKey, name)}
       style={[
         { width: d.w * s, height: d.h * s },
         tintColor != null ? { tintColor } : null,

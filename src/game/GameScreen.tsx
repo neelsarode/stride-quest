@@ -23,7 +23,10 @@
 //   PartyRail / RightNav / Overlays / sheets/* .... STR-69 (rail + nav + sheets)
 // =============================================================================
 import { StyleSheet, View } from "react-native";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { ConnectedBattleScene } from "../battle/ConnectedBattleScene";
+import { UIThemeProvider, themeForClass, useDevThemeOverride } from "../ui";
 import { useGameEngine } from "./useGameEngine";
 import { TopBar } from "./zones/TopBar";
 import { FuelGauge } from "./zones/FuelGauge";
@@ -39,6 +42,15 @@ export function GameScreen() {
   // flag is on; the dashboard and this screen share ONE engine and can't drift.
   useGameEngine();
 
+  // Per-class UI accent (Approach 1): resolve the theme from the player's class
+  // and provide it to every zone. Reactive — a class change re-themes the HUD.
+  // (Same dashboard query the zones read; Convex dedupes it to one subscription.)
+  const data = useQuery(api.game.dashboard, {});
+  // A dev override (the DevPanel theme cycler) wins over the real class; null =
+  // honor the player's class. No-op in production (nothing sets it).
+  const devThemeOverride = useDevThemeOverride();
+  const theme = themeForClass(devThemeOverride ?? data?.player?.classKey);
+
   return (
     <View style={styles.root}>
       {/* THE STAGE — the scene IS the screen (spec §6): full-bleed, edge to
@@ -46,18 +58,20 @@ export function GameScreen() {
       <ConnectedBattleScene style={StyleSheet.absoluteFill} />
 
       {/* HUD ZONES — each self-positions off useGameLayout + the GAME_ZONES
-          table, above the scene FX layer. Empty until their owning ticket fills
-          the component file. */}
-      <TopBar />
-      <FuelGauge />
-      <BossPlate />
-      <PartyRail />
-      <RightNav />
-      <CommandDock />
-      <JobStrip />
+          table, above the scene FX layer. Wrapped in the theme provider (a
+          Context, no layout node) so every zone reads the class accent. */}
+      <UIThemeProvider theme={theme}>
+        <TopBar />
+        <FuelGauge />
+        <BossPlate />
+        <PartyRail />
+        <RightNav />
+        <CommandDock />
+        <JobStrip />
 
-      {/* Overlay host — sheets / popovers / help modal, stacked above all zones. */}
-      <Overlays />
+        {/* Overlay host — sheets / popovers / help modal, above all zones. */}
+        <Overlays />
+      </UIThemeProvider>
     </View>
   );
 }
