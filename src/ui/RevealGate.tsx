@@ -18,7 +18,7 @@
 // A `maxWait` fallback guarantees it always reveals. Fast-refresh safe: opacity
 // is driven by a `revealed` state flag, so it always ends VISIBLE.
 // =============================================================================
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
@@ -57,6 +57,19 @@ export function RevealGate({
   const [capped, setCapped] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
 
+  // STABLE onLoad/onError identity — react-native-web's <Image> lists `onLoad`
+  // in its load-effect deps, so an INLINE handler (new identity per render)
+  // re-runs the load → fires onLoad → setState → re-render → … an infinite
+  // render loop that flooded "Maximum update depth exceeded" and crashed the
+  // web tab (native is unaffected — RN doesn't re-load on handler identity).
+  // One shared stable counter + a bail-out once every probe has reported (the
+  // functional update returns the SAME state, so React skips the re-render).
+  const totalRef = useRef(sources.length);
+  totalRef.current = sources.length;
+  const countProbe = useCallback(() => {
+    setLoaded((n) => (n >= totalRef.current ? n : n + 1));
+  }, []);
+
   useEffect(() => {
     const a = setTimeout(() => setHeld(true), minHold);
     const b = setTimeout(() => setCapped(true), maxWait);
@@ -91,8 +104,8 @@ export function RevealGate({
               key={i}
               source={src}
               style={styles.probeImg}
-              onLoad={() => setLoaded((n) => n + 1)}
-              onError={() => setLoaded((n) => n + 1)}
+              onLoad={countProbe}
+              onError={countProbe}
               fadeDuration={0}
             />
           ))}
