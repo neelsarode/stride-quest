@@ -117,7 +117,19 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center" },
-  bannerZone: { position: "absolute", top: 80, width: "100%", alignItems: "center", gap: 8 },
+  // Announcements (boss defeated / JOB UP! / rally / …) center VERTICALLY in the
+  // screen (owner request 2026-07-20) — the old top:80 anchor overlapped the top
+  // HUD band (identity / fuel / boss plate). Fills the overlay and centers so a
+  // banner (+ optional subtitle) sits mid-screen, clear of every zone.
+  bannerZone: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
   floatZone: { position: "absolute", top: "32%", alignItems: "center" },
   toastZone: { position: "absolute", bottom: 48, width: "100%", alignItems: "center" },
 });
