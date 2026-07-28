@@ -35,6 +35,11 @@ import {
   themeForClass,
   useDevThemeOverride,
 } from "../ui";
+import {
+  markHudRevealed,
+  markSceneRevealed,
+  resetGateReveals,
+} from "../LoadCurtain";
 import { useGameEngine } from "./useGameEngine";
 import { TopBar } from "./zones/TopBar";
 import { FuelGauge } from "./zones/FuelGauge";
@@ -65,11 +70,20 @@ export function GameScreen() {
     prefetchUiChrome(theme.classKey);
   }, [theme.classKey]);
 
+  // LoadCurtain sync (STR-94): clear the gate slate on (re)mount, then the two
+  // RevealGates below report in — the app curtain lifts once BOTH have.
+  useEffect(() => {
+    resetGateReveals();
+  }, []);
+
   return (
     <View style={styles.root}>
       {/* THE STAGE — the scene IS the screen (spec §6): full-bleed, edge to
           edge. A full-viewport box is exactly the battlefield-ui parity math. */}
-      <ConnectedBattleScene style={StyleSheet.absoluteFill} />
+      <ConnectedBattleScene
+        style={StyleSheet.absoluteFill}
+        onRevealed={markSceneRevealed}
+      />
 
       {/* HUD ZONES — each self-positions off useGameLayout + the GAME_ZONES
           table, above the scene FX layer. Wrapped in the theme provider (a
@@ -81,6 +95,7 @@ export function GameScreen() {
         <RevealGate
           waitFor={UI_FONT_ATLASES}
           minHold={700}
+          onRevealed={markHudRevealed}
           style={StyleSheet.absoluteFill}
         >
           <TopBar />

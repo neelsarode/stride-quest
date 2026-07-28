@@ -64,8 +64,9 @@ import {
 import { SCENE, jobRenderScale, type ClassName } from "./fxConfig";
 import { computeShotGeometry, Projectile, type Rect } from "./Projectile";
 import { RestZzz } from "./RestZzz";
-import type { SpriteKey } from "./spriteMap";
+import { SPRITES, type SpriteKey } from "./spriteMap";
 import manifestJson from "./sprites/manifest.json";
+import { RevealGate } from "../ui/RevealGate";
 
 const MANIFEST = manifestJson as Record<
   SpriteKey,
@@ -117,6 +118,8 @@ export interface BattleSceneProps {
   /** Run the preview's timer choreography (STR-21 parity mode). Default off —
    *  the real app drives attacks from game events via the ref handle. */
   autoPlay?: boolean;
+  /** Fires once when the scene's RevealGate reveals (LoadCurtain sync, STR-94). */
+  onRevealed?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -253,7 +256,7 @@ interface Shot {
 // heroes array per render; memo is simply a no-op there.)
 export const BattleScene = memo(
   forwardRef<BattleSceneHandle, BattleSceneProps>(function BattleScene(
-    { heroes, bossKey = "horse_256", autoPlay = false, style },
+    { heroes, bossKey = "horse_256", autoPlay = false, onRevealed, style },
     ref,
   ) {
     const [stage, setStage] = useState<{ w: number; h: number } | null>(null);
@@ -448,6 +451,26 @@ export const BattleScene = memo(
     );
     useImperativeHandle(ref, () => ({ fire: orderAttack }), [orderAttack]);
 
+    // --- fade-in from black (STR-94): gate the WHOLE scene behind its own
+    // asset probes so it never renders in piecemeal (bg, then boss, then
+    // heroes "typing in" as each strip decodes). The stage is black; fading
+    // the children in as one unit IS the fade-from-black. Probes cover what's
+    // visible at t=0 (bg + boss idle + every hero's idle strip) — attack/
+    // special strips keep prefetching in the background and are only needed
+    // seconds later. `ready` blocks an EMPTY roster (Connected mounts with []
+    // until the first snapshot); maxWait still guarantees a reveal.
+    const rosterSig = heroes.map((h) => `${h.cls}/${h.job}`).join(",");
+    const sceneAssets = useMemo(() => {
+      const list = [BACKGROUND, SPRITES[`bosses/${bossKey}/idle` as SpriteKey]];
+      for (const h of heroes) {
+        const strip = SPRITES[`${h.cls}/${h.job}/idle` as SpriteKey];
+        if (strip != null) list.push(strip);
+      }
+      return list;
+      // rosterSig captures exactly the strip-relevant identity of `heroes`.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rosterSig, bossKey]);
+
     // --- idle choreography (timer parity: CYCLE/STAGGER/SPECIAL_EVERY) ------
     useEffect(() => {
       if (!autoPlay) return;
@@ -475,6 +498,15 @@ export const BattleScene = memo(
 
     return (
       <View style={[styles.stage, style]} onLayout={onStageLayout} testID="battle-scene">
+        <RevealGate
+          waitFor={sceneAssets}
+          ready={heroes.length > 0}
+          minHold={350}
+          maxWait={4000}
+          duration={320}
+          onRevealed={onRevealed}
+          style={StyleSheet.absoluteFill}
+        >
         <Image
           source={BACKGROUND}
           style={styles.bg}
@@ -588,6 +620,7 @@ export const BattleScene = memo(
             ))}
           </>
         )}
+        </RevealGate>
       </View>
     );
   }),

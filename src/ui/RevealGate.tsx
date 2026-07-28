@@ -40,6 +40,16 @@ export interface RevealGateProps {
   maxWait?: number;
   /** Fade-in duration once revealed. */
   duration?: number;
+  /**
+   * Extra reveal condition ANDed with the asset probes (default true) — e.g.
+   * the battle scene passes `heroes.length > 0` so a roster that arrives
+   * AFTER mount can't reveal an empty stage and then "type in" the party.
+   * `maxWait` still caps it (never hold black forever).
+   */
+  ready?: boolean;
+  /** Fires once, when the gate decides to reveal (the app-level LoadCurtain
+   *  waits on the scene + HUD gates through this). */
+  onRevealed?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -49,6 +59,8 @@ export function RevealGate({
   minHold = 400,
   maxWait = 3000,
   duration = 160,
+  ready = true,
+  onRevealed,
   style,
 }: RevealGateProps) {
   const sources = waitFor ?? [];
@@ -81,7 +93,13 @@ export function RevealGate({
   }, []);
 
   const assetsReady = loaded >= sources.length;
-  const revealed = capped || (held && assetsReady);
+  const revealed = capped || (held && assetsReady && ready);
+
+  // Latest-callback ref + fire-once guard: onRevealed identity must neither
+  // retrigger the effect nor fire twice across re-renders.
+  const onRevealedRef = useRef(onRevealed);
+  onRevealedRef.current = onRevealed;
+  const firedRef = useRef(false);
 
   useEffect(() => {
     if (revealed) {
@@ -90,6 +108,10 @@ export function RevealGate({
         duration,
         useNativeDriver: true,
       }).start();
+      if (!firedRef.current) {
+        firedRef.current = true;
+        onRevealedRef.current?.();
+      }
     }
   }, [revealed, opacity, duration]);
 

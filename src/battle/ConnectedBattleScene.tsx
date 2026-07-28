@@ -124,8 +124,12 @@ function jobFolderFor(cls: ClassKey, jobLevel: number): string {
 // query updates, by design.
 export const ConnectedBattleScene = memo(function ConnectedBattleScene({
   style,
+  onRevealed,
 }: {
   style?: StyleProp<ViewStyle>;
+  /** Forwarded to the scene's RevealGate (LoadCurtain sync, STR-94). Pass a
+   *  MODULE-STABLE callback — this component is memoized. */
+  onRevealed?: () => void;
 }) {
   const data = useQuery(api.game.dashboard, {});
   const overview = useQuery(api.guild.overview, {});
@@ -422,6 +426,7 @@ export const ConnectedBattleScene = memo(function ConnectedBattleScene({
       ref={sceneRef}
       heroes={heroes}
       bossKey={bossKey}
+      onRevealed={onRevealed}
       style={style}
     />
   );
