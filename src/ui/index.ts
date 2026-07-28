@@ -44,5 +44,10 @@ export { Ring } from "./Ring";
 export { StepsBar } from "./StepsBar";
 export { Beacon } from "./Beacon";
 export { Sheet } from "./Sheet";
-export { Popover, type PopoverSide } from "./Popover";
+export {
+  Popover,
+  POPOVER_CONTENT_W,
+  POPOVER_PAD,
+  type PopoverSide,
+} from "./Popover";
 export { Modal } from "./Modal";

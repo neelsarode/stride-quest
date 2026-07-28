@@ -32,6 +32,7 @@ import {
   Modal,
   PixelText,
   Popover,
+  POPOVER_CONTENT_W,
   Sheet,
   UIScaleProvider,
   useUITheme,
@@ -139,7 +140,9 @@ export function useOverlay(): Overlay {
 // tracks the tile centre, clamped to the panel edges.
 // =============================================================================
 const POP_W_ART = 132;
-const POP_WELL_ART = POP_W_ART - 6; // slim frame → 3px inset each side
+// The popover's padded CONTENT width (STR-93) — rows and full-width buttons
+// span exactly this, never the raw well (which would touch the bezel).
+const POP_WELL_ART = POPOVER_CONTENT_W;
 
 function computePopover(rect: AnchorRect, s: number, winW: number) {
   const popW = POP_W_ART * s;
@@ -313,7 +316,8 @@ function MemberPopover({
   const eligible = new Set(rally.eligibleTeammates.map((t) => t.userId));
   const canRally = !member.isMe && eligible.has(member.userId);
   const { left, top, arrowAt } = computePopover(rect, scale, winW);
-  const H = canRally ? 73 : 55;
+  // Heights include the popover's 2×4px interior padding (STR-93).
+  const H = canRally ? 81 : 63;
   const stateColor = STATE_COLORS[member.heroState];
 
   async function onSendRally() {
@@ -429,7 +433,7 @@ function InvitePopover({
 
   return (
     <Popover
-      height={62}
+      height={70}
       side="top"
       arrowOffset={arrowAt}
       onClose={closeOverlay}
@@ -473,7 +477,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
   const { artScale } = useGameLayout();
   const theme = useUITheme();
   return (
-    <Modal visible onClose={onClose} title="HOW TO PLAY" height={120} scale={artScale}>
+    <Modal visible onClose={onClose} title="HOW TO PLAY" height={124} scale={artScale}>
       <View style={{ gap: 4 * artScale }}>
         {HELP_LINES.map(([line, kind]) => (
           <PixelText

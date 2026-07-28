@@ -168,7 +168,12 @@ export function GuildSheet({
           const restingMate = m.heroState === "resting" && !m.isMe;
           const dotState: HeroState = restingMate ? "rally" : m.heroState;
           const canRally = rally && !m.isMe && eligible.has(m.userId);
-          const sign = m.improvementPct >= 0 ? "+" : "";
+          // Trend shows ONLY when positive (STR-93): a negative here rendered
+          // as "- -100%" (separator + sign collision) and, worse, loss-framed
+          // a PERSON — the design guardrail reserves loss-framing for bonuses,
+          // never members. Positive-only needs no label: "+40%" reads as gain.
+          const trend =
+            m.improvementPct > 0 ? ` - +${m.improvementPct}%` : "";
           const badges: string[] = [];
           if (recognition.mvpUserId === m.userId) badges.push("MVP");
           if (recognition.mostImprovedUserId === m.userId) badges.push("IMPROVED");
@@ -196,7 +201,9 @@ export function GuildSheet({
                 <PixelText text={`${m.damage.toLocaleString()}`} color={UI_PALETTE.gold_light} scale={s} />
               </View>
               <PixelText
-                text={`${m.todaySteps.toLocaleString()} TODAY - JOB ${m.jobLevel} - ${m.displayStreak}D - ${sign}${m.improvementPct}%${m.bonusDamage > 0 ? ` - ${m.bonusDamage.toLocaleString()} BONUS` : ""}`}
+                // "STREAK N", not "ND" (STR-93): the pixel font's 0 is shaped
+                // exactly like O, so "0D" read as a mystery "OD" token.
+                text={`${m.todaySteps.toLocaleString()} TODAY - JOB ${m.jobLevel} - STREAK ${m.displayStreak}${trend}${m.bonusDamage > 0 ? ` - ${m.bonusDamage.toLocaleString()} BONUS` : ""}`}
                 color={theme.accent.mid}
                 scale={s}
               />

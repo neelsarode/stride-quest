@@ -21,6 +21,16 @@ import { useResolvedScale } from "./scale";
 const WIDTH = 132; // popover_silver fixed width (art px)
 const INSET = WELL_INSETS.slim; // hifiFrameSlim 3px frame → well inset
 
+/**
+ * Interior CONTENT padding inside the well, art px (STR-93). The well inset
+ * above is only the frame's own border — without this, content sits flush
+ * against the bezel (the HTML kit always drew popover content at well + 4).
+ * Callers size `height` to include 2×POPOVER_PAD of breathing room.
+ */
+export const POPOVER_PAD = 4;
+/** The content box width callers can rely on (art px): well minus padding. */
+export const POPOVER_CONTENT_W = WIDTH - INSET.dw - 2 * POPOVER_PAD;
+
 export type PopoverSide = "top" | "left";
 
 export interface PopoverProps {
@@ -71,10 +81,10 @@ export function Popover({
       <View
         style={{
           position: "absolute",
-          left: INSET.x * s,
-          top: INSET.y * s,
-          width: (WIDTH - INSET.dw) * s,
-          height: (height - INSET.dh) * s,
+          left: (INSET.x + POPOVER_PAD) * s,
+          top: (INSET.y + POPOVER_PAD) * s,
+          width: POPOVER_CONTENT_W * s,
+          height: (height - INSET.dh - 2 * POPOVER_PAD) * s,
         }}
       >
         {children}

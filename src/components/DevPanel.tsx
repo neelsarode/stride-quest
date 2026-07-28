@@ -523,7 +523,7 @@ const UiGallery = memo(function UiGallery() {
               {/* ---- POPOVER (parity: SAM-MEDIC + SEND RALLY) ---- */}
               <GLabel>POPOVER (member stats + rally)</GLabel>
               <View style={{ paddingTop: 4 * scale, alignItems: "center", width: 132 * scale }}>
-                <Popover height={72} side="top" arrowOffset={15}>
+                <Popover height={80} side="top" arrowOffset={15}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <PixelText text="SAM - MEDIC" color={UI_PALETTE.silver_rim} />
                     <PixelText text="RESTING" color={UI_PALETTE.sky_mid} />
@@ -532,7 +532,7 @@ const UiGallery = memo(function UiGallery() {
                   <GalStat label="DMG WEEK" value="8,750" top={17} scale={scale} />
                   <GalStat label="STREAK" value="0 DAYS" top={26} scale={scale} />
                   <View style={{ position: "absolute", left: 0, top: 39 * scale }}>
-                    <Button material="silver" label="SEND RALLY 500" width={126} />
+                    <Button material="silver" label="SEND RALLY 500" width={118} />
                   </View>
                 </Popover>
               </View>
@@ -555,7 +555,7 @@ const UiGallery = memo(function UiGallery() {
               </View>
             </Sheet>
 
-            <Modal visible={modalOpen} onClose={() => setModalOpen(false)} title="HOW TO PLAY" height={86}>
+            <Modal visible={modalOpen} onClose={() => setModalOpen(false)} title="HOW TO PLAY" height={90}>
               <View style={{ gap: 3 * scale }}>
                 <PixelText text="WALK EVERY DAY." color={UI_PALETTE.silver_rim} />
                 <PixelText text="STEPS BECOME ENERGY." color={UI_PALETTE.sky_mid} />
