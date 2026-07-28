@@ -61,7 +61,7 @@ import {
   type FighterMode,
   type ReleaseEvent,
 } from "./Fighter";
-import { SCENE, type ClassName } from "./fxConfig";
+import { SCENE, jobRenderScale, type ClassName } from "./fxConfig";
 import { computeShotGeometry, Projectile, type Rect } from "./Projectile";
 import { RestZzz } from "./RestZzz";
 import type { SpriteKey } from "./spriteMap";
@@ -175,6 +175,9 @@ export function computeSceneLayout(
 
   // sizeBoss() port: the boss's VISIBLE top (its box top + topPad·height) must
   // reach the top party member's head (their box top + heroTopPad·height).
+  // Deliberately uses the UNSCALED heroPx (this fn doesn't know jobs): with an
+  // all-job-1 party (STR-91 shrink) the boss sizes as if they were full height
+  // — slightly conservative, never wrong.
   const bossBottomY = h * (1 - SCENE.bossBottomPct);
   let bossH = bossMin;
   if (heroCount > 0) {
@@ -214,6 +217,21 @@ function firedAnimKey(e: ReleaseEvent): SpriteKey {
       ? "special"
       : "attack";
   return `${e.cls}/${e.job}/${name}` as SpriteKey;
+}
+
+/**
+ * Wrapper geometry for one hero at the STR-91 per-job scale. Fighter scales
+ * from LEFT-BOTTOM, so a shrunken box would slide the character backwards out
+ * of formation — `leftShift` re-centers it where the full-size sprite's
+ * bottom-CENTER anchor stood. Used identically by the render wrapper, the
+ * shot-geometry shooter rect, and the RestZzz overlay so they never drift.
+ */
+function heroBox(cls: ClassName, job: string, baseHeroPx: number) {
+  const idle = MANIFEST[`${cls}/${job}/idle` as SpriteKey];
+  const aspect = idle.w / idle.h;
+  const heroPx = baseHeroPx * jobRenderScale(job);
+  const wrapW = heroPx * aspect;
+  return { heroPx, wrapW, leftShift: (baseHeroPx * aspect - wrapW) / 2 };
 }
 
 interface Shot {
@@ -319,15 +337,19 @@ export const BattleScene = memo(
         return;
       }
       const entry = MANIFEST[firedAnimKey(e)];
-      const scale = l.heroPx / entry.h;
+      // STR-91: job-1 fighters render smaller — the shot geometry must use the
+      // SAME scaled box as the Fighter (height AND re-centered left), or
+      // projectiles spawn off the weapon.
+      const { heroPx, leftShift } = heroBox(e.cls, e.job, l.heroPx);
+      const scale = heroPx / entry.h;
       // The rendered frame box: bottom-left pinned at (left, bottom), height
-      // exactly heroPx (Fighter displayHeight) — the rect the anchor fractions
+      // exactly the Fighter's displayHeight — the rect the anchor fractions
       // apply to, identical to the HTML's img getBoundingClientRect().
       const shooter: Rect = {
-        x: pos.left,
-        y: l.stageH - pos.bottom - l.heroPx,
+        x: pos.left + leftShift,
+        y: l.stageH - pos.bottom - heroPx,
         width: entry.w * scale,
-        height: l.heroPx,
+        height: heroPx,
       };
       const bossRect: Rect = {
         x: l.bossLeft,
@@ -477,8 +499,15 @@ export const BattleScene = memo(
             />
             {heroes.map((hero, i) => {
               const pos = layout.heroes[i];
-              const idleEntry = MANIFEST[`${hero.cls}/${hero.job}/idle` as SpriteKey];
-              const wrapW = layout.heroPx * (idleEntry.w / idleEntry.h);
+              // STR-91: job-1s draw at SCENE.job1Scale — feet stay on the
+              // formation line (bottom anchor) and leftShift keeps them
+              // CENTERED where the full-size sprite stood (Fighter scales
+              // from left-bottom, which would otherwise slide them back).
+              const { heroPx, wrapW, leftShift } = heroBox(
+                hero.cls,
+                hero.job,
+                layout.heroPx,
+              );
               return (
                 <Pressable
                   key={hero.id}
@@ -494,10 +523,10 @@ export const BattleScene = memo(
                   }
                   style={{
                     position: "absolute",
-                    left: pos.left,
+                    left: pos.left + leftShift,
                     bottom: pos.bottom,
                     width: wrapW,
-                    height: layout.heroPx,
+                    height: heroPx,
                     zIndex: pos.z,
                   }}
                 >
@@ -514,7 +543,7 @@ export const BattleScene = memo(
                     }}
                     cls={hero.cls}
                     job={hero.job}
-                    displayHeight={layout.heroPx}
+                    displayHeight={heroPx}
                     onRelease={(e) => handleRelease(i, e)}
                     onModeChange={(m) => handleModeChange(hero.id, m)}
                     style={styles.fighter}
@@ -528,13 +557,18 @@ export const BattleScene = memo(
               if (!restingIds.has(hero.id)) return null;
               const pos = layout.heroes[i];
               if (!pos) return null;
+              const { heroPx, leftShift } = heroBox(
+                hero.cls,
+                hero.job,
+                layout.heroPx,
+              );
               return (
                 <RestZzz
                   key={`zzz-${hero.id}`}
-                  left={pos.left}
-                  top={layout.stageH - pos.bottom - layout.heroPx}
-                  width={layout.heroPx}
-                  height={layout.heroPx}
+                  left={pos.left + leftShift}
+                  top={layout.stageH - pos.bottom - heroPx}
+                  width={heroPx}
+                  height={heroPx}
                 />
               );
             })}

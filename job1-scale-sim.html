@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — J1 75% scale simulation (STR-91)</title>
+<!--
+  STR-91 experiment: instead of regenerating, can we just SCALE DOWN the job-1
+  sprites (~75%) to fix the "big head / looks bigger than job-ups" problem?
+  This simulates the battlefield: warrior 1_rookie next to 2_strider on the
+  real backdrop at the battlefield's display scale (1.7 css px per file px —
+  note: already non-integer, so the scene is never pixel-perfect anyway).
+  - LEFT (dim label): current J1 at 100% — the problem
+  - MIDDLE: J1 at the slider scale (default 75%)
+  - RIGHT: J2 at 100%
+  Idle animations play; feet sit on a shared ground line via measured alpha
+  bounds. The 4x magnifier (bottom-left) shows both HEADS after true
+  down-then-up nearest-neighbor resampling — the honest pixel-density check.
+  Serve over http for foot alignment + magnifier (file:// = fallback, no zoom).
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden;
+    font-family: ui-monospace, Menlo, monospace; }
+  img.sprite, canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+  #stage { position: fixed; inset: 0; overflow: hidden; }
+  #bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    object-position: 50% 35%; }
+  .hero { position: absolute; bottom: 26%; }
+  .hero img { display: block; }
+  .hero .shadow { position: absolute; left: 50%; bottom: 2px; width: 62%; height: 13px;
+    transform: translateX(-50%); border-radius: 50%; background: #000; opacity: .6;
+    filter: blur(5px); }
+  .hero .tag { position: absolute; top: -34px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; text-align: center; font-size: 11px; font-weight: 700;
+    letter-spacing: 1px; color: #e8ecf4; text-shadow: 0 2px 3px #000; }
+  .hero .tag small { display: block; font-size: 9px; font-weight: 400; color: #b9c0cf; }
+  .hero.dim .tag { color: #ff9a78; }
+
+  #panel { position: absolute; top: 14px; left: 14px; z-index: 50;
+    background: rgba(10,12,16,.85); border: 1px solid #3a4049; border-radius: 8px;
+    padding: 12px 14px; width: 270px; color: #b9c0cf; }
+  #panel h1 { font-size: 11px; letter-spacing: 1px; color: #ffce6b; margin-bottom: 6px; }
+  #panel .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  #panel label { font-size: 10px; letter-spacing: 1px; color: #98a2b0; }
+  #panel input[type=range] { flex: 1; accent-color: #ffce6b; }
+  #panel .val { font-size: 12px; font-weight: 700; color: #ffce6b; width: 42px; }
+  #panel button { background: #24272f; color: #cdd3de; border: 1px solid #3a4049;
+    border-radius: 4px; font: inherit; font-size: 10px; padding: 3px 8px; cursor: pointer; }
+  #panel button.on { background: #ffce6b; color: #201607; border-color: #ffce6b; font-weight: 700; }
+  #panel .meta { font-size: 9.5px; color: #667080; margin-top: 8px; line-height: 1.55; }
+  #panel .meta b { color: #cdd3de; }
+  #panel label.chk { display: flex; gap: 6px; align-items: center; cursor: pointer;
+    font-size: 10px; color: #98a2b0; margin-top: 8px; }
+
+  #mag { position: absolute; left: 14px; bottom: 14px; z-index: 50;
+    background: rgba(10,12,16,.85); border: 1px solid #3a4049; border-radius: 8px;
+    padding: 10px 12px; color: #b9c0cf; }
+  #mag h2 { font-size: 10px; letter-spacing: 1px; color: #98a2b0; margin-bottom: 6px; }
+  #mag .caps { display: flex; gap: 18px; font-size: 9px; color: #667080; margin-top: 4px; }
+  #magcv { display: block; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <img id="bg" src="assets/backgrounds/battlefield_beach.png" alt="" />
+</div>
+
+<div id="panel">
+  <h1>J1 SCALE SIMULATION — STR-91</h1>
+  <div class="row">
+    <label>J1 SCALE</label>
+    <input type="range" id="scale" min="60" max="100" value="75" />
+    <div class="val" id="scaleval">75%</div>
+  </div>
+  <div class="row" id="presets">
+    <button data-s="100">100%</button>
+    <button data-s="85">85%</button>
+    <button class="on" data-s="75">75%</button>
+    <button data-s="65">65%</button>
+  </div>
+  <label class="chk"><input type="checkbox" id="showold" checked /> show current 100% J1 for reference</label>
+  <div class="meta" id="meta">measuring…</div>
+</div>
+
+<div id="mag">
+  <h2>HEADS AT 4X — PIXEL DENSITY CHECK</h2>
+  <canvas id="magcv" width="10" height="10"></canvas>
+  <div class="caps"><span id="capA">J1 @ 75% (resampled)</span><span>J2 @ 100%</span></div>
+</div>
+
+<script>
+'use strict';
+const DISPLAY = 1.7;                      // battlefield css px per file px (desktop)
+const FPS = 5;
+const HEROES = [
+  { key:'old',  job:'1_rookie',  label:'CURRENT J1 — 100%', dim:true,  x:.30, scale:()=>1 },
+  { key:'new',  job:'1_rookie',  label:'J1 ROOKIE',         dim:false, x:.46, scale:()=>S },
+  { key:'j2',   job:'2_strider', label:'J2 STRIDER — 100%', dim:false, x:.62, scale:()=>1 },
+];
+let S = .75;
+let tainted = false;
+
+const stage = document.getElementById('stage');
+const frames = {};                        // job -> [Image x4]
+const meas = {};                          // job -> {x0,y0,bodyW,bodyH,fileH}
+
+function loadImg(src){
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+}
+function measure(img){
+  try {
+    const cv = document.createElement('canvas');
+    cv.width = img.width; cv.height = img.height;
+    const cx = cv.getContext('2d');
+    cx.drawImage(img, 0, 0);
+    const d = cx.getImageData(0, 0, cv.width, cv.height).data;
+    let x0 = cv.width, x1 = -1, y0 = cv.height, y1 = -1;
+    for (let y = 0; y < cv.height; y++)
+      for (let x = 0; x < cv.width; x++)
+        if (d[(y * cv.width + x) * 4 + 3] > 40){
+          if (x < x0) x0 = x; if (x > x1) x1 = x;
+          if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+    return { x0, y0, bodyW: x1-x0+1, bodyH: y1-y0+1, fileH: img.height };
+  } catch(e){ tainted = true; return null; }
+}
+
+const heroEls = {};
+function buildHero(h){
+  const el = document.createElement('div');
+  el.className = 'hero' + (h.dim ? ' dim' : '');
+  el.style.left = (h.x * 100) + '%';
+  const shadow = document.createElement('div'); shadow.className = 'shadow';
+  const img = document.createElement('img'); img.className = 'sprite';
+  const tag = document.createElement('div'); tag.className = 'tag';
+  el.appendChild(shadow); el.appendChild(img); el.appendChild(tag);
+  stage.appendChild(el);
+  heroEls[h.key] = { el, img, tag, h };
+}
+function layout(){
+  for (const { el, img, tag, h } of Object.values(heroEls)){
+    const fs = frames[h.job];
+    if (!fs || !fs[0]) continue;
+    const sc = h.scale();
+    const m = meas[h.job];
+    const dispH = fs[0].height * DISPLAY * sc;
+    img.style.height = dispH + 'px';
+    img.style.width = 'auto';
+    // sink the sprite's transparent bottom padding below the ground line
+    const pad = m ? (m.fileH - (m.y0 + m.bodyH)) : 0;
+    img.style.transform = `translateY(${Math.round(pad * DISPLAY * sc)}px)`;
+    const artH = m ? Math.round(m.bodyH * sc) : '?';
+    tag.textContent = '';
+    const t1 = document.createTextNode(
+      h.key === 'new' ? `J1 ROOKIE — ${Math.round(S*100)}%` : h.label);
+    const t2 = document.createElement('small');
+    t2.textContent = `body ${artH} art px`;
+    tag.appendChild(t1); tag.appendChild(t2);
+  }
+  heroEls.old.el.style.display = document.getElementById('showold').checked ? '' : 'none';
+  document.getElementById('meta').innerHTML = tainted
+    ? 'file:// mode — no measurements; serve via http for foot-align + magnifier.'
+    : `display scale ${DISPLAY}x (battlefield desktop — already non-integer).<br>` +
+      `J1 body ${meas['1_rookie'].bodyH}px → <b>${Math.round(meas['1_rookie'].bodyH*S)}px</b> at ${Math.round(S*100)}% · ` +
+      `J2 body ${meas['2_strider'].bodyH}px`;
+  drawMag();
+}
+
+/* ---- idle animation ---- */
+let fi = 0;
+setInterval(() => {
+  fi++;
+  for (const { img, h } of Object.values(heroEls)){
+    const fs = frames[h.job];
+    if (fs && fs.length) img.src = fs[fi % fs.length].src;
+  }
+}, 1000 / FPS);
+
+/* ---- 4x head magnifier: true down-then-up nearest resample ---- */
+const magcv = document.getElementById('magcv');
+function headCanvas(job, sc){
+  const img = frames[job][0], m = meas[job];
+  if (!m) return null;
+  // 1) downscale the whole sprite (nearest)
+  const dw = Math.max(1, Math.round(img.width * sc));
+  const dh = Math.max(1, Math.round(img.height * sc));
+  const down = document.createElement('canvas');
+  down.width = dw; down.height = dh;
+  const dctx = down.getContext('2d');
+  dctx.imageSmoothingEnabled = false;
+  dctx.drawImage(img, 0, 0, dw, dh);
+  // 2) crop the head region (top 45% of the body) in downscaled coords
+  const hx = Math.round((m.x0 + m.bodyW * .15) * sc);
+  const hy = Math.round(m.y0 * sc);
+  const hs = Math.round(m.bodyH * .45 * sc);
+  const hw = Math.round(m.bodyW * .7 * sc);
+  return { down, hx, hy, hw, hs };
+}
+function drawMag(){
+  if (tainted){ document.getElementById('mag').style.display = 'none'; return; }
+  const Z = 4, GAP = 12;
+  const a = headCanvas('1_rookie', S);
+  const b = headCanvas('2_strider', 1);
+  if (!a || !b) return;
+  const w = a.hw * Z + GAP + b.hw * Z;
+  const h = Math.max(a.hs, b.hs) * Z;
+  magcv.width = w; magcv.height = h;
+  magcv.style.width = w + 'px';
+  const ctx = magcv.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#14171c';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(a.down, a.hx, a.hy, a.hw, a.hs, 0, h - a.hs*Z, a.hw*Z, a.hs*Z);
+  ctx.drawImage(b.down, b.hx, b.hy, b.hw, b.hs, a.hw*Z + GAP, h - b.hs*Z, b.hw*Z, b.hs*Z);
+  document.getElementById('capA').textContent = `J1 @ ${Math.round(S*100)}% (resampled)`;
+}
+
+/* ---- controls ---- */
+const slider = document.getElementById('scale');
+slider.addEventListener('input', () => {
+  S = +slider.value / 100;
+  document.getElementById('scaleval').textContent = slider.value + '%';
+  document.querySelectorAll('#presets button').forEach(b =>
+    b.classList.toggle('on', +b.dataset.s === +slider.value));
+  layout();
+});
+document.querySelectorAll('#presets button').forEach(b => {
+  b.addEventListener('click', () => {
+    slider.value = b.dataset.s;
+    slider.dispatchEvent(new Event('input'));
+  });
+});
+document.getElementById('showold').addEventListener('change', layout);
+
+/* ---- boot ---- */
+(async () => {
+  for (const job of ['1_rookie', '2_strider']){
+    frames[job] = [];
+    for (let i = 0; i < 4; i++)
+      frames[job].push(await loadImg(`characters/warrior/${job}/animations/idle/frame_00${i}.png`));
+    frames[job] = frames[job].filter(Boolean);
+    meas[job] = frames[job][0] ? measure(frames[job][0]) : null;
+  }
+  HEROES.forEach(buildHero);
+  for (const { img, h } of Object.values(heroEls)) img.src = frames[h.job][0].src;
+  layout();
+})();
+</script>
+</body>
+</html>
