@@ -20,11 +20,12 @@ import {
   weekRange,
   endOfEffectiveDay,
 } from "./time";
-import { getUserGroup } from "./players";
+import { getUserGroup, memberCount } from "./players";
 import {
   DAILY_STEP_GOAL,
   FUEL,
   RALLY,
+  bossMaxHP,
   multiplierForJobLevel,
 } from "./gameConfig";
 import {
@@ -430,6 +431,54 @@ export const resetAccount = mutation({
       healthKitConnectedAt: undefined,
       firstIdleCollectedAt: undefined,
     });
+  },
+});
+
+/** Re-baseline the caller's ACTIVE boss to the current damage scale (dev-only).
+ *  Stored damage-space fields (challenge.bossMaxHP, per-member damageContributed)
+ *  are stamped/accumulated at the scale in force when written, so after a
+ *  DAMAGE_SCALE change (gameConfig) an in-flight boss keeps its OLD max HP while
+ *  taking NEW-scale damage — it would die instantly. This re-stamps bossMaxHP =
+ *  bossMaxHP(tier, members) at the CURRENT config and zeroes every member's
+ *  accumulated damage + restarts their idle clock, so the boss reads full at the
+ *  new scale with no clock jump (the alternative is resetAccount + a +7-day
+ *  triggerWeeklyReset). No production users yet, so this is a test-data tool. */
+export const rescaleActiveBoss = mutation({
+  args: {},
+  handler: async (ctx) => {
+    assertDevEnabled();
+    const caller = await getAuthUserId(ctx);
+    if (caller === null) throw new Error("Not signed in.");
+    const ug = await getUserGroup(ctx, caller);
+    if (!ug) throw new Error("No guild — nothing to rescale.");
+
+    const challenge = await ensureCurrentChallenge(ctx, ug.group);
+    const members = await memberCount(ctx, ug.group._id);
+    const now = await effectiveNow(ctx);
+
+    // Re-stamp the boss to full HP at the current scale, and clear its bonus
+    // phase (a re-baselined boss is a fresh fight, not a "won" victory week).
+    await ctx.db.patch(challenge._id, {
+      bossMaxHP: bossMaxHP(challenge.tier ?? 1, members),
+      status: "active",
+      bonusStartedAt: undefined,
+      bonusBossName: undefined,
+    });
+
+    // Zero every member's mixed-scale accumulated damage and restart idle clocks
+    // so currentHP = new bossMaxHP − 0 (full) and pending re-accrues at new scale.
+    const progress = await ctx.db
+      .query("challengeProgress")
+      .withIndex("by_challenge", (q) => q.eq("challengeId", challenge._id))
+      .collect();
+    for (const p of progress) {
+      await ctx.db.patch(p._id, {
+        damageContributed: 0,
+        bonusDamageContributed: 0,
+        lastIdleCollectedAt: now,
+        updatedAt: Date.now(),
+      });
+    }
   },
 });
 

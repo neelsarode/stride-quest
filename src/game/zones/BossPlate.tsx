@@ -25,8 +25,9 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { GAME_ZONES } from "../../config/assets";
 import { usePrevious } from "../../feedback/usePrevious";
-import { Bar, type BarHandle, Chip, PixelText, UIScaleProvider } from "../../ui";
+import { Bar, type BarHandle, Chip, PixelText, UIScaleProvider, useUITheme } from "../../ui";
 import { UI_PALETTE, WELL_INSETS } from "../../ui/theme";
+import { usePendingIdle } from "../../usePendingIdle";
 import { useGameLayout } from "../useGameLayout";
 import { zoneStyles } from "./zoneStyle";
 
@@ -60,30 +61,48 @@ type BonusData = {
 
 export function BossPlate() {
   const { topPad, artScale, width } = useGameLayout();
+  const theme = useUITheme();
   const data = useQuery(api.game.dashboard, {});
 
   // Hooks run unconditionally (guarded bodies) so hook order never forks.
   const barRef = useRef<BarHandle>(null);
   const boss = data?.boss ?? null;
   const bonus: BonusData = data?.bonus ?? null;
-  const currentHP = boss?.currentHP ?? 0;
 
-  // HP ghost chip: hold the pre-hit fill, flash, then catch down to the new fill.
+  // LIVE HP (Problem 2): the boss's TRUE current HP is the settled remaining
+  // MINUS the uncollected idle still accruing server-side — fold that in so the
+  // number ticks down as the party attacks instead of only jumping at settles.
+  // usePendingIdle projects it from idle.dph + the effective clock and snaps to
+  // ~0 on each settle (in the same payload that drops settledHP), so `currentHP`
+  // stays continuous. Called unconditionally (idle is always in the payload) to
+  // keep hook order stable across the bonus/boss render branches.
+  const livePending = usePendingIdle(data?.idle, data?.now);
+  const settledHP = boss?.currentHP ?? 0;
   const maxHP = boss?.maxHP ?? 0;
+  const currentHP = Math.max(0, settledHP - livePending);
   const hpFrac = maxHP > 0 ? clamp01(currentHP / maxHP) : 0;
-  const prevHP = usePrevious(currentHP);
-  const [ghost, setGhost] = useState(hpFrac);
+
+  // HP ghost chip: on a SETTLE (a real damage land — a Super Attack, a teammate
+  // hit, an idle collect) hold the pre-hit fill in red for a beat, flash, then
+  // catch down. Keyed on the SETTLED HP, so the every-second idle creep (which
+  // leaves settledHP unchanged and only grows livePending) NEVER flashes — the
+  // gold just recedes smoothly. Rendered as `ghostHold ?? hpFrac`: with no hit in
+  // flight ghost === value (no red chip) and it tracks the live fill as idle
+  // drains it; during the 300ms hold it's the frozen pre-hit slice.
+  const prevSettledHP = usePrevious(settledHP);
+  const prevFrac = usePrevious(hpFrac);
+  const [ghostHold, setGhostHold] = useState<number | null>(null);
   useEffect(() => {
     if (bonus) return; // the bonus meter has no depleting ghost
-    if (prevHP != null && currentHP < prevHP && maxHP > 0) {
-      setGhost(clamp01(prevHP / maxHP)); // reveal the just-lost slice in red
+    if (prevSettledHP != null && settledHP < prevSettledHP && maxHP > 0) {
+      setGhostHold(prevFrac ?? hpFrac); // freeze the pre-hit fill (the red slice)
       barRef.current?.flash();
-      const t = setTimeout(() => setGhost(hpFrac), GHOST_HOLD_MS);
+      const t = setTimeout(() => setGhostHold(null), GHOST_HOLD_MS);
       return () => clearTimeout(t);
     }
-    setGhost(hpFrac); // heal / respawn / first paint: ghost tracks the fill
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentHP, maxHP, bonus]);
+  }, [settledHP, maxHP, bonus]);
+  const ghost = ghostHold ?? hpFrac;
 
   // Bonus meter flash: a banked hit pulses the crowned bar (the "kill moment").
   const prevBonusTotal = usePrevious(bonus?.totalDamage);
@@ -147,7 +166,7 @@ export function BossPlate() {
                     top: inset.y * artScale,
                     width: 1 * artScale,
                     height: (20 - inset.dh) * artScale,
-                    backgroundColor: reached ? UI_PALETTE.white : UI_PALETTE.sky_dark,
+                    backgroundColor: reached ? UI_PALETTE.white : theme.accent.dark,
                   }}
                 />
               );

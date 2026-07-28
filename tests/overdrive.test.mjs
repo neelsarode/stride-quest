@@ -29,7 +29,7 @@ import {
   isOverdriveActive,
 } from "../convex/fuelMath.ts";
 import { endOfEffectiveDay } from "../convex/time.ts";
-import { OVERDRIVE } from "../convex/gameConfig.ts";
+import { BASE_IDLE_DPH, DAMAGE_PER_ENERGY, OVERDRIVE } from "../convex/gameConfig.ts";
 
 const HOUR_MS = 3_600_000;
 const approx = (a, b, msg) =>
@@ -41,7 +41,7 @@ const approx = (a, b, msg) =>
 
 test("overdrive doubles damage inside the boundary, burn is untouched", () => {
   // Full-ish tank (7,200), 6h window, overdrive covers the first 4h, mult 1:
-  //   damage = 4h × 150×2 + 2h × 150 = 1,200 + 300 = 1,500
+  //   damage = 4h × dph×2 + 2h × dph = (8 + 2) × BASE_IDLE_DPH = 10 × BASE_IDLE_DPH
   //   burn   = 6h × 225 = 1,350 (same as without overdrive — pure reward)
   const t0 = 0;
   const od = settleFuelAndIdleWindow({
@@ -59,23 +59,23 @@ test("overdrive doubles damage inside the boundary, burn is untouched", () => {
     now: t0 + 6 * HOUR_MS,
     jobMult: 1,
   });
-  assert.equal(od.damage, 1_500);
-  assert.equal(plain.damage, 900);
+  assert.equal(od.damage, 10 * BASE_IDLE_DPH);
+  assert.equal(plain.damage, 6 * BASE_IDLE_DPH);
   approx(od.burned, plain.burned); // 1,350 both — never a cost
   approx(od.fuel, plain.fuel);
 });
 
-test("spec sizing check: Job 3 overdrive = 1,050 dph → 4,200 over the 4h window", () => {
-  // 150 × 3.5 × 2 = 1,050 dph; 4h = 4,200 damage (~+2,100 over baseline 2,100).
+test("spec sizing check: Job 3 overdrive dph → 28×BASE over the 4h window", () => {
+  // dph = BASE_IDLE_DPH × 3.5 × 2; 4h = 28 × BASE_IDLE_DPH (~+14×BASE over baseline).
   const w = walkFuel(10_800, 4 * HOUR_MS); // battling throughout
   const damage = idleDamageForSegments(w.segments, 3.5, 4);
-  approx(damage, 4_200);
-  approx(idleDamageForSegments(w.segments, 3.5, 0), 2_100); // baseline
+  approx(damage, 28 * BASE_IDLE_DPH);
+  approx(idleDamageForSegments(w.segments, 3.5, 0), 14 * BASE_IDLE_DPH); // baseline
 });
 
 test("winded ×0.5 stacks multiplicatively under overdrive", () => {
-  // Winded dph 75; overdriven winded = 75 × 2 = 150/h. Tank 1,200 (winded),
-  // 2h window fully inside overdrive: damage 300, burn 225 (winded rate).
+  // Overdriven winded = dph×0.5×2 = dph. Tank 1,200 (winded), 2h window fully
+  // inside overdrive: damage 2 × BASE_IDLE_DPH, burn 225 (winded rate).
   const t0 = 0;
   const r = settleFuelAndIdleWindow({
     fuel: 1_200,
@@ -85,16 +85,16 @@ test("winded ×0.5 stacks multiplicatively under overdrive", () => {
     jobMult: 1,
     overdriveUntil: t0 + 4 * HOUR_MS,
   });
-  assert.equal(r.damage, 300);
+  assert.equal(r.damage, 2 * BASE_IDLE_DPH);
   approx(r.burned, 225);
 });
 
 test("overdrive boundary splits a fuel-state segment mid-window", () => {
   // Tank 1,575, 4h, overdrive ends 2h in, mult 1:
-  //   battling 1h (inside OD):        150 × 2 = 300
-  //   winded 1h (inside OD):           75 × 2 = 150
-  //   winded 2h (outside OD):         2h × 75 = 150
-  //   damage 600 · burn 225 + 112.5 + 225 = 562.5 · end fuel 1,012.5
+  //   battling 1h (inside OD): dph×2        = 2 × BASE_IDLE_DPH
+  //   winded 1h (inside OD):   dph×0.5×2    = 1 × BASE_IDLE_DPH
+  //   winded 2h (outside OD):  2h × dph×0.5 = 1 × BASE_IDLE_DPH
+  //   damage 4 × BASE_IDLE_DPH · burn 225 + 112.5 + 225 = 562.5 · end fuel 1,012.5
   const t0 = 0;
   const r = settleFuelAndIdleWindow({
     fuel: 1_575,
@@ -104,7 +104,7 @@ test("overdrive boundary splits a fuel-state segment mid-window", () => {
     jobMult: 1,
     overdriveUntil: t0 + 2 * HOUR_MS,
   });
-  assert.equal(r.damage, 600);
+  assert.equal(r.damage, 4 * BASE_IDLE_DPH);
   approx(r.burned, 562.5);
   approx(r.fuel, 1_012.5);
 });
@@ -123,7 +123,7 @@ test("an armed window yields EXACTLY its ×2 hours across settles + a 30h gap", 
     jobMult: 1,
     overdriveUntil: activeUntil,
   });
-  assert.equal(s1.damage, 600); // 2h × 300
+  assert.equal(s1.damage, 4 * BASE_IDLE_DPH); // 2h × (dph×2)
   approx(s1.fuel, 10_350);
   // Then vanish for 30h. Settle 2 covers the capped 10h ANCHORED AT THE STAMP
   // (t0+2h): the ×2 boundary is 2h into that window → 2h × 300 + 8h × 150.
@@ -135,12 +135,12 @@ test("an armed window yields EXACTLY its ×2 hours across settles + a 30h gap", 
     jobMult: 1,
     overdriveUntil: activeUntil,
   });
-  assert.equal(s2.damage, 1_800);
+  assert.equal(s2.damage, 12 * BASE_IDLE_DPH); // 2h×(dph×2) + 8h×dph
   // Total ×2 hours = 2 + 2 = exactly the 4 armed hours. The offline pause
   // truncated the FAR end of the window, never the overdrive head.
-  const total = s1.damage + s2.damage; // 2,400
-  const baseline = 12 * 150; // the same 12 settled hours without overdrive
-  assert.equal(total - baseline, 4 * (300 - 150)); // exactly 4h of extra ×2
+  const total = s1.damage + s2.damage; // 16 × BASE_IDLE_DPH
+  const baseline = 12 * BASE_IDLE_DPH; // the same 12 settled hours without overdrive
+  assert.equal(total - baseline, 4 * BASE_IDLE_DPH); // exactly 4h of extra ×2 (dph each)
 });
 
 test("an expired overdrive stamp contributes nothing to later windows", () => {
@@ -153,7 +153,7 @@ test("an expired overdrive stamp contributes nothing to later windows", () => {
     jobMult: 1,
     overdriveUntil: t0 + 4 * HOUR_MS,
   });
-  assert.equal(r.damage, 300); // plain 2h × 150
+  assert.equal(r.damage, 2 * BASE_IDLE_DPH); // plain 2h × dph
   assert.equal(overdriveHoursAt(t0 + 10 * HOUR_MS, t0 + 4 * HOUR_MS), 0);
   assert.equal(overdriveHoursAt(t0, undefined), 0);
 });
@@ -175,7 +175,10 @@ test("a resting hero earns nothing even under overdrive (×2 of zero is zero)", 
 test("idleDphFor sanity under overdrive config: mult is data-driven (×2)", () => {
   // The ×2 lives in OVERDRIVE.idleDamageMult (gameConfig), not hard-coded.
   assert.equal(OVERDRIVE.idleDamageMult, 2);
-  assert.equal(idleDphFor("battling", 1) * OVERDRIVE.idleDamageMult, 300);
+  assert.equal(
+    idleDphFor("battling", 1) * OVERDRIVE.idleDamageMult,
+    BASE_IDLE_DPH * OVERDRIVE.idleDamageMult,
+  );
 });
 
 // =============================================================================
@@ -234,7 +237,7 @@ test("Super Attack factor is ×2 when armed & boostsSuperAttack, else ×1", () =
 
 test("worked example (spec §5.4): 10k bank, first-of-day crit, streak 1.4125", () => {
   // The exact combat.applyDeploy damage line:
-  //   round(available × DAMAGE_PER_ENERGY(1) × critMult × streakMult × boost(1)
+  //   round(available × DAMAGE_PER_ENERGY × critMult × streakMult × boost(1)
   //         × overdriveMult)
   const available = 10_000;
   const critMult = 2; // first-of-day guaranteed crit
@@ -243,13 +246,13 @@ test("worked example (spec §5.4): 10k bank, first-of-day crit, streak 1.4125", 
   const now = 1_000_000;
 
   const withoutOD = Math.round(
-    available * 1 * critMult * streakMult * boost * superAttackOverdriveMult(undefined, now),
+    available * DAMAGE_PER_ENERGY * critMult * streakMult * boost * superAttackOverdriveMult(undefined, now),
   );
   const withOD = Math.round(
-    available * 1 * critMult * streakMult * boost * superAttackOverdriveMult(now + HOUR_MS, now),
+    available * DAMAGE_PER_ENERGY * critMult * streakMult * boost * superAttackOverdriveMult(now + HOUR_MS, now),
   );
 
-  assert.equal(withoutOD, 28_250); // 10,000 × 2 × 1.4125
-  assert.equal(withOD, 56_500); // exactly ×2 the no-Overdrive Super Attack
-  assert.equal(withOD, withoutOD * OVERDRIVE.idleDamageMult); // the factor lands
+  // 10,000 × DAMAGE_PER_ENERGY × 2 (crit) × 1.4125 (streak) = 1,412,500 at scale 50.
+  assert.equal(withoutOD, Math.round(available * DAMAGE_PER_ENERGY * critMult * streakMult));
+  assert.equal(withOD, withoutOD * OVERDRIVE.idleDamageMult); // exactly ×2 the no-OD Super Attack
 });

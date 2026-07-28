@@ -1,0 +1,7 @@
+{
+  "name": "pixel-crisp",
+  "version": "1.0.0",
+  "description": "Nearest-neighbor crisp pixel-art image view (local Expo module)",
+  "main": "index.ts",
+  "license": "UNLICENSED"
+}

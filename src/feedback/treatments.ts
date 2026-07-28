@@ -8,6 +8,7 @@
 import type { FeedbackEvent } from "./events";
 import { FEEDBACK } from "../config/assets";
 import type { BannerVariant } from "../config/assets";
+import { fmtCompact } from "../format";
 import * as juice from "./juice";
 
 export type FloatingSpawn = { text: string; color: string; size: number };
@@ -19,6 +20,9 @@ export type Treatment = {
   toast?: ToastSpawn;
 };
 
+// `n` — grouped digits, for STEP counts (unscaled step space). Damage/HP figures
+// use fmtCompact instead ("1.4M") so scaled millions can't overflow the tiny
+// floating-number labels (see src/format.ts).
 const n = (x: number) => Math.round(x).toLocaleString();
 
 export function treatmentFor(e: FeedbackEvent): Treatment {
@@ -29,7 +33,7 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
       if (crit) juice.screenShake();
       return {
         floating: {
-          text: `${crit ? "CRIT! " : "−"}${n(e.amount)}`,
+          text: `${crit ? "CRIT! " : "−"}${fmtCompact(e.amount)}`,
           color: crit ? FEEDBACK.critColor : FEEDBACK.damageColor,
           size: crit ? FEEDBACK.critNumberSize : FEEDBACK.floatNumberSize,
         },
@@ -37,14 +41,14 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
     }
     case "idleCollected":
       return {
-        floating: { text: `+${n(e.amount)}`, color: FEEDBACK.idleColor, size: FEEDBACK.floatNumberSize },
+        floating: { text: `+${fmtCompact(e.amount)}`, color: FEEDBACK.idleColor, size: FEEDBACK.floatNumberSize },
         toast: {
           // First-time suffix (STR-49): teach the idle loop exactly once, at
           // the moment it first pays out (self-defers to session 2 — day-1
           // pending idle is 0 by design).
           message: e.firstTime
-            ? `While you were away: +${n(e.amount)} damage. Your hero never stops.`
-            : `While you were away: +${n(e.amount)} damage`,
+            ? `While you were away: +${fmtCompact(e.amount)} damage. Your hero never stops.`
+            : `While you were away: +${fmtCompact(e.amount)} damage`,
           tone: "good",
         },
       };
@@ -181,7 +185,7 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
           title: `×${e.mult} POWER SECURED`,
           subtitle:
             e.nextMult != null && e.damageToGo != null
-              ? `${n(e.damageToGo)} more damage reaches ×${e.nextMult}.`
+              ? `${fmtCompact(e.damageToGo)} more damage reaches ×${e.nextMult}.`
               : "Top tier — the crown has no more to give.",
         },
       };
@@ -192,7 +196,7 @@ export function treatmentFor(e: FeedbackEvent): Treatment {
         banner: {
           variant: "boostActive",
           title: `×${e.mult} POWER ALL WEEK!`,
-          subtitle: `The crew dealt ${n(e.sourceDamage)} bonus damage last week.`,
+          subtitle: `The crew dealt ${fmtCompact(e.sourceDamage)} bonus damage last week.`,
         },
       };
   }

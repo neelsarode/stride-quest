@@ -1,66 +1,449 @@
-// GENERATED — regen via ui-export-rig.html + npm run pack-ui, never hand-edit.
-// (scripts/pack-ui.mjs decodes ui-export.json. Single source of truth is the
-// procedural kit assets/ui-kit.js — a kit change means: rerun the rig, then
-// `npm run pack-ui`, then diff. Same house rule as fx-anchors / pack-sprites.)
+// GENERATED — regen via `node scripts/capture-ui-export.mjs && npm run pack-ui`,
+// never hand-edit. Single source of truth is the procedural kit assets/ui-kit.js
+// + its per-class KITS in ui-export-rig.html. A kit change means: recapture,
+// repack, diff. Same house rule as fx-anchors / pack-sprites.
 //
-// Everything the runtime primitives (src/ui/*.tsx, built in STR-64) need that is
-// NOT a PNG: palette hexes for plain View fills, bar-fill families, well insets,
-// state colours, the modal scrim, full-body portrait crops, bitmap-font metrics,
-// 3-slice/ring assembly metadata, and art dims. All baked for S8 CELESTIAL
-// SILVER (spec §3/§10-Q3). Colour meaning: wells bake dark into the PNG; these
-// fills overlay INSIDE them at runtime (spec §5).
+// Everything the runtime primitives need that is NOT a PNG. Colour (palette /
+// fills / stateColors) is PER CLASS in UI_THEMES; geometry (slices / dims /
+// insets / crops / font metrics / scrim) is class-invariant and shared. Wells
+// bake dark into the PNG; these fills overlay INSIDE them at runtime.
 
+/** Per-class colour themes. The UI theme context selects one by player class.
+ *  Emitted `as const` so every fill family keeps its precise {light,mid,dark}
+ *  shape (consumers read .light/.mid/.dark; ghost/flash are plain strings). */
+export const UI_THEMES = {
+  warrior: {
+    palette: {
+      "white": "#f7f3e7",
+      "outline": "#15110f",
+      "night_w": "#1a2942",
+      "night_wd": "#131f33",
+      "silver_rim": "#e8eef4",
+      "silver_dark": "#67727f",
+      "gold_light": "#ffe9a0",
+      "gold_mid": "#f4c95a",
+      "gold_dark": "#a6761f",
+      "sky_light": "#e9f4ff",
+      "sky_mid": "#a9c8e6",
+      "sky_dark": "#6485a8",
+      "red_light": "#ff9a78"
+    },
+    fills: {
+      "gold": {
+        "light": "#ffe9a0",
+        "mid": "#f4c95a",
+        "dark": "#a6761f"
+      },
+      "sky": {
+        "light": "#e9f4ff",
+        "mid": "#a9c8e6",
+        "dark": "#6485a8"
+      },
+      "green": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "yellow": {
+        "light": "#ffe08a",
+        "mid": "#f0b43c",
+        "dark": "#9c6d1e"
+      },
+      "red": {
+        "light": "#ff9a78",
+        "mid": "#dd4632",
+        "dark": "#7e2418"
+      },
+      "ghost": "#ff9a78",
+      "flash": "#f7f3e7"
+    },
+    stateColors: {
+      "battling": "#46b34e",
+      "winded": "#f0b43c",
+      "resting": "#a9c8e6",
+      "rally": "#dd4632"
+    },
+  },
+  archer: {
+    palette: {
+      "white": "#f7f3e7",
+      "outline": "#15110f",
+      "night_w": "#16200c",
+      "night_wd": "#0f1706",
+      "silver_rim": "#c4e07e",
+      "silver_dark": "#4a6b26",
+      "gold_light": "#ffe9a0",
+      "gold_mid": "#f4c95a",
+      "gold_dark": "#a6761f",
+      "sky_light": "#c4e07e",
+      "sky_mid": "#6d9439",
+      "sky_dark": "#2e4517",
+      "red_light": "#ff9a78"
+    },
+    fills: {
+      "gold": {
+        "light": "#ffe9a0",
+        "mid": "#f4c95a",
+        "dark": "#a6761f"
+      },
+      "sky": {
+        "light": "#c4e07e",
+        "mid": "#6d9439",
+        "dark": "#2e4517"
+      },
+      "green": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "yellow": {
+        "light": "#ffe08a",
+        "mid": "#f0b43c",
+        "dark": "#9c6d1e"
+      },
+      "red": {
+        "light": "#ff9a78",
+        "mid": "#dd4632",
+        "dark": "#7e2418"
+      },
+      "ghost": "#ff9a78",
+      "flash": "#f7f3e7"
+    },
+    stateColors: {
+      "battling": "#46b34e",
+      "winded": "#f0b43c",
+      "resting": "#6d9439",
+      "rally": "#dd4632"
+    },
+  },
+  assassin: {
+    palette: {
+      "white": "#f7f3e7",
+      "outline": "#15110f",
+      "night_w": "#2a0d0d",
+      "night_wd": "#1d0808",
+      "silver_rim": "#b9c2cb",
+      "silver_dark": "#49525c",
+      "gold_light": "#ffe9a0",
+      "gold_mid": "#f4c95a",
+      "gold_dark": "#a6761f",
+      "sky_light": "#ffb15c",
+      "sky_mid": "#f07a26",
+      "sky_dark": "#8a300b",
+      "red_light": "#ff9a78"
+    },
+    fills: {
+      "gold": {
+        "light": "#ffe9a0",
+        "mid": "#f4c95a",
+        "dark": "#a6761f"
+      },
+      "sky": {
+        "light": "#ffb15c",
+        "mid": "#f07a26",
+        "dark": "#8a300b"
+      },
+      "green": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "yellow": {
+        "light": "#ffe08a",
+        "mid": "#f0b43c",
+        "dark": "#9c6d1e"
+      },
+      "red": {
+        "light": "#ff9a78",
+        "mid": "#dd4632",
+        "dark": "#7e2418"
+      },
+      "ghost": "#ff9a78",
+      "flash": "#f7f3e7"
+    },
+    stateColors: {
+      "battling": "#46b34e",
+      "winded": "#f0b43c",
+      "resting": "#f07a26",
+      "rally": "#dd4632"
+    },
+  },
+  bard: {
+    palette: {
+      "white": "#f7f3e7",
+      "outline": "#15110f",
+      "night_w": "#2a1233",
+      "night_wd": "#1e0c26",
+      "silver_rim": "#ffe9a0",
+      "silver_dark": "#a6761f",
+      "gold_light": "#ffe9a0",
+      "gold_mid": "#f4c95a",
+      "gold_dark": "#a6761f",
+      "sky_light": "#dfb8ff",
+      "sky_mid": "#b985ec",
+      "sky_dark": "#66339c",
+      "red_light": "#ff9a78"
+    },
+    fills: {
+      "gold": {
+        "light": "#ffe9a0",
+        "mid": "#f4c95a",
+        "dark": "#a6761f"
+      },
+      "sky": {
+        "light": "#dfb8ff",
+        "mid": "#b985ec",
+        "dark": "#66339c"
+      },
+      "green": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "yellow": {
+        "light": "#ffe08a",
+        "mid": "#f0b43c",
+        "dark": "#9c6d1e"
+      },
+      "red": {
+        "light": "#ff9a78",
+        "mid": "#dd4632",
+        "dark": "#7e2418"
+      },
+      "ghost": "#ff9a78",
+      "flash": "#f7f3e7"
+    },
+    stateColors: {
+      "battling": "#46b34e",
+      "winded": "#f0b43c",
+      "resting": "#b985ec",
+      "rally": "#dd4632"
+    },
+  },
+  mage: {
+    palette: {
+      "white": "#f7f3e7",
+      "outline": "#15110f",
+      "night_w": "#221040",
+      "night_wd": "#180b30",
+      "silver_rim": "#dfb8ff",
+      "silver_dark": "#66339c",
+      "gold_light": "#ffe9a0",
+      "gold_mid": "#f4c95a",
+      "gold_dark": "#a6761f",
+      "sky_light": "#dfb8ff",
+      "sky_mid": "#b985ec",
+      "sky_dark": "#66339c",
+      "red_light": "#ff9a78"
+    },
+    fills: {
+      "gold": {
+        "light": "#ffe9a0",
+        "mid": "#f4c95a",
+        "dark": "#a6761f"
+      },
+      "sky": {
+        "light": "#dfb8ff",
+        "mid": "#b985ec",
+        "dark": "#66339c"
+      },
+      "green": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "yellow": {
+        "light": "#ffe08a",
+        "mid": "#f0b43c",
+        "dark": "#9c6d1e"
+      },
+      "red": {
+        "light": "#ff9a78",
+        "mid": "#dd4632",
+        "dark": "#7e2418"
+      },
+      "ghost": "#ff9a78",
+      "flash": "#f7f3e7"
+    },
+    stateColors: {
+      "battling": "#46b34e",
+      "winded": "#f0b43c",
+      "resting": "#b985ec",
+      "rally": "#dd4632"
+    },
+  },
+  medic: {
+    palette: {
+      "white": "#f7f3e7",
+      "outline": "#15110f",
+      "night_w": "#1b2026",
+      "night_wd": "#14181d",
+      "silver_rim": "#aab4c0",
+      "silver_dark": "#3e454e",
+      "gold_light": "#ffe9a0",
+      "gold_mid": "#f4c95a",
+      "gold_dark": "#a6761f",
+      "sky_light": "#9ae06b",
+      "sky_mid": "#46b34e",
+      "sky_dark": "#256e30",
+      "red_light": "#ff9a78"
+    },
+    fills: {
+      "gold": {
+        "light": "#ffe9a0",
+        "mid": "#f4c95a",
+        "dark": "#a6761f"
+      },
+      "sky": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "green": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "yellow": {
+        "light": "#ffe08a",
+        "mid": "#f0b43c",
+        "dark": "#9c6d1e"
+      },
+      "red": {
+        "light": "#ff9a78",
+        "mid": "#dd4632",
+        "dark": "#7e2418"
+      },
+      "ghost": "#ff9a78",
+      "flash": "#f7f3e7"
+    },
+    stateColors: {
+      "battling": "#46b34e",
+      "winded": "#f0b43c",
+      "resting": "#46b34e",
+      "rally": "#dd4632"
+    },
+  },
+  paladin: {
+    palette: {
+      "white": "#f7f3e7",
+      "outline": "#15110f",
+      "night_w": "#3a2317",
+      "night_wd": "#2b1810",
+      "silver_rim": "#ffe9a0",
+      "silver_dark": "#a6761f",
+      "gold_light": "#ffe9a0",
+      "gold_mid": "#f4c95a",
+      "gold_dark": "#a6761f",
+      "sky_light": "#ffd9a0",
+      "sky_mid": "#d9a86a",
+      "sky_dark": "#8a5f36",
+      "red_light": "#ff9a78"
+    },
+    fills: {
+      "gold": {
+        "light": "#ffe9a0",
+        "mid": "#f4c95a",
+        "dark": "#a6761f"
+      },
+      "sky": {
+        "light": "#ffd9a0",
+        "mid": "#d9a86a",
+        "dark": "#8a5f36"
+      },
+      "green": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "yellow": {
+        "light": "#ffe08a",
+        "mid": "#f0b43c",
+        "dark": "#9c6d1e"
+      },
+      "red": {
+        "light": "#ff9a78",
+        "mid": "#dd4632",
+        "dark": "#7e2418"
+      },
+      "ghost": "#ff9a78",
+      "flash": "#f7f3e7"
+    },
+    stateColors: {
+      "battling": "#46b34e",
+      "winded": "#f0b43c",
+      "resting": "#d9a86a",
+      "rally": "#dd4632"
+    },
+  },
+  warlock: {
+    palette: {
+      "white": "#f7f3e7",
+      "outline": "#15110f",
+      "night_w": "#171018",
+      "night_wd": "#100a10",
+      "silver_rim": "#f1e9d4",
+      "silver_dark": "#8d8063",
+      "gold_light": "#ffe9a0",
+      "gold_mid": "#f4c95a",
+      "gold_dark": "#a6761f",
+      "sky_light": "#a9f4c9",
+      "sky_mid": "#5cd694",
+      "sky_dark": "#2b8a56",
+      "red_light": "#ff9a78"
+    },
+    fills: {
+      "gold": {
+        "light": "#ffe9a0",
+        "mid": "#f4c95a",
+        "dark": "#a6761f"
+      },
+      "sky": {
+        "light": "#a9f4c9",
+        "mid": "#5cd694",
+        "dark": "#2b8a56"
+      },
+      "green": {
+        "light": "#9ae06b",
+        "mid": "#46b34e",
+        "dark": "#256e30"
+      },
+      "yellow": {
+        "light": "#ffe08a",
+        "mid": "#f0b43c",
+        "dark": "#9c6d1e"
+      },
+      "red": {
+        "light": "#ff9a78",
+        "mid": "#dd4632",
+        "dark": "#7e2418"
+      },
+      "ghost": "#ff9a78",
+      "flash": "#f7f3e7"
+    },
+    stateColors: {
+      "battling": "#46b34e",
+      "winded": "#f0b43c",
+      "resting": "#5cd694",
+      "rally": "#dd4632"
+    },
+  },
+} as const;
+
+/** One class's baked colour set (palette + fills + stateColors). Named to avoid
+ *  clashing with theme-context's UITheme (the runtime context value). */
+export type UIThemeColors = (typeof UI_THEMES)[keyof typeof UI_THEMES];
+
+/* ---- warrior-default statics (back-compat: non-context consumers) --------- */
 /** Hexes for plain View fills / borders that pair with the baked chrome. */
-export const UI_PALETTE = {
-  "white": "#f7f3e7",
-  "outline": "#15110f",
-  "night_w": "#1a2942",
-  "night_wd": "#131f33",
-  "silver_rim": "#e8eef4",
-  "silver_dark": "#67727f",
-  "gold_light": "#ffe9a0",
-  "gold_mid": "#f4c95a",
-  "gold_dark": "#a6761f",
-  "sky_light": "#e9f4ff",
-  "sky_mid": "#a9c8e6",
-  "sky_dark": "#6485a8",
-  "red_light": "#ff9a78"
-} as const;
+export const UI_PALETTE = UI_THEMES.warrior.palette;
+/** Bar-fill families (light/mid/dark) + ghost & flash. */
+export const UI_FILLS = UI_THEMES.warrior.fills;
+/** Hero fuel-state dot/label colours (resting = dignified accent, never red). */
+export const STATE_COLORS = UI_THEMES.warrior.stateColors;
 
-/** Bar-fill families (light top / mid body / dark bottom) + ghost & flash.
- *  Which bar uses which family is a zone decision (boss=gold, fuel/xp=sky, …). */
-export const UI_FILLS = {
-  "gold": {
-    "light": "#ffe9a0",
-    "mid": "#f4c95a",
-    "dark": "#a6761f"
-  },
-  "sky": {
-    "light": "#e9f4ff",
-    "mid": "#a9c8e6",
-    "dark": "#6485a8"
-  },
-  "green": {
-    "light": "#9ae06b",
-    "mid": "#46b34e",
-    "dark": "#256e30"
-  },
-  "yellow": {
-    "light": "#ffe08a",
-    "mid": "#f0b43c",
-    "dark": "#9c6d1e"
-  },
-  "red": {
-    "light": "#ff9a78",
-    "mid": "#dd4632",
-    "dark": "#7e2418"
-  },
-  "ghost": "#ff9a78",
-  "flash": "#f7f3e7"
-} as const;
-
-/** Inset a fill View into a baked well: x/y offset, dw/dh shrink, corner radius
- *  (art px). slim = 3px frame (xp/fuel); full = 6px frame (boss/plate). */
+/* ---- shared geometry (class-invariant) ------------------------------------ */
+/** Inset a fill View into a baked well: x/y offset, dw/dh shrink, corner radius. */
 export const WELL_INSETS = {
   "slim": {
     "x": 3,
@@ -77,24 +460,11 @@ export const WELL_INSETS = {
     "radius": 2
   }
 } as const;
-
-/** Hero fuel-state dot / label colours (resting is dignified sky, never red;
- *  a RESTING teammate's rally call-to-action is the separate red 'rally'). */
-export const STATE_COLORS = {
-  "battling": "#46b34e",
-  "winded": "#f0b43c",
-  "resting": "#a9c8e6",
-  "rally": "#dd4632"
-} as const;
-
-/** Dim behind popovers / sheets / modals (tap-to-close surface). */
+/** Dim behind popovers / sheets / modals. */
 export const SCRIM = {
   "modal": "rgba(6,8,12,0.6)"
 } as const;
-
-/** Full-body sprite crops (source px) so a character fills a portrait well —
- *  ported 1:1 from ui-kit's PORTRAIT_CROPS (sprites carry transparent padding;
- *  never assume the character fills the file). Keyed by class + warrior_j2. */
+/** Full-body sprite crops (source px) so a character fills a portrait well. */
 export const PORTRAIT_CROPS: Record<string, { x: number; y: number; s: number }> =
   {
   "warrior": {
@@ -144,11 +514,6 @@ export const PORTRAIT_CROPS: Record<string, { x: number; y: number; s: number }>
   }
 };
 
-/** Bitmap-font metrics for <PixelText> (STR-64). Two atlases:
- *  - white:    5px tall, glyph cell = {x, w} px, advance = w + letterSpacing.
- *  - outlined: 7px tall, glyph cell = {x, w=inkW+2*pad} px with the ink inset by
- *    `pad`; render the cell at (cursor - pad) so the baked 1px outline overlaps
- *    the letter-spacing gap → identical visual advance (inkW + letterSpacing). */
 export interface FontAtlasMetrics {
   glyphs: Record<string, { x: number; w: number }>;
   letterSpacing: number;
@@ -541,14 +906,7 @@ export const FONT_METRICS: { white: FontAtlasMetrics; outlined: FontAtlasMetrics
   }
 };
 
-/** 3-slice / ring assembly metadata.
- *  - axis 'h': stretch `<name>_mid` (1 art px wide) between `_left`/`_right`
- *    caps (capW art px each); frame height `h`.
- *  - axis 'v': stretch `<name>_mid` (1 art px tall) between `_top`/`_bottom`
- *    caps (capH art px each); fixed frame width `w`.
- *  - kind 'ringstrip': `frames` cells of `frameW`×`frameH`, pick cell i for
- *    fill fraction i/(frames-1) (Sprite.tsx strip technique).
- *  Speckles/glint live on the caps only — the stretch mid is uniform (spec §5). */
+/** 3-slice / ring assembly metadata (class-invariant geometry). */
 export const UI_SLICES = {
   "bar_full": {
     "axis": "h",
@@ -727,9 +1085,7 @@ export const UI_SLICES = {
     ]
   }
 } as const;
-
-/** Art-pixel dimensions of every baked component (before the ×2/×4/×6 device
- *  scale). Slice parts carry their own dims; a mid is 1px on its stretch axis. */
+/** Art-pixel dimensions of every baked component (before device scale). */
 export const UI_DIMS = {
   "bar_full_left": {
     "w": 10,

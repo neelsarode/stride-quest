@@ -25,10 +25,12 @@ import { api } from "./convex/_generated/api";
 import { convex } from "./src/convex";
 import { secureStorage } from "./src/secureStorage";
 import { DEV_FLAGS } from "./src/devConfig";
+import { FadeThrough, useGameSurfacesRevealed } from "./src/LoadCurtain";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { GameScreen } from "./src/game/GameScreen";
 import { BackendSetupScreen } from "./src/screens/BackendSetupScreen";
 import { FeedbackProvider } from "./src/feedback/FeedbackProvider";
+import { prefetchUiChrome } from "./src/ui";
 import { TitleCard } from "./src/screens/onboarding/TitleCard";
 import { OnboardingFlow } from "./src/screens/onboarding/OnboardingFlow";
 
@@ -85,23 +87,50 @@ function AuthGate() {
     }
   }, [isLoading, isAuthenticated, signIn]);
 
+  // Warm the HUD chrome + font cache as early as possible (fonts + the default
+  // kit are shared, so this covers onboarding AND the first game-screen paint;
+  // GameScreen warms the player's actual class on top). Kills the "types-in on
+  // open" progressive decode before any surface mounts.
+  useEffect(() => {
+    prefetchUiChrome();
+  }, []);
+
   // The routing keys, straight from the server (skip until the token exists).
   const viewer = useQuery(api.users.viewer, isAuthenticated ? {} : "skip");
+  const gameRevealed = useGameSurfacesRevealed();
 
   // Beat 0 — covers anonymous sign-in AND the first viewer load, so there is
   // exactly one pre-game surface (<2s, nothing to tap).
+  let screenKey: string;
+  let screen: ReactNode;
   if (isLoading || !isAuthenticated || viewer === undefined || viewer === null) {
-    return <TitleCard />;
+    screenKey = "title";
+    screen = <TitleCard />;
+  } else if (viewer.onboardedAt === null) {
+    screenKey = "onboarding";
+    screen = <OnboardingFlow viewer={viewer} />;
+  } else if (DEV_FLAGS.useGameScreen) {
+    // The home screen: full-screen GameScreen (STR-66 / M2.75), or the classic
+    // DashboardScreen behind the flag. Both share useGameEngine — no forks.
+    screenKey = "game";
+    screen = <GameScreen />;
+  } else {
+    screenKey = "dashboard";
+    screen = <DashboardScreen />;
   }
 
-  if (viewer.onboardedAt === null) {
-    return <OnboardingFlow viewer={viewer} />;
-  }
-
-  // The home screen: classic DashboardScreen, or the new full-screen GameScreen
-  // behind DEV_FLAGS.useGameScreen (STR-66 / M2.75). Both share useGameEngine,
-  // so flipping the flag re-skins the presentation without forking behavior.
-  return DEV_FLAGS.useGameScreen ? <GameScreen /> : <DashboardScreen />;
+  // LoadCurtain (STR-94): screen changes fade THROUGH black instead of hard-
+  // cutting — entrance fades out, the new screen mounts under the curtain, and
+  // for the game the curtain holds until BOTH its RevealGates (scene + HUD)
+  // have reported, so the whole battlefield + pixel UI arrive as one fade.
+  return (
+    <FadeThrough
+      screenKey={screenKey}
+      ready={screenKey !== "game" || gameRevealed}
+    >
+      {screen}
+    </FadeThrough>
+  );
 }
 
 // =============================================================================

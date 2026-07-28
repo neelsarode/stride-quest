@@ -29,6 +29,9 @@ import {
   Sheet,
   StatusDot,
   UIScaleProvider,
+  THEME_CLASS_KEYS,
+  setDevThemeOverride,
+  useDevThemeOverride,
 } from "../ui";
 import { BakedImage } from "../ui/Baked";
 import { UI_PALETTE } from "../ui/theme";
@@ -78,6 +81,7 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const simDeploy = useMutation(api.dev.simulateTeammateDeploy);
   const removeTeammates = useMutation(api.dev.removeSimulatedTeammates);
   const resetAccount = useMutation(api.dev.resetAccount);
+  const rescaleBoss = useMutation(api.dev.rescaleActiveBoss);
   const resetOnboarding = useMutation(api.dev.resetOnboarding);
   const setFuelHours = useMutation(api.dev.setFuelHours);
   const simRally = useMutation(api.dev.simulateTeammateRally);
@@ -91,6 +95,16 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+
+  // Theme cycler: force the HUD accent through each class, then back to OFF
+  // (honor the real class). Lets a warrior account preview every class theme.
+  const themeOverride = useDevThemeOverride();
+  const cycleTheme = () => {
+    const keys = THEME_CLASS_KEYS as readonly string[];
+    if (themeOverride == null) return setDevThemeOverride(keys[0]);
+    const i = keys.indexOf(themeOverride);
+    setDevThemeOverride(i < 0 || i >= keys.length - 1 ? null : keys[i + 1]);
+  };
 
   const run = (fn: () => Promise<unknown>) => async () => {
     setBusy(true);
@@ -190,10 +204,18 @@ export function DevPanel({ stepsToday }: { stepsToday: number }) {
           <BattleSceneDemo />
           <LiveSceneDemo />
 
+          <Section title="UI THEME (per-class accent)">
+            <Btn
+              label={`Theme: ${(themeOverride ?? "OFF (real class)").toUpperCase()} ▸`}
+              onPress={cycleTheme}
+            />
+          </Section>
+
           <Section title="TIME">
             <Btn label="Advance day +1" onPress={run(() => advanceDay({ days: 1 }))} busy={busy} />
             <Btn label="+10h idle" onPress={run(() => fastForwardIdle({ hours: 10 }))} busy={busy} />
             <Btn label="Weekly reset →" onPress={run(() => triggerWeeklyReset({}))} busy={busy} />
+            <Btn label="Rescale boss →" onPress={run(() => rescaleBoss({}))} busy={busy} />
             <Btn label="Reset clock" onPress={run(() => resetClock({}))} busy={busy} />
           </Section>
 
@@ -501,7 +523,7 @@ const UiGallery = memo(function UiGallery() {
               {/* ---- POPOVER (parity: SAM-MEDIC + SEND RALLY) ---- */}
               <GLabel>POPOVER (member stats + rally)</GLabel>
               <View style={{ paddingTop: 4 * scale, alignItems: "center", width: 132 * scale }}>
-                <Popover height={72} side="top" arrowOffset={15}>
+                <Popover height={80} side="top" arrowOffset={15}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <PixelText text="SAM - MEDIC" color={UI_PALETTE.silver_rim} />
                     <PixelText text="RESTING" color={UI_PALETTE.sky_mid} />
@@ -510,7 +532,7 @@ const UiGallery = memo(function UiGallery() {
                   <GalStat label="DMG WEEK" value="8,750" top={17} scale={scale} />
                   <GalStat label="STREAK" value="0 DAYS" top={26} scale={scale} />
                   <View style={{ position: "absolute", left: 0, top: 39 * scale }}>
-                    <Button material="silver" label="SEND RALLY 500" width={126} />
+                    <Button material="silver" label="SEND RALLY 500" width={118} />
                   </View>
                 </Popover>
               </View>
@@ -533,7 +555,7 @@ const UiGallery = memo(function UiGallery() {
               </View>
             </Sheet>
 
-            <Modal visible={modalOpen} onClose={() => setModalOpen(false)} title="HOW TO PLAY" height={86}>
+            <Modal visible={modalOpen} onClose={() => setModalOpen(false)} title="HOW TO PLAY" height={90}>
               <View style={{ gap: 3 * scale }}>
                 <PixelText text="WALK EVERY DAY." color={UI_PALETTE.silver_rim} />
                 <PixelText text="STEPS BECOME ENERGY." color={UI_PALETTE.sky_mid} />

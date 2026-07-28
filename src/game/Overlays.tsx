@@ -32,8 +32,10 @@ import {
   Modal,
   PixelText,
   Popover,
+  POPOVER_CONTENT_W,
   Sheet,
   UIScaleProvider,
+  useUITheme,
 } from "../ui";
 import { STATE_COLORS, UI_PALETTE } from "../ui/theme";
 import { useFeedback } from "../feedback/FeedbackProvider";
@@ -138,7 +140,9 @@ export function useOverlay(): Overlay {
 // tracks the tile centre, clamped to the panel edges.
 // =============================================================================
 const POP_W_ART = 132;
-const POP_WELL_ART = POP_W_ART - 6; // slim frame → 3px inset each side
+// The popover's padded CONTENT width (STR-93) — rows and full-width buttons
+// span exactly this, never the raw well (which would touch the bezel).
+const POP_WELL_ART = POPOVER_CONTENT_W;
 
 function computePopover(rect: AnchorRect, s: number, winW: number) {
   const popW = POP_W_ART * s;
@@ -312,7 +316,8 @@ function MemberPopover({
   const eligible = new Set(rally.eligibleTeammates.map((t) => t.userId));
   const canRally = !member.isMe && eligible.has(member.userId);
   const { left, top, arrowAt } = computePopover(rect, scale, winW);
-  const H = canRally ? 73 : 55;
+  // Heights include the popover's 2×4px interior padding (STR-93).
+  const H = canRally ? 81 : 63;
   const stateColor = STATE_COLORS[member.heroState];
 
   async function onSendRally() {
@@ -382,6 +387,7 @@ function PopStat({
   top: number;
   scale: number;
 }) {
+  const theme = useUITheme();
   return (
     <View
       style={{
@@ -393,7 +399,7 @@ function PopStat({
         justifyContent: "space-between",
       }}
     >
-      <PixelText text={label} color={UI_PALETTE.sky_mid} scale={scale} />
+      <PixelText text={label} color={theme.accent.mid} scale={scale} />
       <PixelText text={value} color={UI_PALETTE.silver_rim} scale={scale} />
     </View>
   );
@@ -417,6 +423,7 @@ function InvitePopover({
   onCopied: (ok: boolean) => void;
 }) {
   const { left, top, arrowAt } = computePopover(rect, scale, winW);
+  const theme = useUITheme();
 
   async function onCopy() {
     const ok = await copyToClipboard(code);
@@ -426,7 +433,7 @@ function InvitePopover({
 
   return (
     <Popover
-      height={62}
+      height={70}
       side="top"
       arrowOffset={arrowAt}
       onClose={closeOverlay}
@@ -435,7 +442,7 @@ function InvitePopover({
     >
       <PixelText text="INVITE A FRIEND" color={UI_PALETTE.silver_rim} scale={scale} />
       <View style={{ position: "absolute", top: 13 * scale }}>
-        <PixelText text="SHARE YOUR GUILD CODE" color={UI_PALETTE.sky_mid} scale={scale} />
+        <PixelText text="SHARE YOUR GUILD CODE" color={theme.accent.mid} scale={scale} />
       </View>
       <View style={{ position: "absolute", top: 24 * scale, left: 0, right: 0, alignItems: "center" }}>
         <PixelText text={code} color={UI_PALETTE.gold_light} scale={scale} />
@@ -453,24 +460,32 @@ function InvitePopover({
 // Overdrive is automatic on a goal-hit (no charge/activate). Pixel-font
 // conventions: caps, "X2" not "×2", short lines that fit the 134-art-px well.
 // =============================================================================
-const HELP_LINES: [string, string][] = [
-  ["WALK EVERY DAY.", UI_PALETTE.silver_rim],
-  ["STEPS BECOME ENERGY.", UI_PALETTE.sky_mid],
-  ["SUPER ATTACK SPENDS IT", UI_PALETTE.silver_rim],
-  ["ON THE WEEKLY BOSS.", UI_PALETTE.sky_mid],
-  ["YOUR CREW FIGHTS 24/7.", UI_PALETTE.sky_mid],
-  ["HIT YOUR GOAL: X2 OVERDRIVE.", UI_PALETTE.sky_mid],
-  ["RALLY RESTING FRIENDS.", UI_PALETTE.sky_mid],
-  ["JOBS RESET MONDAYS.", UI_PALETTE.sky_mid],
+// "rim" = neutral silver; "accent" = the class theme accent (resolved in render,
+// so a class swap re-colors these — never bake the color at module load).
+const HELP_LINES: [string, "rim" | "accent"][] = [
+  ["WALK EVERY DAY.", "rim"],
+  ["STEPS BECOME ENERGY.", "accent"],
+  ["SUPER ATTACK SPENDS IT", "rim"],
+  ["ON THE WEEKLY BOSS.", "accent"],
+  ["YOUR CREW FIGHTS 24/7.", "accent"],
+  ["HIT YOUR GOAL: X2 OVERDRIVE.", "accent"],
+  ["RALLY RESTING FRIENDS.", "accent"],
+  ["JOBS RESET MONDAYS.", "accent"],
 ];
 
 function HelpModal({ onClose }: { onClose: () => void }) {
   const { artScale } = useGameLayout();
+  const theme = useUITheme();
   return (
-    <Modal visible onClose={onClose} title="HOW TO PLAY" height={120} scale={artScale}>
+    <Modal visible onClose={onClose} title="HOW TO PLAY" height={124} scale={artScale}>
       <View style={{ gap: 4 * artScale }}>
-        {HELP_LINES.map(([line, color]) => (
-          <PixelText key={line} text={line} color={color} scale={artScale} />
+        {HELP_LINES.map(([line, kind]) => (
+          <PixelText
+            key={line}
+            text={line}
+            color={kind === "accent" ? theme.accent.mid : UI_PALETTE.silver_rim}
+            scale={artScale}
+          />
         ))}
         <View style={{ marginTop: 6 * artScale, alignItems: "center" }}>
           <Button material="silver" label="OK" onPress={onClose} scale={artScale} />

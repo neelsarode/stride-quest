@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { Frame } from "./Frame";
 import { Button } from "./Button";
+import { RevealGate } from "./RevealGate";
+import { UI_ASSETS } from "./uiMap";
 import { PixelText, measurePixelText } from "./PixelText";
 import { SCRIM, UI_PALETTE, WELL_INSETS } from "./theme";
 import { useResolvedScale } from "./scale";
@@ -21,6 +23,13 @@ import { useResolvedScale } from "./scale";
 const WIDTH = 146; // modal_silver fixed width (art px)
 const INSET = WELL_INSETS.full; // hifiFrame 6px → well inset
 const TITLE_BAND = 11; // gold nameplate height (art px)
+
+// Interior CONTENT padding inside the well, art px (STR-93): the well inset is
+// only the frame border — the HTML kit drew modal lines at well + 6, so without
+// this, text hugs the inner bezel ring. Vertical is smaller (TITLE_BAND already
+// spaces the top; consumers own their bottom margin).
+const PAD_X = 5;
+const PAD_Y = 2;
 
 export interface ModalProps {
   visible: boolean;
@@ -59,7 +68,11 @@ export function Modal({
         style={[StyleSheet.absoluteFill, { backgroundColor: SCRIM.modal }]}
         onPress={onClose}
       />
-      <View style={[{ width: WIDTH * s, height: height * s }, style]}>
+      <RevealGate
+        waitFor={[UI_ASSETS.font_white, UI_ASSETS.font_white_outlined]}
+        minHold={420}
+        style={[{ width: WIDTH * s, height: height * s }, style]}
+      >
         <Frame slice="modal_silver" length={height} scale={s} />
 
         {/* gold nameplate straddling the top frame band */}
@@ -99,15 +112,15 @@ export function Modal({
         <View
           style={{
             position: "absolute",
-            left: INSET.x * s,
-            top: (INSET.y + TITLE_BAND) * s,
-            width: (WIDTH - INSET.dw) * s,
-            height: (height - INSET.dh - TITLE_BAND) * s,
+            left: (INSET.x + PAD_X) * s,
+            top: (INSET.y + TITLE_BAND + PAD_Y) * s,
+            width: (WIDTH - INSET.dw - 2 * PAD_X) * s,
+            height: (height - INSET.dh - TITLE_BAND - 2 * PAD_Y) * s,
           }}
         >
           {children}
         </View>
-      </View>
+      </RevealGate>
     </View>
   );
 }

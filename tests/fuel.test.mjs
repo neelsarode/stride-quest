@@ -164,32 +164,34 @@ test("burn-rate anchor: a full 24h of fighting costs less than the daily goal", 
 
 // ==================================================================================
 // STR-7 — fuel-driven idle damage: burn and damage priced off the SAME walk.
-// Damage rates: Battling = 150 × jobMult dph · Winded = 75 × jobMult · Resting = 0.
-// (Unchanged by the Core Loop v2 re-anchor — damage is priced off BASE_IDLE_DPH.)
+// Damage rates: Battling = BASE_IDLE_DPH × jobMult · Winded = ×windedDamageMult ·
+// Resting = 0. Damage is priced off BASE_IDLE_DPH, so expectations are written as
+// multiples of it — a DAMAGE_SCALE re-tune keeps them correct. (Burn/fuel numbers
+// are step-space and unscaled.)
 // ==================================================================================
 
-test("idle dph per state: 150 battling, 75 winded, 0 resting (at job mult 1)", () => {
-  assert.equal(idleDphFor("battling", 1), BASE_IDLE_DPH); // 150
-  assert.equal(idleDphFor("winded", 1), 75); // 150 × 0.5
+test("idle dph per state: BASE_IDLE_DPH battling, ×windedDamageMult winded, 0 resting", () => {
+  assert.equal(idleDphFor("battling", 1), BASE_IDLE_DPH);
+  assert.equal(idleDphFor("winded", 1), BASE_IDLE_DPH * FUEL.windedDamageMult);
   assert.equal(idleDphFor("resting", 1), 0);
-  assert.equal(idleDphFor("battling", 3.5), 525); // Job 3
+  assert.equal(idleDphFor("battling", 3.5), BASE_IDLE_DPH * 3.5); // Job 3
 });
 
-test("the hand-computed fueled → winded → resting day earns 3,600 damage at ×2", () => {
+test("the hand-computed fueled → winded → resting day earns 24×BASE_IDLE_DPH at ×2", () => {
   // Same 2,700-fuel / 24h day as above, priced at job mult ×2:
-  //   battling 6h  × (150 × 2 × 1)   = 1,800
-  //   winded  12h  × (150 × 2 × 0.5) = 1,800
-  //   resting  6h  × 0               =     0
-  //   total damage = 3,600 (and burn = 2,700 → tank empty)
+  //   battling 6h  × (dph×2)     = 12 × BASE_IDLE_DPH
+  //   winded  12h  × (dph×2×0.5) = 12 × BASE_IDLE_DPH
+  //   resting  6h  × 0           =  0
+  //   total = 24 × BASE_IDLE_DPH (and burn = 2,700 → tank empty)
   const w = walkFuel(2_700, 24 * HOUR_MS);
-  approx(idleDamageForSegments(w.segments, 2), 3_600);
+  approx(idleDamageForSegments(w.segments, 2), 24 * BASE_IDLE_DPH);
 });
 
-test("shared settle (aligned stamps): burn 562.5 and damage 375 from one 4h walk", () => {
+test("shared settle (aligned stamps): burn 562.5 and damage 2.5×BASE from one 4h walk", () => {
   // fuel 1,575, 4h window, job mult 1:
-  //   battling 1h: burn 225, damage 1 × 150 = 150
-  //   winded   3h: burn 337.5, damage 3 ×  75 = 225
-  //   → burned 562.5, damage 375, end fuel 1,012.5
+  //   battling 1h: burn 225, damage 1 × dph       = 1.0 × BASE_IDLE_DPH
+  //   winded   3h: burn 337.5, damage 3 × dph×0.5 = 1.5 × BASE_IDLE_DPH
+  //   → burned 562.5, damage 2.5 × BASE_IDLE_DPH, end fuel 1,012.5
   const t0 = 1_000_000;
   const r = settleFuelAndIdleWindow({
     fuel: 1_575,
@@ -199,7 +201,7 @@ test("shared settle (aligned stamps): burn 562.5 and damage 375 from one 4h walk
     jobMult: 1,
   });
   approx(r.burned, 562.5);
-  assert.equal(r.damage, 375);
+  assert.equal(r.damage, 2.5 * BASE_IDLE_DPH);
   approx(r.fuel, 1_012.5);
 });
 
@@ -232,7 +234,7 @@ test("never-disagree invariant: damage tracks burn through every burning state",
 
 test("OFFLINE_CAP pauses BOTH burn and damage after 10h", () => {
   // 30h away, tank 7,200, mult 1: only 10h settle — all battling
-  //   (end fuel 4,950 > 1,350): burn 10 × 225 = 2,250, damage 10 × 150 = 1,500.
+  //   (end fuel 4,950 > 1,350): burn 10 × 225 = 2,250, damage 10 × dph = 10 × BASE_IDLE_DPH.
   // The other 20h are paused: no burn, no damage. Absence pauses, never punishes.
   const t0 = 5_000;
   const r = settleFuelAndIdleWindow({
@@ -243,7 +245,7 @@ test("OFFLINE_CAP pauses BOTH burn and damage after 10h", () => {
     jobMult: 1,
   });
   approx(r.burned, 2_250);
-  assert.equal(r.damage, 1_500);
+  assert.equal(r.damage, 10 * BASE_IDLE_DPH);
   approx(r.fuel, 4_950);
 });
 
@@ -252,7 +254,7 @@ test("weekly-rollover lead-in: older fuel stamp burns but deals no damage", () =
   // didn't exist during the lead-in. fuel 2,250, mult 1, now = +6h:
   //   lead-in  [0h → 4h] burn-only: battling (2,250−1,350)/225 = 4h exactly
   //            → burn 900, damage 0, fuel 1,350
-  //   shared   [4h → 6h] winded 2h: burn 225, damage 2 × 75 = 150, fuel 1,125
+  //   shared   [4h → 6h] winded 2h: burn 225, damage 2 × dph×0.5 = BASE_IDLE_DPH, fuel 1,125
   const t0 = 0;
   const r = settleFuelAndIdleWindow({
     fuel: 2_250,
@@ -262,14 +264,14 @@ test("weekly-rollover lead-in: older fuel stamp burns but deals no damage", () =
     jobMult: 1,
   });
   approx(r.burned, 1_125);
-  assert.equal(r.damage, 150);
+  assert.equal(r.damage, BASE_IDLE_DPH);
   approx(r.fuel, 1_125);
 });
 
 test("defensive path: older idle stamp earns damage at the settled level's state", () => {
   // idle stamp 2h older than the fuel stamp; fuel already settled at 900
-  // (winded). The lead-in earns 2 × 75 = 150 damage, burns nothing new
-  // (that burn was already settled), and the shared window is empty.
+  // (winded). The lead-in earns 2 × dph×0.5 = BASE_IDLE_DPH damage, burns nothing
+  // new (that burn was already settled), and the shared window is empty.
   const t0 = 0;
   const r = settleFuelAndIdleWindow({
     fuel: 900,
@@ -279,7 +281,7 @@ test("defensive path: older idle stamp earns damage at the settled level's state
     jobMult: 1,
   });
   approx(r.burned, 0);
-  assert.equal(r.damage, 150);
+  assert.equal(r.damage, BASE_IDLE_DPH);
   approx(r.fuel, 900);
 });
 
@@ -298,7 +300,9 @@ test("a resting hero deals no damage and burns nothing — never punished", () =
 });
 
 test("damage floors once at the end of a settle (no per-segment rounding)", () => {
-  // fuel 101 (winded) empties in 101/112.5 h → damage 101/112.5 × 75 = 67.33 → 67.
+  // fuel 101 (winded) empties in 101/112.5 h → damage (101/112.5)×dph×0.5, floored.
+  // The non-integer pre-floor value is the point of this test, so it's written as
+  // the exact formula (tracks BASE_IDLE_DPH); at scale 50 it floors to 3,366.
   const t0 = 0;
   const r = settleFuelAndIdleWindow({
     fuel: 101,
@@ -308,7 +312,10 @@ test("damage floors once at the end of a settle (no per-segment rounding)", () =
     jobMult: 1,
   });
   approx(r.burned, 101);
-  assert.equal(r.damage, 67);
+  assert.equal(
+    r.damage,
+    Math.floor((101 / 112.5) * BASE_IDLE_DPH * FUEL.windedDamageMult),
+  );
   assert.equal(r.fuel, 0);
 });
 

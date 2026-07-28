@@ -19,6 +19,14 @@ export const FX = {
   restFps: 5, // 6-frame kneel loop → ~1.2s breath (fx-engine parity)
   projFps: 12,
   impactFps: 14,
+  // One-shot swings HOLD their final frame this long before onDone (STR-92).
+  // Time-based playback gives the finale exactly one 83ms tick — and under
+  // jank withTiming SKIPS trailing frames — so without a hold, 17-frame
+  // specials read as "cut off". Deliberately SMALL: user testing rejected a
+  // 120ms hold ("pause then teleport") AND an opacity crossfade (breaks the
+  // pixel aesthetic) — the swing ends with the HTML preview's hard cut to
+  // idle frame 0, this hold only guarantees the climax frame actually lands.
+  lastFrameHoldMs: 40,
 
   // --- projectile flight ---
   speedPxMs: 1.5, // constant px/ms; duration clamped to [flightMinMs, flightMaxMs]
@@ -62,8 +70,15 @@ export const SCENE = {
   pxPerSrcPhone: 1.4,
   phoneMaxWidth: 430, // stage width at/below this = phone fit
 
-  srcHero: 128, // hero art canvas (display height = srcHero × pxPerSrc for ALL jobs)
+  srcHero: 128, // hero art canvas (display height = srcHero × pxPerSrc, × job1Scale for job-1s)
   srcBoss: 256, // boss art canvas (min display height before auto-scale)
+
+  // STR-91 EXPERIMENT (may be reverted — set to 1 to turn off): job-1 sprites
+  // were generated with oversized heads vs their job-ups, so rookies read as
+  // physically BIGGER than evolved forms. Until/unless the art is regenerated,
+  // job-1 fighters render at this fraction of normal hero height. Scene only —
+  // portraits normalize size inside their frames already.
+  job1Scale: 0.75,
 
   // Party formation: two staggered columns; hero i sits at
   // bottom (partyBasePct + i·partyStepPct)% − partyDy px,
@@ -162,4 +177,13 @@ export function projectileSizePx(kind: "basic" | "special"): number {
   return kind === "special"
     ? FX.specialBaseSizePx * FX.fxScale * (FX.specialScale / 1.5)
     : FX.projBaseSizePx * FX.fxScale;
+}
+
+/**
+ * Per-job render scale (STR-91 experiment): job-1 folders ("1_rookie", …)
+ * draw at SCENE.job1Scale of the normal hero height; every other job at 1.
+ * Anchors are fractions of the rendered frame, so shot geometry scales free.
+ */
+export function jobRenderScale(job: string): number {
+  return job.startsWith("1_") ? SCENE.job1Scale : 1;
 }

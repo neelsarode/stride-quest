@@ -206,7 +206,9 @@ export const Fighter = forwardRef<FighterHandle, FighterProps>(
     }));
 
     // One-shot swing finished (Sprite held the last frame, then onDone):
-    // return to idle, or straight to rest if requested mid-swing.
+    // return to idle, or straight to rest if requested mid-swing. HARD CUT to
+    // idle frame 0 — HTML preview parity. (An opacity dissolve was tried and
+    // reverted here, STR-92: it broke the pixel aesthetic.)
     const handleDone = () => go(restingRef.current ? "rest" : "idle");
 
     // STACKED STRIPS (native flash fix): mount all four animation strips at
@@ -265,7 +267,11 @@ export const Fighter = forwardRef<FighterHandle, FighterProps>(
               animKey={animKey}
               fps={fps}
               loop={looping}
-              playKey={playKey}
+              // Restart tokens (STR-92): LOOPS re-key on every mode change so
+              // idle/rest always resume from frame 0 (HTML parity — makeFighter
+              // resets f.frame per mode set). ONE-SHOTS restart only when a
+              // swing fires (playKey).
+              playKey={looping ? `loop-${mode}` : playKey}
               // onDone drives the return-to-idle; wire it ONLY to the strip
               // actually playing this swing. The one-shot strips (attack/
               // special) auto-play once on mount while hidden — gating on

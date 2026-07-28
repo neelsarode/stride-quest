@@ -40,13 +40,18 @@ import { Frame } from "./Frame";
 import { PixelText, measurePixelText } from "./PixelText";
 import { UI_FILLS, WELL_INSETS } from "./theme";
 import { useResolvedScale } from "./scale";
+import { useUITheme } from "./theme-context";
 
 export type BarVariant = "full" | "slim";
-export type BarFill = keyof typeof UI_FILLS extends infer K
-  ? K extends "ghost" | "flash"
-    ? never
-    : K
-  : never;
+export type BarFill =
+  | (keyof typeof UI_FILLS extends infer K
+      ? K extends "ghost" | "flash"
+        ? never
+        : K
+      : never)
+  // "accent" resolves to the current class theme's accent (per-class), not a
+  // static UI_FILLS family — used for the fuel/energy bars (was "sky").
+  | "accent";
 
 const FRAME_H = { full: 20, slim: 14 } as const;
 const SLICE = { full: "bar_full", slim: "bar_slim" } as const;
@@ -97,11 +102,13 @@ export const Bar = forwardRef<BarHandle, BarProps>(function Bar(
   ref,
 ) {
   const s = useResolvedScale(scale);
+  const theme = useUITheme();
   const h = FRAME_H[variant];
   const inset = WELL_INSETS[variant === "full" ? "full" : "slim"];
   const wellW = width - inset.dw;
   const wellH = h - inset.dh;
-  const fam = UI_FILLS[fill];
+  // "accent" is class-themed; everything else is a static UI_FILLS family.
+  const fam = fill === "accent" ? theme.accent : UI_FILLS[fill];
 
   // Internal drives (used unless an external SharedValue is provided).
   const ownFill = useSharedValue(clamp01(value));

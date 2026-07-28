@@ -20,6 +20,7 @@ import {
   PixelText,
   Sheet,
   StatusDot,
+  useUITheme,
   type HeroState,
 } from "../../ui";
 import { STATE_COLORS, UI_PALETTE } from "../../ui/theme";
@@ -102,6 +103,7 @@ export function GuildSheet({
   onToast: (msg: string) => void;
 }) {
   const { artScale, height } = useGameLayout();
+  const theme = useUITheme();
   const s = artScale;
   const { members, recognition, inviteCode, maxMembers } = overview;
   const sendRally = useMutation(api.rally.sendRally);
@@ -166,7 +168,12 @@ export function GuildSheet({
           const restingMate = m.heroState === "resting" && !m.isMe;
           const dotState: HeroState = restingMate ? "rally" : m.heroState;
           const canRally = rally && !m.isMe && eligible.has(m.userId);
-          const sign = m.improvementPct >= 0 ? "+" : "";
+          // Trend shows ONLY when positive (STR-93): a negative here rendered
+          // as "- -100%" (separator + sign collision) and, worse, loss-framed
+          // a PERSON — the design guardrail reserves loss-framing for bonuses,
+          // never members. Positive-only needs no label: "+40%" reads as gain.
+          const trend =
+            m.improvementPct > 0 ? ` - +${m.improvementPct}%` : "";
           const badges: string[] = [];
           if (recognition.mvpUserId === m.userId) badges.push("MVP");
           if (recognition.mostImprovedUserId === m.userId) badges.push("IMPROVED");
@@ -194,8 +201,10 @@ export function GuildSheet({
                 <PixelText text={`${m.damage.toLocaleString()}`} color={UI_PALETTE.gold_light} scale={s} />
               </View>
               <PixelText
-                text={`${m.todaySteps.toLocaleString()} TODAY - JOB ${m.jobLevel} - ${m.displayStreak}D - ${sign}${m.improvementPct}%${m.bonusDamage > 0 ? ` - ${m.bonusDamage.toLocaleString()} BONUS` : ""}`}
-                color={UI_PALETTE.sky_mid}
+                // "STREAK N", not "ND" (STR-93): the pixel font's 0 is shaped
+                // exactly like O, so "0D" read as a mystery "OD" token.
+                text={`${m.todaySteps.toLocaleString()} TODAY - JOB ${m.jobLevel} - STREAK ${m.displayStreak}${trend}${m.bonusDamage > 0 ? ` - ${m.bonusDamage.toLocaleString()} BONUS` : ""}`}
+                color={theme.accent.mid}
                 scale={s}
               />
               {badges.length > 0 && (
@@ -233,7 +242,7 @@ export function GuildSheet({
         {/* invite code + COPY */}
         {inviteCode ? (
           <View style={{ marginTop: 8 * s, gap: 4 * s }}>
-            <PixelText text="INVITE CODE" color={UI_PALETTE.sky_mid} scale={s} />
+            <PixelText text="INVITE CODE" color={theme.accent.mid} scale={s} />
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <PixelText text={inviteCode} color={UI_PALETTE.gold_light} scale={s + 1} />
               <Button
@@ -259,7 +268,7 @@ export function GuildSheet({
 
         {/* join-by-code (closes the joinGuildByCode UI gap) */}
         <View style={{ marginTop: 10 * s, gap: 4 * s }}>
-          <PixelText text="JOIN ANOTHER GUILD" color={UI_PALETTE.sky_mid} scale={s} />
+          <PixelText text="JOIN ANOTHER GUILD" color={theme.accent.mid} scale={s} />
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 * s }}>
             <TextInput
               value={joinCode}

@@ -1,4 +1,5 @@
-// A top announcement banner (job-up / boss-defeated / overdrive / rally / …).
+// A centered announcement banner (job-up / boss-defeated / overdrive / rally /
+// …) — vertically mid-screen (positioned by FeedbackProvider's bannerZone).
 // Slides in, holds, slides out, then self-removes. The CHOREOGRAPHY is unchanged
 // (ANIM.banner* timings + the translateY/opacity curve) — STR-70 only swaps the
 // CHROME: the old coloured box + emoji glyph becomes the hi-fi kit's gold

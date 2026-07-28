@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stride Quest — Job-1 proportion regen compare (STR-91)</title>
+<!--
+  STR-91 QA page: job-1 sprites have oversized heads vs jobs 2–5, making
+  rookies look physically BIGGER than their evolved forms.
+  Each class row shows NEW J1 candidate / OLD J1 / J2–J5, foot-aligned on a
+  shared baseline at identical art scale, with alpha-measured body size and a
+  head-width metric (widest pixel run in the top 40% of the body). The OLD J1
+  cell shows its head delta vs the class's J2–J5 average.
+  NEW candidates are auto-picked up from characters/_job1_regen/<class>/south.png
+  once generated (PixelLab renewal pending as of 2026-07-20).
+  Serve over http (e.g. python3 -m http.server 8090) for the measurements —
+  file:// taints the canvas, page falls back to unmeasured bottom-alignment.
+-->
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #101216; color: #b9c0cf;
+    font-family: ui-monospace, Menlo, monospace; }
+  #page { max-width: 1200px; margin: 0 auto; padding: 22px 18px 60px; }
+  h1 { font-size: 14px; letter-spacing: 1px; color: #ffce6b; margin: 0 0 6px; }
+  .note { font-size: 10px; color: #667080; line-height: 1.6; margin-bottom: 6px; }
+  section { border: 1px solid #24272f; border-radius: 6px; padding: 12px 14px;
+    margin-top: 14px; background: #15181d; }
+  h2 { font-size: 11px; letter-spacing: 2px; color: #98a2b0; margin: 0 0 8px;
+    text-transform: uppercase; }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .cell canvas { image-rendering: pixelated; display: block;
+    background: linear-gradient(180deg, #191d24, #14171c); border: 1px solid #262b33;
+    border-radius: 4px; }
+  .cell.old canvas { border-color: #7e2418; }
+  .cell.new canvas { border-color: #2a6e3a; }
+  .cell.pending canvas { border-style: dashed; border-color: #3a4049; }
+  .lbl { font-size: 9px; letter-spacing: 1px; color: #98a2b0; }
+  .cell.old .lbl { color: #ff9a78; }
+  .cell.new .lbl { color: #8ee08b; }
+  .met { font-size: 9px; color: #667080; white-space: pre; text-align: center; line-height: 1.5; }
+  .met b { color: #cdd3de; font-weight: 600; }
+  .met .bad { color: #ff9a78; font-weight: 700; }
+  .met .good { color: #8ee08b; font-weight: 700; }
+  #scalectl { display: flex; gap: 8px; align-items: center; margin: 10px 0 2px; }
+  #scalectl label { font-size: 10px; color: #98a2b0; letter-spacing: 1px; }
+  button.ctl { background: #24272f; color: #cdd3de; border: 1px solid #3a4049;
+    border-radius: 4px; font: inherit; font-size: 11px; padding: 3px 9px; cursor: pointer; }
+  button.ctl.on { background: #ffce6b; color: #201607; border-color: #ffce6b; font-weight: 700; }
+  #taintwarn { display: none; font-size: 10px; color: #f0b43c; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="page">
+  <h1>JOB-1 PROPORTION REGEN — COMPARE (STR-91)</h1>
+  <div class="note">Every sprite drawn at the SAME art scale, feet on a shared baseline —
+    heights and head sizes compare directly. <b>HEAD</b> = widest pixel run in the top 40% of the
+    body (hats/wings included — which inflates J2–5 numbers, so trust your eyes first).
+    <b>H/B</b> = head-to-body-width ratio, the chibi-ness signal: J1s run high because the same-size
+    head sits on a narrow unarmored body. The green NEW cell appears automatically once
+    <span style="color:#cdd3de">characters/_job1_regen/&lt;class&gt;/south.png</span> exists.</div>
+  <div id="scalectl">
+    <label>SCALE</label>
+    <button class="ctl on" data-s="2">2x</button>
+    <button class="ctl" data-s="3">3x</button>
+  </div>
+  <div id="taintwarn">⚠ measurements unavailable over file:// — serve via http (python3 -m http.server 8090) for body/head metrics.</div>
+  <div id="rows"></div>
+</div>
+
+<script>
+'use strict';
+const JOBS = {
+  warrior:['1_rookie','2_strider','3_vanguard','4_champion','5_warlord'],
+  mage:['1_apprentice','2_adept','3_conjurer','4_sorcerer','5_archmage'],
+  archer:['1_greenhorn','2_scout','3_hunter','4_ranger','5_sentinel'],
+  paladin:['1_squire','2_knight','3_crusader','4_paladin','5_lightbringer'],
+  medic:['1_acolyte','2_healer','3_cleric','4_priest','5_hierophant'],
+  assassin:['1_footpad','2_prowler','3_nightblade','4_assassin','5_shadowlord'],
+  bard:['1_busker','2_minstrel','3_troubadour','4_bard','5_maestro'],
+  warlock:['1_initiate','2_cultist','3_hexer','4_warlock','5_dreadlord'],
+};
+const TEST_CLASSES = ['warrior', 'mage', 'archer'];   // STR-91 test scope (NEW slots)
+let SCALE = 2;
+const CELL_ART_H = 92;          // fits the tallest body + headroom
+let tainted = false;
+
+function loadImg(src){
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+}
+// Alpha-measure: body bbox + head width (widest run in the top 40% of the body).
+function measure(img){
+  try {
+    const cv = document.createElement('canvas');
+    cv.width = img.width; cv.height = img.height;
+    const cx = cv.getContext('2d');
+    cx.drawImage(img, 0, 0);
+    const d = cx.getImageData(0, 0, cv.width, cv.height).data;
+    let x0 = cv.width, x1 = -1, y0 = cv.height, y1 = -1;
+    for (let y = 0; y < cv.height; y++)
+      for (let x = 0; x < cv.width; x++)
+        if (d[(y * cv.width + x) * 4 + 3] > 40){
+          if (x < x0) x0 = x; if (x > x1) x1 = x;
+          if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+    if (x1 < 0) return null;
+    const bodyH = y1 - y0 + 1, bodyW = x1 - x0 + 1;
+    const headBottom = y0 + Math.round(bodyH * .4);
+    let headW = 0;
+    for (let y = y0; y <= headBottom; y++){
+      let rx0 = -1, rx1 = -1;
+      for (let x = x0; x <= x1; x++)
+        if (d[(y * cv.width + x) * 4 + 3] > 40){ if (rx0 < 0) rx0 = x; rx1 = x; }
+      if (rx0 >= 0) headW = Math.max(headW, rx1 - rx0 + 1);
+    }
+    return { x0, y0, bodyW, bodyH, headW };
+  } catch (e){ tainted = true; return null; }
+}
+function drawCell(canvas, img, m){
+  const artW = 78;
+  canvas.width = artW; canvas.height = CELL_ART_H;
+  canvas.style.width = artW * SCALE + 'px';
+  canvas.style.height = CELL_ART_H * SCALE + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  if (!img){
+    ctx.strokeStyle = '#3a4049';
+    return;
+  }
+  const baseline = CELL_ART_H - 6;
+  if (m){
+    // foot-aligned by MEASURED feet, horizontally centered on the body
+    const dx = Math.round(artW/2 - (m.x0 + m.bodyW/2));
+    const dy = baseline - (m.y0 + m.bodyH);
+    ctx.drawImage(img, dx, dy);
+  } else {
+    // fallback: bottom-align the file box
+    ctx.drawImage(img, Math.round((artW - img.width)/2), baseline - img.height);
+  }
+  // baseline tick
+  ctx.fillStyle = '#2c323c';
+  ctx.fillRect(0, baseline + 1, artW, 1);
+}
+function metHtml(m, avgHead){
+  if (!m) return '<span>—</span>';
+  const ratio = m.headW / m.bodyW;
+  let s = `H <b>${m.bodyH}</b>  W <b>${m.bodyW}</b>\nHEAD <b>${m.headW}</b>  H/B <b>${ratio.toFixed(2)}</b>`;
+  if (avgHead){
+    const pct = Math.round((m.headW / avgHead - 1) * 100);
+    const cls = pct >= 10 ? 'bad' : 'good';
+    s += `\n<span class="${cls}">(${pct >= 0 ? '+' : ''}${pct}% VS J2-5)</span>`;
+  }
+  return s;
+}
+
+const rowsEl = document.getElementById('rows');
+const allCells = [];   // {canvas, img, m} for rescale redraws
+async function build(){
+  for (const [cls, jobs] of Object.entries(JOBS)){
+    const sec = document.createElement('section');
+    const h = document.createElement('h2');
+    h.textContent = cls + (TEST_CLASSES.includes(cls) ? '  ·  STR-91 TEST CLASS' : '');
+    sec.appendChild(h);
+    const row = document.createElement('div');
+    row.className = 'row';
+    sec.appendChild(row);
+    rowsEl.appendChild(sec);
+
+    const newImg = TEST_CLASSES.includes(cls)
+      ? await loadImg(`characters/_job1_regen/${cls}/south.png`) : null;
+    const jobImgs = [];
+    for (const job of jobs) jobImgs.push(await loadImg(`characters/${cls}/${job}/south.png`));
+    const ms = jobImgs.map(im => im ? measure(im) : null);
+    const upper = ms.slice(1).filter(Boolean);
+    const avgHead = upper.length
+      ? upper.reduce((a, m) => a + m.headW, 0) / upper.length : null;
+
+    const addCell = (img, label, kind, m, showDelta) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell' + (kind ? ' ' + kind : '');
+      const cv = document.createElement('canvas');
+      drawCell(cv, img, m);
+      const lb = document.createElement('div');
+      lb.className = 'lbl'; lb.textContent = label;
+      const mt = document.createElement('div');
+      mt.className = 'met';
+      mt.innerHTML = img ? metHtml(m, showDelta ? avgHead : null)
+                         : 'AWAITING\nGENERATION';
+      cell.appendChild(cv); cell.appendChild(lb); cell.appendChild(mt);
+      row.appendChild(cell);
+      allCells.push({ cv, img, m });
+    };
+
+    if (TEST_CLASSES.includes(cls))
+      addCell(newImg, 'NEW J1', newImg ? 'new' : 'pending', newImg ? measure(newImg) : null, !!newImg);
+    addCell(jobImgs[0], 'OLD J1 — ' + jobs[0].slice(2).toUpperCase(), 'old', ms[0], true);
+    for (let i = 1; i < 5; i++)
+      addCell(jobImgs[i], 'J' + (i+1) + ' ' + jobs[i].slice(2).toUpperCase(), '', ms[i], false);
+  }
+  if (tainted) document.getElementById('taintwarn').style.display = 'block';
+}
+build();
+
+document.querySelectorAll('#scalectl .ctl').forEach(b => {
+  b.addEventListener('click', () => {
+    SCALE = +b.dataset.s;
+    document.querySelectorAll('#scalectl .ctl').forEach(x => x.classList.toggle('on', x === b));
+    allCells.forEach(({ cv }) => {
+      cv.style.width = cv.width * SCALE + 'px';
+      cv.style.height = cv.height * SCALE + 'px';
+    });
+  });
+});
+</script>
+</body>
+</html>

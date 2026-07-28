@@ -18,10 +18,11 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { UI_ASSETS, type UiAssetKey } from "./uiMap";
+import { uiAsset, type ClassKey, type UiAssetKey } from "./uiMap";
 import { UI_SLICES } from "./theme";
 import { PIXELATED } from "./Baked";
 import { useResolvedScale } from "./scale";
+import { useUITheme } from "./theme-context";
 
 type HSliceKey =
   | "bar_full"
@@ -62,6 +63,7 @@ export interface FrameProps {
 }
 
 function sliceImage(
+  cls: ClassKey,
   key: string,
   w: number,
   h: number,
@@ -69,7 +71,7 @@ function sliceImage(
 ): React.ReactNode {
   return (
     <Image
-      source={UI_ASSETS[key as UiAssetKey]}
+      source={uiAsset(cls, key as UiAssetKey)}
       style={[{ width: w * s, height: h * s }, PIXELATED]}
       resizeMode="stretch"
       fadeDuration={0}
@@ -79,6 +81,7 @@ function sliceImage(
 
 export function Frame({ slice, length, scale, style, children }: FrameProps) {
   const s = useResolvedScale(scale);
+  const { classKey } = useUITheme();
   const def = UI_SLICES[slice] as unknown as SliceDef;
   const [a, b, c] = def.parts;
 
@@ -90,9 +93,9 @@ export function Frame({ slice, length, scale, style, children }: FrameProps) {
       <View
         style={[{ width: length * s, height: h * s, flexDirection: "row" }, style]}
       >
-        {sliceImage(a, capW, h, s)}
-        {sliceImage(b, midLen, h, s)}
-        {sliceImage(c, capW, h, s)}
+        {sliceImage(classKey, a, capW, h, s)}
+        {sliceImage(classKey, b, midLen, h, s)}
+        {sliceImage(classKey, c, capW, h, s)}
         {children != null && (
           <View style={StyleSheet.absoluteFill}>{children}</View>
         )}
@@ -106,9 +109,9 @@ export function Frame({ slice, length, scale, style, children }: FrameProps) {
   const midLen = Math.max(0, length - 2 * capH);
   return (
     <View style={[{ width: w * s, height: length * s }, style]}>
-      {sliceImage(a, w, capH, s)}
-      {sliceImage(b, w, midLen, s)}
-      {sliceImage(c, w, capH, s)}
+      {sliceImage(classKey, a, w, capH, s)}
+      {sliceImage(classKey, b, w, midLen, s)}
+      {sliceImage(classKey, c, w, capH, s)}
       {children != null && (
         <View style={StyleSheet.absoluteFill}>{children}</View>
       )}

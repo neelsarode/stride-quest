@@ -17,9 +17,16 @@
 //       SCENE.idleLoopCycleMs, Winded ×windedCycleMult slower, your Overdrive
 //       ×overdriveCycleMult faster, Resting = kneels (no swing). Phase-offset
 //       per member by index × idleLoopStaggerMs → a staggered wave, not unison.
-//       These carry NO damage number (fire(..., null)) — the idle DAMAGE economy
-//       is server-settled on interaction, not per-swing; the projectile flies
-//       and the boss flashes so the fight reads as alive without lying.
+//       Teammate swings carry NO number (their idle settles server-side, out of
+//       this client's view). YOUR front hero's swings float a small idle-PREVIEW
+//       number (IDLE_PREVIEW): the projected idle accrued since the last one —
+//       a client extrapolation of the server's uncollected `pending` (same math
+//       as usePendingIdle: dph × elapsed, offline-capped), advanced only when a
+//       number is actually shown and reset whenever a settle re-stamps the idle
+//       clock. It is a PREVIEW, not a settlement — the shown numbers sum to the
+//       pending the next settle applies, so nothing double-counts against boss
+//       HP (the bar still moves only when the server settles). Makes the fight
+//       read as landing without lying.
 //
 //   (B) EVENT-driven layer (over the top; the overlay treatments —
 //       banners/toasts/floating numbers — are untouched, the scene is ADDITIVE):
@@ -57,7 +64,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { CLASSES, type ClassKey } from "../../convex/gameConfig";
 import { useFeedbackEvent } from "../feedback/FeedbackProvider";
-import { SUPER_ATTACK } from "../config/assets";
+import { IDLE_PREVIEW, SUPER_ATTACK } from "../config/assets";
 import { splitSuperAttack } from "./flurryMath";
 import {
   BattleScene,
@@ -117,8 +124,12 @@ function jobFolderFor(cls: ClassKey, jobLevel: number): string {
 // query updates, by design.
 export const ConnectedBattleScene = memo(function ConnectedBattleScene({
   style,
+  onRevealed,
 }: {
   style?: StyleProp<ViewStyle>;
+  /** Forwarded to the scene's RevealGate (LoadCurtain sync, STR-94). Pass a
+   *  MODULE-STABLE callback — this component is memoized. */
+  onRevealed?: () => void;
 }) {
   const data = useQuery(api.game.dashboard, {});
   const overview = useQuery(api.guild.overview, {});
@@ -173,6 +184,62 @@ export const ConnectedBattleScene = memo(function ConnectedBattleScene({
   // One live self-rescheduling timeout per member id, so a rebuild/unmount can
   // clear exactly the right ones (a leaked timer = a double swing).
   const idleTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  // --- idle-preview projection (layer A, your hero's floating numbers) -------
+  // A client extrapolation of the server's uncollected idle `pending` (same math
+  // as usePendingIdle) so the ambient loop can float honest preview numbers.
+  // `shownPending` is how much of the projection we've already floated; each
+  // swing shows the delta since then. A settle re-stamps lastIdleCollectedAt and
+  // zeroes pending → reset shownPending so the next swing starts fresh from 0.
+  const idleProjRef = useRef<{
+    last: number;
+    dph: number;
+    cap: number;
+    serverNow: number;
+    recvAt: number;
+  } | null>(null);
+  const shownPendingRef = useRef(0);
+  const idleData = data?.idle;
+  const serverNow = data?.now;
+  useEffect(() => {
+    if (idleData && serverNow != null) {
+      idleProjRef.current = {
+        last: idleData.lastIdleCollectedAt,
+        dph: idleData.dph,
+        cap: idleData.capMs,
+        serverNow,
+        recvAt: Date.now(),
+      };
+    }
+  }, [
+    idleData?.lastIdleCollectedAt,
+    idleData?.dph,
+    idleData?.capMs,
+    serverNow,
+    idleData,
+  ]);
+  // Reset ONLY when the idle clock re-stamps (a settle), not on a dph change
+  // (fuel/Overdrive shift keeps the same accrued pending), so a rate change can
+  // never dump the whole bank into one oversized number.
+  useEffect(() => {
+    shownPendingRef.current = 0;
+  }, [idleData?.lastIdleCollectedAt]);
+
+  /** The idle-preview number to float on THIS swing (0 = a plain ambient swing).
+   *  Projects pending now, returns floor(delta since last shown) once it clears
+   *  minNibble, and advances shownPending by exactly what it returns. */
+  const takeIdleNibble = (): number => {
+    const r = idleProjRef.current;
+    if (!r) return 0;
+    const displayNow = r.serverNow + (Date.now() - r.recvAt);
+    const elapsed = Math.min(Math.max(0, displayNow - r.last), r.cap);
+    const pendingNow = (elapsed / 3_600_000) * r.dph;
+    const delta = pendingNow - shownPendingRef.current;
+    if (delta < IDLE_PREVIEW.minNibble) return 0;
+    const nibble = Math.floor(delta);
+    shownPendingRef.current += nibble;
+    return nibble;
+  };
 
   const fire = (heroId: string, kind: AttackKind, damage?: number | null) =>
     sceneRef.current?.fire(heroId, kind, damage) ?? false;
@@ -322,9 +389,12 @@ export const ConnectedBattleScene = memo(function ConnectedBattleScene({
         // Yield to YOUR Super Attack flurry (it owns the single fighter and must
         // land every number); still reschedule so ambient resumes afterward.
         if (!(m.id === meIdRef.current && flurryActiveRef.current)) {
-          // Ambient swing — NO damage number (null): the projectile flies and
-          // the boss flashes, but the idle economy is server-settled (§5.1).
-          sceneRef.current?.fire(m.id, "basic", null);
+          // YOUR front hero floats a live idle-PREVIEW number (the projected
+          // accrual since its last one); teammates + a zero projection stay
+          // numberless (null). Not a settlement — see the header. The projectile
+          // flies and the boss flashes either way.
+          const dmg = m.id === meIdRef.current ? takeIdleNibble() || null : null;
+          sceneRef.current?.fire(m.id, "basic", dmg);
         }
         timers.set(m.id, setTimeout(tick, periodFor()));
       };
@@ -356,6 +426,7 @@ export const ConnectedBattleScene = memo(function ConnectedBattleScene({
       ref={sceneRef}
       heroes={heroes}
       bossKey={bossKey}
+      onRevealed={onRevealed}
       style={style}
     />
   );

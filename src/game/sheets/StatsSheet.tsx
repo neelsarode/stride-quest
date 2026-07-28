@@ -6,7 +6,7 @@
 // =============================================================================
 import { ScrollView, View } from "react-native";
 import { DAILY_STEP_GOAL } from "../../../convex/gameConfig";
-import { Bar, Chip, PixelText, Sheet } from "../../ui";
+import { Bar, Chip, PixelText, Sheet, useUITheme } from "../../ui";
 import { UI_PALETTE } from "../../ui/theme";
 import { useGameLayout } from "../useGameLayout";
 
@@ -37,6 +37,7 @@ export function StatsSheet({
   onClose: () => void;
 }) {
   const { artScale, width, height } = useGameLayout();
+  const theme = useUITheme();
   const s = artScale;
   const barW = Math.floor((width - 24) / s); // art px, fits the sheet content well
 
@@ -55,7 +56,7 @@ export function StatsSheet({
 
         {/* Job XP */}
         <View style={{ marginTop: 8 * s, gap: 3 * s }}>
-          <PixelText text={`JOB XP - JOB ${player.jobLevel}`} color={UI_PALETTE.sky_mid} scale={s} />
+          <PixelText text={`JOB XP - JOB ${player.jobLevel}`} color={theme.accent.mid} scale={s} />
           <Bar
             variant="slim"
             width={barW}
@@ -72,12 +73,12 @@ export function StatsSheet({
 
         {/* Energy */}
         <View style={{ marginTop: 8 * s, gap: 3 * s }}>
-          <PixelText text="ENERGY - SUPER ATTACK FUEL" color={UI_PALETTE.sky_mid} scale={s} />
+          <PixelText text="ENERGY - SUPER ATTACK FUEL" color={theme.accent.mid} scale={s} />
           <Bar
             variant="slim"
             width={barW}
             value={energyFrac}
-            fill="sky"
+            fill="accent"
             label={`${meters.energy.toLocaleString()} ENERGY`}
             scale={s}
           />
@@ -88,7 +89,7 @@ export function StatsSheet({
           <StatLine label="STEPS TODAY" value={steps.today.toLocaleString()} scale={s} />
           <StatLine label="STEPS THIS WEEK" value={steps.thisWeek.toLocaleString()} scale={s} />
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <PixelText text="DAILY GOAL" color={UI_PALETTE.sky_mid} scale={s} />
+            <PixelText text="DAILY GOAL" color={theme.accent.mid} scale={s} />
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 * s }}>
               <PixelText
                 text={`${dailyGoal.steps.toLocaleString()} / ${dailyGoal.goal.toLocaleString()}`}
@@ -138,9 +139,10 @@ function StatLine({
   value: string;
   scale: number;
 }) {
+  const theme = useUITheme();
   return (
     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-      <PixelText text={label} color={UI_PALETTE.sky_mid} scale={scale} />
+      <PixelText text={label} color={theme.accent.mid} scale={scale} />
       <PixelText text={value} color={UI_PALETTE.silver_rim} scale={scale} />
     </View>
   );

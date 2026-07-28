@@ -22,8 +22,24 @@
 //     OverdriveBar strip was retired 2026-07-16, approved od-super-lab.html A)
 //   PartyRail / RightNav / Overlays / sheets/* .... STR-69 (rail + nav + sheets)
 // =============================================================================
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { ConnectedBattleScene } from "../battle/ConnectedBattleScene";
+import {
+  RevealGate,
+  UIThemeProvider,
+  UI_FONT_ATLASES,
+  prefetchUiChrome,
+  themeForClass,
+  useDevThemeOverride,
+} from "../ui";
+import {
+  markHudRevealed,
+  markSceneRevealed,
+  resetGateReveals,
+} from "../LoadCurtain";
 import { useGameEngine } from "./useGameEngine";
 import { TopBar } from "./zones/TopBar";
 import { FuelGauge } from "./zones/FuelGauge";
@@ -39,25 +55,61 @@ export function GameScreen() {
   // flag is on; the dashboard and this screen share ONE engine and can't drift.
   useGameEngine();
 
+  // Per-class UI accent (Approach 1): resolve the theme from the player's class
+  // and provide it to every zone. Reactive — a class change re-themes the HUD.
+  // (Same dashboard query the zones read; Convex dedupes it to one subscription.)
+  const data = useQuery(api.game.dashboard, {});
+  // A dev override (the DevPanel theme cycler) wins over the real class; null =
+  // honor the player's class. No-op in production (nothing sets it).
+  const devThemeOverride = useDevThemeOverride();
+  const theme = themeForClass(devThemeOverride ?? data?.player?.classKey);
+
+  // Warm this class's chrome cache so the HUD (and its modals/sheets) mount with
+  // decoded art — no progressive "types-in" paint. Re-warms on a class switch.
+  useEffect(() => {
+    prefetchUiChrome(theme.classKey);
+  }, [theme.classKey]);
+
+  // LoadCurtain sync (STR-94): clear the gate slate on (re)mount, then the two
+  // RevealGates below report in — the app curtain lifts once BOTH have.
+  useEffect(() => {
+    resetGateReveals();
+  }, []);
+
   return (
     <View style={styles.root}>
       {/* THE STAGE — the scene IS the screen (spec §6): full-bleed, edge to
           edge. A full-viewport box is exactly the battlefield-ui parity math. */}
-      <ConnectedBattleScene style={StyleSheet.absoluteFill} />
+      <ConnectedBattleScene
+        style={StyleSheet.absoluteFill}
+        onRevealed={markSceneRevealed}
+      />
 
       {/* HUD ZONES — each self-positions off useGameLayout + the GAME_ZONES
-          table, above the scene FX layer. Empty until their owning ticket fills
-          the component file. */}
-      <TopBar />
-      <FuelGauge />
-      <BossPlate />
-      <PartyRail />
-      <RightNav />
-      <CommandDock />
-      <JobStrip />
+          table, above the scene FX layer. Wrapped in the theme provider (a
+          Context, no layout node) so every zone reads the class accent, and in a
+          RevealGate so the whole HUD comes up as ONE unit over the scene — the
+          glyph/chrome <Image> loads resolve during the hold, so it never decodes
+          in letter-by-letter (the "typing" effect). */}
+      <UIThemeProvider theme={theme}>
+        <RevealGate
+          waitFor={UI_FONT_ATLASES}
+          minHold={700}
+          onRevealed={markHudRevealed}
+          style={StyleSheet.absoluteFill}
+        >
+          <TopBar />
+          <FuelGauge />
+          <BossPlate />
+          <PartyRail />
+          <RightNav />
+          <CommandDock />
+          <JobStrip />
 
-      {/* Overlay host — sheets / popovers / help modal, stacked above all zones. */}
-      <Overlays />
+          {/* Overlay host — sheets / popovers / help modal, above all zones. */}
+          <Overlays />
+        </RevealGate>
+      </UIThemeProvider>
     </View>
   );
 }

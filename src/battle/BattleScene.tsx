@@ -61,18 +61,45 @@ import {
   type FighterMode,
   type ReleaseEvent,
 } from "./Fighter";
-import { SCENE, type ClassName } from "./fxConfig";
+import { SCENE, jobRenderScale, type ClassName } from "./fxConfig";
 import { computeShotGeometry, Projectile, type Rect } from "./Projectile";
 import { RestZzz } from "./RestZzz";
-import type { SpriteKey } from "./spriteMap";
+import { SPRITES, type SpriteKey } from "./spriteMap";
 import manifestJson from "./sprites/manifest.json";
+import { RevealGate } from "../ui/RevealGate";
 
 const MANIFEST = manifestJson as Record<
   SpriteKey,
   { frames: number; w: number; h: number; file: string }
 >;
 
-const BACKGROUND = require("../../assets/backgrounds/battlefield_beach.png");
+const BACKGROUND = require("../../assets/backgrounds/battlefield_ruins.png");
+
+// Concentric ellipses that fade outward → a cheap soft "blur" for the ground
+// shadow (RN has no CSS blur off web, and boxShadow/filter don't render reliably
+// on iOS here). Overlapping translucent black layers build a darker core that
+// fades to nothing at the edges. Filled into the styles.shadow footprint.
+const SHADOW_LAYERS = (
+  [
+    [0, 0.1],
+    [10, 0.12],
+    [20, 0.15],
+    [30, 0.18],
+    [40, 0.2],
+  ] as const
+).map(([n, opacity]) => {
+  const inset = `${n}%` as const;
+  return {
+    position: "absolute" as const,
+    top: inset,
+    left: inset,
+    right: inset,
+    bottom: inset,
+    borderRadius: 999,
+    backgroundColor: "#000",
+    opacity,
+  };
+});
 
 /** One party member as the scene needs it. */
 export interface SceneHero {
@@ -91,6 +118,8 @@ export interface BattleSceneProps {
   /** Run the preview's timer choreography (STR-21 parity mode). Default off —
    *  the real app drives attacks from game events via the ref handle. */
   autoPlay?: boolean;
+  /** Fires once when the scene's RevealGate reveals (LoadCurtain sync, STR-94). */
+  onRevealed?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -149,6 +178,9 @@ export function computeSceneLayout(
 
   // sizeBoss() port: the boss's VISIBLE top (its box top + topPad·height) must
   // reach the top party member's head (their box top + heroTopPad·height).
+  // Deliberately uses the UNSCALED heroPx (this fn doesn't know jobs): with an
+  // all-job-1 party (STR-91 shrink) the boss sizes as if they were full height
+  // — slightly conservative, never wrong.
   const bossBottomY = h * (1 - SCENE.bossBottomPct);
   let bossH = bossMin;
   if (heroCount > 0) {
@@ -190,6 +222,21 @@ function firedAnimKey(e: ReleaseEvent): SpriteKey {
   return `${e.cls}/${e.job}/${name}` as SpriteKey;
 }
 
+/**
+ * Wrapper geometry for one hero at the STR-91 per-job scale. Fighter scales
+ * from LEFT-BOTTOM, so a shrunken box would slide the character backwards out
+ * of formation — `leftShift` re-centers it where the full-size sprite's
+ * bottom-CENTER anchor stood. Used identically by the render wrapper, the
+ * shot-geometry shooter rect, and the RestZzz overlay so they never drift.
+ */
+function heroBox(cls: ClassName, job: string, baseHeroPx: number) {
+  const idle = MANIFEST[`${cls}/${job}/idle` as SpriteKey];
+  const aspect = idle.w / idle.h;
+  const heroPx = baseHeroPx * jobRenderScale(job);
+  const wrapW = heroPx * aspect;
+  return { heroPx, wrapW, leftShift: (baseHeroPx * aspect - wrapW) / 2 };
+}
+
 interface Shot {
   id: number;
   cls: ClassName;
@@ -209,7 +256,7 @@ interface Shot {
 // heroes array per render; memo is simply a no-op there.)
 export const BattleScene = memo(
   forwardRef<BattleSceneHandle, BattleSceneProps>(function BattleScene(
-    { heroes, bossKey = "horse_256", autoPlay = false, style },
+    { heroes, bossKey = "horse_256", autoPlay = false, onRevealed, style },
     ref,
   ) {
     const [stage, setStage] = useState<{ w: number; h: number } | null>(null);
@@ -293,15 +340,19 @@ export const BattleScene = memo(
         return;
       }
       const entry = MANIFEST[firedAnimKey(e)];
-      const scale = l.heroPx / entry.h;
+      // STR-91: job-1 fighters render smaller — the shot geometry must use the
+      // SAME scaled box as the Fighter (height AND re-centered left), or
+      // projectiles spawn off the weapon.
+      const { heroPx, leftShift } = heroBox(e.cls, e.job, l.heroPx);
+      const scale = heroPx / entry.h;
       // The rendered frame box: bottom-left pinned at (left, bottom), height
-      // exactly heroPx (Fighter displayHeight) — the rect the anchor fractions
+      // exactly the Fighter's displayHeight — the rect the anchor fractions
       // apply to, identical to the HTML's img getBoundingClientRect().
       const shooter: Rect = {
-        x: pos.left,
-        y: l.stageH - pos.bottom - l.heroPx,
+        x: pos.left + leftShift,
+        y: l.stageH - pos.bottom - heroPx,
         width: entry.w * scale,
-        height: l.heroPx,
+        height: heroPx,
       };
       const bossRect: Rect = {
         x: l.bossLeft,
@@ -400,6 +451,26 @@ export const BattleScene = memo(
     );
     useImperativeHandle(ref, () => ({ fire: orderAttack }), [orderAttack]);
 
+    // --- fade-in from black (STR-94): gate the WHOLE scene behind its own
+    // asset probes so it never renders in piecemeal (bg, then boss, then
+    // heroes "typing in" as each strip decodes). The stage is black; fading
+    // the children in as one unit IS the fade-from-black. Probes cover what's
+    // visible at t=0 (bg + boss idle + every hero's idle strip) — attack/
+    // special strips keep prefetching in the background and are only needed
+    // seconds later. `ready` blocks an EMPTY roster (Connected mounts with []
+    // until the first snapshot); maxWait still guarantees a reveal.
+    const rosterSig = heroes.map((h) => `${h.cls}/${h.job}`).join(",");
+    const sceneAssets = useMemo(() => {
+      const list = [BACKGROUND, SPRITES[`bosses/${bossKey}/idle` as SpriteKey]];
+      for (const h of heroes) {
+        const strip = SPRITES[`${h.cls}/${h.job}/idle` as SpriteKey];
+        if (strip != null) list.push(strip);
+      }
+      return list;
+      // rosterSig captures exactly the strip-relevant identity of `heroes`.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rosterSig, bossKey]);
+
     // --- idle choreography (timer parity: CYCLE/STAGGER/SPECIAL_EVERY) ------
     useEffect(() => {
       if (!autoPlay) return;
@@ -427,6 +498,15 @@ export const BattleScene = memo(
 
     return (
       <View style={[styles.stage, style]} onLayout={onStageLayout} testID="battle-scene">
+        <RevealGate
+          waitFor={sceneAssets}
+          ready={heroes.length > 0}
+          minHold={350}
+          maxWait={4000}
+          duration={320}
+          onRevealed={onRevealed}
+          style={StyleSheet.absoluteFill}
+        >
         <Image
           source={BACKGROUND}
           style={styles.bg}
@@ -451,8 +531,15 @@ export const BattleScene = memo(
             />
             {heroes.map((hero, i) => {
               const pos = layout.heroes[i];
-              const idleEntry = MANIFEST[`${hero.cls}/${hero.job}/idle` as SpriteKey];
-              const wrapW = layout.heroPx * (idleEntry.w / idleEntry.h);
+              // STR-91: job-1s draw at SCENE.job1Scale — feet stay on the
+              // formation line (bottom anchor) and leftShift keeps them
+              // CENTERED where the full-size sprite stood (Fighter scales
+              // from left-bottom, which would otherwise slide them back).
+              const { heroPx, wrapW, leftShift } = heroBox(
+                hero.cls,
+                hero.job,
+                layout.heroPx,
+              );
               return (
                 <Pressable
                   key={hero.id}
@@ -468,14 +555,18 @@ export const BattleScene = memo(
                   }
                   style={{
                     position: "absolute",
-                    left: pos.left,
+                    left: pos.left + leftShift,
                     bottom: pos.bottom,
                     width: wrapW,
-                    height: layout.heroPx,
+                    height: heroPx,
                     zIndex: pos.z,
                   }}
                 >
-                  <View style={styles.shadow} />
+                  <View style={styles.shadow} pointerEvents="none">
+                    {SHADOW_LAYERS.map((s, li) => (
+                      <View key={li} style={s} />
+                    ))}
+                  </View>
                   <Fighter
                     ref={(h) => {
                       fighters.current[i] = h;
@@ -484,7 +575,7 @@ export const BattleScene = memo(
                     }}
                     cls={hero.cls}
                     job={hero.job}
-                    displayHeight={layout.heroPx}
+                    displayHeight={heroPx}
                     onRelease={(e) => handleRelease(i, e)}
                     onModeChange={(m) => handleModeChange(hero.id, m)}
                     style={styles.fighter}
@@ -498,13 +589,18 @@ export const BattleScene = memo(
               if (!restingIds.has(hero.id)) return null;
               const pos = layout.heroes[i];
               if (!pos) return null;
+              const { heroPx, leftShift } = heroBox(
+                hero.cls,
+                hero.job,
+                layout.heroPx,
+              );
               return (
                 <RestZzz
                   key={`zzz-${hero.id}`}
-                  left={pos.left}
-                  top={layout.stageH - pos.bottom - layout.heroPx}
-                  width={layout.heroPx}
-                  height={layout.heroPx}
+                  left={pos.left + leftShift}
+                  top={layout.stageH - pos.bottom - heroPx}
+                  width={heroPx}
+                  height={heroPx}
                 />
               );
             })}
@@ -524,6 +620,7 @@ export const BattleScene = memo(
             ))}
           </>
         )}
+        </RevealGate>
       </View>
     );
   }),
@@ -548,18 +645,18 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  // .hero .shadow parity: ellipse at 66% width centered, 4px above the feet.
-  // blur(5px) is web-only (adaptation #4); native gets the crisp ellipse.
+  // Soft ground shadow footprint, centred under the character's FEET — bottom is
+  // a PERCENTAGE (not px) because the sprite frame carries ~27% transparent
+  // padding below the feet; a fixed offset dropped the shadow far below the
+  // character (into the lower grass), which is why it read as a detached bar.
+  // The % scales with each hero's size, so front (big) and back (small) rows
+  // both land at the feet. Filled by SHADOW_LAYERS for a soft edge.
   shadow: {
     position: "absolute",
-    left: "17%",
-    bottom: 4,
-    width: "66%",
-    height: 15,
-    borderRadius: 999,
-    backgroundColor: "#000",
-    opacity: 0.65,
-    ...(Platform.OS === "web" ? ({ filter: "blur(5px)" } as object) : null),
+    left: "26%",
+    bottom: "27%",
+    width: "48%",
+    height: 14,
   },
   // Native frame box pinned bottom-left of the wrapper; the displayHeight
   // scale (origin left-bottom) grows it to fill the wrapper exactly.

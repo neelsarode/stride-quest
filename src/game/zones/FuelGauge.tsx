@@ -62,7 +62,7 @@ export function FuelGauge() {
       <UIScaleProvider value={artScale}>
         <View style={styles.row}>
           <PixelText text="FUEL" color={LABEL_COLOR} />
-          <Bar variant="slim" width={FUEL_BAR_ART_W} value={value} fill="sky" label={barLabel} />
+          <Bar variant="slim" width={FUEL_BAR_ART_W} value={value} fill="accent" label={barLabel} />
           {/* State chip — custom small pill (no baked state-chip asset; the kit
               Chip is only green/red/gold and resting must never read red). */}
           <View style={[styles.stateChip, { borderColor: stateColor }]}>

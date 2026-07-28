@@ -17,10 +17,11 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
-import { UI_ASSETS } from "./uiMap";
+import { uiAsset } from "./uiMap";
 import { UI_SLICES } from "./theme";
 import { PIXELATED } from "./Baked";
 import { useResolvedScale } from "./scale";
+import { useUITheme } from "./theme-context";
 
 const RING = UI_SLICES.steps_ring; // { frames:33, frameW:30, frameH:30 }
 const SWEEP_MS = 420;
@@ -35,6 +36,7 @@ export interface RingProps {
 
 export function Ring({ value = 0, progress, scale, style }: RingProps) {
   const s = useResolvedScale(scale);
+  const { classKey } = useUITheme(); // ring track = the class well (varies per kit)
   const own = useSharedValue(Math.max(0, Math.min(1, value)));
   const frac = progress ?? own;
   const { frames, frameW, frameH } = RING;
@@ -61,7 +63,7 @@ export function Ring({ value = 0, progress, scale, style }: RingProps) {
       ]}
     >
       <Animated.Image
-        source={UI_ASSETS.steps_ring}
+        source={uiAsset(classKey, "steps_ring")}
         style={[
           { width: frames * frameW * s, height: frameH * s },
           PIXELATED,

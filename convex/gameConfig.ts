@@ -29,12 +29,23 @@ export const OFFLINE_CAP_HOURS = 10;
 export const ENERGY_PER_STEP = 1; // TUNABLE start
 export const XP_PER_STEP = 1; // TUNABLE start (Job XP == weekly steps while = 1)
 
-/** Deploy: how much boss damage one Energy buys. */
-export const DAMAGE_PER_ENERGY = 1; // TUNABLE start
+// DAMAGE SCALE (feel, not balance): the whole DAMAGE space is scaled by a single
+// uniform factor so on-screen numbers read big (idle hits in the tens, not "1").
+// Because BOTH damage-in (DAMAGE_PER_ENERGY, BASE_IDLE_DPH) AND boss HP
+// (BOSS.baseHP/placeholderMaxHP) carry the SAME factor, and every combat
+// multiplier (crit/streak/Overdrive/job/tier + bonus-tier fractions) is a pure
+// ratio, steps-to-kill-the-boss is invariant — pacing/balance is unchanged. To
+// re-scale, move these FOUR values together by the same factor. Energy stays in
+// step space (ENERGY_PER_STEP = 1), so the energy bank number and users.energySpent
+// are untouched. (Was 1 / 150 / 300k / 100k at DAMAGE_SCALE 1.)
+
+/** Deploy: how much boss damage one Energy buys. (DAMAGE space — see above.) */
+export const DAMAGE_PER_ENERGY = 50; // TUNABLE — moves with BASE_IDLE_DPH + BOSS.baseHP
 
 /** Idle combat: base damage-per-hour at Job 1 (×1). Scales by the job multiplier.
- *  Chosen so idle feels present but the deploy still clearly matters most. */
-export const BASE_IDLE_DPH = 150; // TUNABLE start
+ *  Chosen so idle feels present but the deploy still clearly matters most.
+ *  (DAMAGE space — moves with DAMAGE_PER_ENERGY + BOSS.baseHP.) */
+export const BASE_IDLE_DPH = 7500; // TUNABLE
 /** Offline idle accrues up to this many hours, then pauses. */
 export const OFFLINE_CAP_MS = OFFLINE_CAP_HOURS * 60 * 60 * 1000;
 
@@ -144,9 +155,9 @@ export const BOSS = {
   // (spec §6): all-day Overdrive ×2 + Overdrive-on-Super roughly doubles engaged
   // per-member output, so the boss HP rises to hold the ~day-5 kill. Bonus tiers
   // auto-scale (they're fractions of bossMaxHP). — TUNABLE start
-  baseHP: 300_000,
-  tierScaling: 1.4, // each kill-spawn is 40% tougher — TUNABLE start
-  placeholderMaxHP: 100_000, // fallback only
+  baseHP: 15_000_000, // DAMAGE space — moves with DAMAGE_PER_ENERGY + BASE_IDLE_DPH
+  tierScaling: 1.4, // each kill-spawn is 40% tougher — TUNABLE start (RATIO, unscaled)
+  placeholderMaxHP: 5_000_000, // fallback only (DAMAGE space)
 } as const;
 
 // ============================================================================
