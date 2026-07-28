@@ -19,6 +19,14 @@ export const FX = {
   restFps: 5, // 6-frame kneel loop → ~1.2s breath (fx-engine parity)
   projFps: 12,
   impactFps: 14,
+  // One-shot swings HOLD their final frame this long before onDone (STR-92).
+  // Time-based playback gives the finale exactly one 83ms tick — and under
+  // jank withTiming SKIPS trailing frames — so without a hold, 17-frame
+  // specials read as "cut off". Deliberately SMALL: user testing rejected a
+  // 120ms hold ("pause then teleport") AND an opacity crossfade (breaks the
+  // pixel aesthetic) — the swing ends with the HTML preview's hard cut to
+  // idle frame 0, this hold only guarantees the climax frame actually lands.
+  lastFrameHoldMs: 40,
 
   // --- projectile flight ---
   speedPxMs: 1.5, // constant px/ms; duration clamped to [flightMinMs, flightMaxMs]
